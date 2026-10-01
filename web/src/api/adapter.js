@@ -303,7 +303,9 @@ export function variantsFromSpec(payload, ctx) {
       // Индекс при максимальной длительности сбоя сервер не присылает — оцениваем по приросту опоздания.
       worstIndex: Math.max(0, index.value - robustExtra * 0.5),
       robustExtraMin: k.robust_total_delay_s != null ? robustExtra : null,
-      conflicts: k.conflicts ?? 0,
+      // kpi.conflicts у сервера в MVP — вынужденные остановки (CLAUDE.md, «Индекс: conflicts»), а не конфликты:
+      // план решателя без пересечений по построению. Остановки идут отдельным полем unplannedStops.
+      conflicts: 0,
       weightedDelayMin: (k.weighted_delay_s ?? 0) / 60,
       passengerDelayMin: trains.filter((t) => t.category !== 'freight' && t.category !== 'freightFast').reduce((s, t) => s + destDelayMin(plan, baseline, t.id), 0),
       impacts: prev ? impactsOf(prev, plan, baseline, trains) : [],
@@ -334,7 +336,7 @@ export function whatIfFromSpec(r, ctx) {
     trains: ctx.trains,
     index: indexFromSpec(r.plan.index),
     deltaIndex: r.delta_index,
-    conflicts: r.plan.kpi?.conflicts ?? 0,
+    conflicts: 0, // kpi.conflicts — вынужденные остановки, см. variantsFromSpec
     affected: r.per_train.map((x) => ({ trainId: x.train_id, number: x.train_id, deltaMin: x.arr_delta_s / 60, delayMin: x.final_delay_s / 60 })),
     changedMeetings: (r.changed_meetings ?? []).map((m) => ({ ...m, time: toUi(m.time) })),
     explanation: r.explanation ?? [],
