@@ -28,6 +28,12 @@ docker compose up --build -d      # или: make up
 все backend-сервисы запускаются из одного образа (`Dockerfile`) с разными командами
 `python -m app.<service>.main`. Остановка — `make down`, логи — `make logs`.
 
+### Домен и HTTPS
+
+Для публикации на домене с TLS есть хостовый конфиг nginx:
+`deploy/nginx/autodispatcher.conf` (TLS → `web`-контейнер `127.0.0.1:8080`, сертификаты
+подключаются через `snippets/`). Инструкция — `deploy/nginx/README.md`.
+
 ## Демо (MVP.md §6)
 
 1. Открыть http://localhost:8000: поезда едут, поездограмма рисует факт и план, индекс в «Норме».
