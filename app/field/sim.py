@@ -24,7 +24,10 @@ from app.railcore.running_time import RunningTimes
 
 log = logging.getLogger("field")
 SUBSTEP_S = 1.0
-STALL_OVERRIDE_S = 600.0  # nothing moved this long -> the DC lets a physically possible move go out of plan order
+STALL_OVERRIDE_S = 600.0
+STARVE_OVERRIDE_S = 900.0  # one train held only by a stale plan order this long -> let it go if safe
+VISIBLE_AHEAD_S = 3 * 3600
+VISIBLE_BEHIND_S = 3 * 3600  # nothing moved this long -> the DC lets a physically possible move go out of plan order
 
 
 @dataclass
@@ -41,6 +44,8 @@ class SimTrain:
     delay_s: float = 0.0
     speed_kmh: float = 0.0
     track_id: str | None = None
+    finished_at: float | None = None
+    order_blocked_since: float | None = None  # ready to go, held only by the plan's order
     done_segments: set[str] = field(default_factory=set)
 
 
@@ -61,6 +66,7 @@ class FieldSim:
         self._violating: set[str] = set()
         self._last_progress = 0.0
         self.plan_overrides = 0
+        self._guard_events: list[dict] = []
 
     # ---- plan -------------------------------------------------------------------------------
     def set_plan(self, plan: Plan) -> None:
@@ -130,6 +136,8 @@ class FieldSim:
                 if ev:
                     events.append(("field.train_event", {**ev, "train_id": tr.train.id, "time": self.now}))
             self._safety(events)
+            events += [("field.guard", g) for g in self._guard_events]
+            self._guard_events.clear()
         return events
 
     def _cat(self, tr: SimTrain):
@@ -175,7 +183,7 @@ class FieldSim:
         if k == last:
             if t >= tr.arrived_at + self.settings["station"]["leave_after_arr_s"]:
                 self._last_progress = t
-                tr.loc = "done"
+                tr.loc, tr.finished_at = "done", t
                 return {"kind": "finished", "station_id": st_id}
             return None
         seg = self._seg(tr, k)
@@ -200,13 +208,26 @@ class FieldSim:
         nxt = tr.route[k + 1]
         if self._occupancy(nxt, tid) >= self.world.capacity(nxt) or not self._direction_ok(tr, nxt):
             return None
-        if t < dep_plan or not (self._segment_turn(tr, seg.id) and self._my_turn_at(tr, nxt)):
-            # waiting for the plan's time and order is right, unless the whole field has stopped: then the
-            # plan no longer matches reality and the DC lets a physically safe move through
-            if self.stalled_s < STALL_OVERRIDE_S or not self._safe_out_of_order(tr, nxt):
+        order_ok = self._segment_turn(tr, seg.id) and self._my_turn_at(tr, nxt)
+        if t >= dep_plan and not order_ok:
+            tr.order_blocked_since = tr.order_blocked_since or t
+        else:
+            tr.order_blocked_since = None
+        if t < dep_plan or not order_ok:
+            # waiting for the plan's time and order is right — unless the whole field has stopped, or this
+            # train has been held only by the plan's order for long: then the plan no longer matches reality
+            # and the DC lets a physically safe move through (counted: it must not hide planning bugs)
+            starving = tr.order_blocked_since is not None and t - tr.order_blocked_since >= STARVE_OVERRIDE_S
+            if (self.stalled_s < STALL_OVERRIDE_S and not starving) or not self._safe_out_of_order(tr, nxt):
                 return None
             self.plan_overrides += 1
-            log.warning("field stalled %.0f s: %s leaves %s out of plan", self.stalled_s, tid, st_id)
+            held = t - (tr.order_blocked_since or t)
+            log.warning("deadlock guard: %s leaves %s out of plan (field stalled %.0f s, held %.0f s)", tid, st_id,
+                        self.stalled_s, held)
+            self._guard_events.append({"train_id": tid, "station_id": st_id, "time": t,
+                                       "reason": "stalled" if self.stalled_s >= STALL_OVERRIDE_S else "starving",
+                                       "stalled_s": round(self.stalled_s), "held_s": round(held)})
+        tr.order_blocked_since = None
         self._last_progress = t
         rt = self.rts.get(cat.id, seg.id, tr.train.direction, tr.train.v_max_override_kmh)
         if tr.stopped:
@@ -231,7 +252,11 @@ class FieldSim:
         run = self._run.get((tid, seg.id))
         rate = 1.0 / rt.t_pp
         if run is not None:
-            rate = min((1.0 - tr.progress) / max(run.end - t, 1.0), rate)
+            # follow the plan's arrival time, but never crawl slower than the model allows (1.3x the running
+            # time + the cost of a stop): a stale plan must not leave a train creeping along the line for hours;
+            # if it arrives early it waits at the station, whose track was reserved when it left
+            slowest = 1.0 / (1.3 * (rt.t_pp + rt.sup_start + rt.sup_end) + rt.sup_start + rt.sup_end)
+            rate = min(max((1.0 - tr.progress) / max(run.end - t, 1.0), slowest), rate)
         new_p = min(tr.progress + rate * h, cap)
         if new_p > tr.progress:
             self._last_progress = t
@@ -426,11 +451,20 @@ class FieldSim:
                           speed_kmh=round(tr.speed_kmh, 1), regime=regime,
                           next_station_id=tr.route[tr.idx + 1], on_field=True)
 
+    def _visible(self, tr: SimTrain) -> bool:
+        """Continuous traffic (§9.3): publish trains on the line, the next ones (departing within the ГИД
+        window, 3 h) and those finished within the last 3 h — not the whole 48-hour timetable."""
+        if tr.loc in ("station", "segment"):
+            return True
+        if tr.loc == "none":
+            return tr.train.stops[0].dep <= self.now + VISIBLE_AHEAD_S
+        return tr.finished_at is not None and tr.finished_at >= self.now - VISIBLE_BEHIND_S
+
     def snapshot(self) -> dict:
         occupied = sorted({self._seg(tr, tr.idx).id for tr in self.trains.values() if tr.loc == "segment"})
         return {
             "sim_time": self.now,
-            "trains": [self._train_state(tr).model_dump(mode="json") for tr in self.trains.values()],
+            "trains": [self._train_state(tr).model_dump(mode="json") for tr in self.trains.values() if self._visible(tr)],
             "incidents": [fi.incident.model_dump(mode="json") for fi in self.active()],
             "closed_segments": sorted({fi.incident.segment_id for fi in self.active()
                                        if fi.incident.type in CLOSING_TYPES}),

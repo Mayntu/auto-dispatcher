@@ -46,6 +46,29 @@ def assert_conflict_free(plan: Plan) -> None:
         assert peak <= WORLD.capacity(st), f"station {st} over capacity"
 
 
+def due_trains_finished(sim: FieldSim, slack_s: float = 2 * 3600) -> list[str]:
+    """Continuous timetable: every train scheduled to arrive at least `slack_s` ago must have arrived.
+    Returns the ones that have not (empty = fine)."""
+    due = [t for t in sim.trains.values() if t.train.stops[-1].arr <= sim.now - slack_s]
+    assert due, "nothing was due yet — run longer"
+    return [t.train.id for t in due if t.loc != "done"]
+
+
+def service_tick(sim: FieldSim, plan: Plan) -> Plan:
+    """What the planner service does every tick: refresh on lag or when trains enter the horizon, re-plan
+    with CP-SAT when the plan no longer fits (forecast fails or the field stopped)."""
+    fc = forecast_plan(snapshot(sim, plan), SETTINGS)
+    lag = max((t["delay_s"] for t in sim.snapshot()["trains"] if t["on_field"]), default=0)
+    if fc is None or sim.stalled_s >= 3 * SETTINGS["planner"]["replan_deviation_s"]:
+        new = Plan.model_validate(solve_job(snapshot(sim, plan).model_dump(mode="json"), "balanced", SETTINGS)["plan"])
+    elif lag > SETTINGS["planner"]["replan_deviation_s"] or ({e.train_id for e in fc.entries} - {e.train_id for e in plan.entries}):
+        new = fc
+    else:
+        return plan
+    sim.set_plan(new)
+    return new
+
+
 def new_sim() -> FieldSim:
     return FieldSim(WORLD, RunningTimes(WORLD), SETTINGS)
 
@@ -109,10 +132,11 @@ def test_headless_run_with_obstacle_is_safe_and_completes():
     new_plan = Plan.model_validate(res["plan"])
     new_plan.version = 2
     sim.set_plan(new_plan)
-    while sim.now < 8 * 3600 and not all(t.loc == "done" for t in sim.trains.values()):
+    while sim.now < 8 * 3600:
         sim.step(60)
+        new_plan = service_tick(sim, new_plan)
     assert sim.safety_violations == 0
-    assert all(t.loc == "done" for t in sim.trains.values())
+    assert due_trains_finished(sim) == []
 
 
 def test_forecast_matches_plan_in_normal_operation():
@@ -163,14 +187,11 @@ def test_segment_closure_then_reapply_does_not_deadlock():
     while sim.active():
         sim.step(60)
     plan = apply_best(plan)
-    while sim.now < 30000 and not all(t.loc == "done" for t in sim.trains.values()):
+    while sim.now < 7 * 3600:
         sim.step(60)
-        fc = forecast_plan(snapshot(sim, plan), SETTINGS)
-        if fc is not None and max((t["delay_s"] for t in sim.snapshot()["trains"] if t["on_field"]), default=0) > 120:
-            plan = fc
-            sim.set_plan(plan)
+        plan = service_tick(sim, plan)
     assert sim.safety_violations == 0
-    assert all(t.loc == "done" for t in sim.trains.values())
+    assert due_trains_finished(sim) == []
 
 
 def test_eco_profile_hits_target_and_saves_energy():

@@ -142,7 +142,10 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
             if kind == "mid":
                 node.dwell_min = max(s.min_dwell_s, cat.min_dwell_s) if s.stop else t_pass
                 node.stop_fixed = s.stop
-                if s.stop and cat.id != "freight" and node.sched_dep is not None:
+                # never leave a stop before the timetable — passenger stops and the technical stops the
+                # normative timetable keeps for crossings alike: leaving a crossing stop early takes the
+                # segment from a train that is still beyond the planning horizon
+                if s.stop and node.sched_dep is not None:
                     node.dep_min = max(0, node.sched_dep)
             elif kind == "origin":
                 node.stop_fixed = True

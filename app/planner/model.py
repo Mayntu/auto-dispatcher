@@ -20,7 +20,12 @@ EPS_FINAL = 0.01
 
 
 def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: float,
-                lambda_stop_mult: float = 1.0, time_limit_s: float | None = None) -> tuple[Solution | None, str, int]:
+                lambda_stop_mult: float = 1.0, time_limit_s: float | None = None,
+                fix: Solution | None = None, keep_order: list[PlanEntry] | None = None
+                ) -> tuple[Solution | None, str, int]:
+    """`fix` pins some trains to given (arr, dep, stop) — used to stitch timetable windows together.
+    `keep_order`: the approved plan — trains already in it keep their order on every segment, only trains
+    new to the horizon are placed freely (extending the plan does not change the dispatcher's decision)."""
     p = settings["planner"]
     clear = p["segment_clear_s"]
     m = cp_model.CpModel()
@@ -32,6 +37,7 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
         warm = {}
     ub = max([p["horizon_s"] + 7200] + [d + 1800 for times in warm.values() for _, d, _ in times])
     seg_intervals: dict[str, list] = {}
+    seg_users: dict[str, list[tuple[str, object, object]]] = {}  # segment -> (train, dep expr, arr expr)
     station_intervals: dict[str, list] = {}
     station_dir_intervals: dict[tuple[str, str], list] = {}
     objective = []
@@ -68,6 +74,12 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
                 late = m.NewIntVar(0, ub, f"late_{tid}_{i}")
                 m.Add(late >= a - n.sched_arr)
                 objective.append(round(t.weight * SCALE) * late)
+            if fix and tid in fix:
+                fa, fd, fs = fix[tid][i]
+                m.Add(a == fa)
+                m.Add(d == fd)
+                if not n.stop_fixed:
+                    m.Add(s == int(fs))
             if tid in warm:
                 wa, wd, ws = warm[tid][i]
                 m.AddHint(a, wa)
@@ -85,6 +97,7 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
             m.Add(end == arr[0] + clear)
             size = m.NewIntVar(0, ub + clear, f"cs_{tid}")
             seg_intervals.setdefault(t.current.segment_id, []).append(m.NewIntervalVar(0, size, end, f"cb_{tid}"))
+            seg_users.setdefault(t.current.segment_id, []).append((tid, 0, arr[0]))
         for i, leg in enumerate(t.legs):
             run = arr[i + 1] - dep[i]
             m.Add(run >= leg.t_pp + leg.sup_start * stop[i] + leg.sup_end * stop[i + 1])
@@ -93,10 +106,17 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
             m.Add(end == arr[i + 1] + clear)
             size = m.NewIntVar(0, ub + clear, f"bs_{tid}_{i}")
             seg_intervals.setdefault(leg.segment_id, []).append(m.NewIntervalVar(dep[i], size, end, f"b_{tid}_{i}"))
+            seg_users.setdefault(leg.segment_id, []).append((tid, dep[i], arr[i + 1]))
         vars_by_train[tid] = list(zip(arr, dep, stop))
 
     for ivs in seg_intervals.values():
         m.AddNoOverlap(ivs)
+    if keep_order:
+        start = {(e.train_id, e.segment_id): e.start for e in keep_order if e.kind == "run"}
+        for seg, users in seg_users.items():
+            kept = sorted((u for u in users if (u[0], seg) in start), key=lambda u: start[(u[0], seg)])
+            for (_, _, arr_a), (_, dep_b, _) in zip(kept, kept[1:]):
+                m.Add(dep_b >= arr_a + clear)
     world = get_world()
     for st_id, ivs in station_intervals.items():
         m.AddCumulative(ivs, [1] * len(ivs), world.capacity(st_id))

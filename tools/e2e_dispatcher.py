@@ -129,6 +129,7 @@ async def wait_variants(c: httpx.AsyncClient, after_version: int | None, inciden
 
 
 STALE_SEEN: set = set()
+SCHED_ARR: dict = {}
 
 
 async def apply(c: httpx.AsyncClient, mon: Monitor, v: dict, label: str, check_promise: bool) -> dict | None:
@@ -168,7 +169,9 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     R.check((await c.get("/health")).status_code == 200, "health")
     R.check((await c.get("/docs")).status_code == 200, "Swagger /docs")
     infra = (await c.get("/api/infra")).json()
-    R.check(len(infra["timetable"]) == 10 and len(infra["infra"]["stations"]) == 6, "infra: 6 пунктов, 10 поездов")
+    R.check(len(infra["timetable"]) >= 100 and len(infra["infra"]["stations"]) == 6,
+            f"infra: 6 пунктов, непрерывное движение — {len(infra['timetable'])} поездов на 48 ч")
+    SCHED_ARR.update({t["id"]: t["stops"][-1]["arr"] for t in infra["timetable"]})
     plan = (await c.get("/api/plan")).json()
     R.check(plan["solver"] in ("cpsat", "refresh") and plan["index"]["value"] >= 95, f"план v{plan['version']}, индекс {plan['index']['value']}")
     await c.post("/api/sim/clock", json={"speed": speed, "paused": False})
@@ -195,7 +198,8 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     r = await c.post("/api/whatif", json={"modifications": [{"kind": "train_speed", "target_id": "2003", "value": 60}]})
     R.check(r.status_code == 200 and time.time() - t0 <= 3.5, f"what-if 2003→60 км/ч: {r.status_code}, {time.time() - t0:.1f} с, Δ {r.json().get('delta_index')}")
     R.check((await c.get("/api/plan")).json()["version"] == plan["version"], "what-if не меняет действующий план")
-    codes = [(await c.get(f"/api/ato/{t['id']}")).status_code for t in infra["timetable"]]
+    visible = [t["train_id"] for t in mon.state["field"]["trains"]]
+    codes = [(await c.get(f"/api/ato/{tid}")).status_code for tid in visible]
     R.check(all(code in (200, 404) for code in codes), f"ATO по всем поездам: {codes}")
 
     print("\n# 3. скот на перегоне — применяем лучший сразу")
@@ -303,8 +307,8 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     if vs:
         await apply(c, mon, max(vs, key=lambda v: v["plan"]["index"]["value"]), "пересчёт/лучший", check_promise=True)
 
-    print("\n# 8. доводим день до конца")
-    while any(t["status"] != "finished" for t in mon.state["field"]["trains"]) and mon.now < 40000 and not mon.stall:
+    print("\n# 8. движение продолжается: доводим до 15:30 по часам симуляции")
+    while mon.now < 7.5 * 3600 and not mon.stall:
         for v in (await c.get("/api/variants")).json():
             if v["status"] == "proposed":  # nobody at the desk: decline, so the line goes back to ×60
                 await c.post(f"/api/plan/variants/{v['id']}/reject")
@@ -333,11 +337,13 @@ async def main() -> None:
             mt.cancel()
             wt.cancel()
         f = mon.state["field"]
+        due_stuck = [t["train_id"] for t in f["trains"]
+                     if t["status"] != "finished" and SCHED_ARR.get(t["train_id"], 1e9) <= f["sim_time"] - 2 * 3600]
         print("\n# итог")
         R.check(mon.max_viol == 0, f"нарушений безопасности: {mon.max_viol}")
         R.check(not mon.stall, "нет остановки движения (блокировки) без сбоев")
-        fin = sum(t["status"] == "finished" for t in f["trains"])
-        R.check(fin == 10, f"все поезда доехали: {fin}/10 к {f['sim_time'] / 3600 + 7 + 55 / 60:.1f} ч")
+        R.check(not due_stuck, f"все поезда, которым по графику пора было прибыть (2+ ч назад), прибыли {due_stuck or ''}")
+        R.check(f["counters"]["in_transit"] + f["counters"]["at_stations"] > 0, f"движение продолжается: {f['counters']}")
         R.check(mon.max_quiet_growth <= 10, f"без сбоев прогноз не растёт: макс. рост {mon.max_quiet_growth:.1f} мин за 30 мин")
         R.check(mon.http_5xx == 0, f"ответов 5xx: {mon.http_5xx}")
         lat = sorted(ws_stats.get("lat", [0]))

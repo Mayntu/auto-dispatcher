@@ -196,7 +196,9 @@ def create_app(bus: EventBus, world: World, settings: dict,
     async def metrics() -> dict:
         idx = cache.index or {}
         return {"last_solve_ms": idx.get("last_solve_ms"), "ui_p95_ms": wsm.p95_ms(),
-                "safety_violations": cache.field and cache.field["safety_violations"]}
+                "safety_violations": cache.field and cache.field["safety_violations"],
+                "deadlock_guard_triggered_total": idx.get("deadlock_guard_triggered_total", 0),
+                "plan_overrides": cache.field and cache.field.get("plan_overrides")}
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:

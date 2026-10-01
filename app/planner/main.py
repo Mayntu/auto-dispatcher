@@ -26,6 +26,7 @@ from app.railcore.models import Incident, JournalEntry, Plan, Variant, WhatIfReq
 from app.railcore.problem import Snapshot
 
 log = logging.getLogger("planner")
+GUARD_BROKEN_S = 600  # sim seconds a plan may stay unexecutable without a decision before the guard re-plans
 STALE_MARGIN_S = 300  # objective units (weighted s): a variant this much worse than keeping the current plan is stale
 JOURNAL_MAX = 500
 
@@ -52,11 +53,15 @@ class PlannerService:
         self._forecast_fails = 0
         self._hold = False
         self._last_gain = 0.0
+        self.guard_triggers = 0  # deadlock_guard_triggered_total: guards must not hide planning bugs
+        self._guard_pending: str | None = None
+        self._broken_since: float | None = None
 
     async def start(self) -> None:
         await self.bus.subscribe("field.state", self._on_field)
         await self.bus.subscribe("incident.*", self._on_incident)
         await self.bus.subscribe("cmd.planner.*", self._on_cmd)
+        await self.bus.subscribe("field.guard", self._on_guard)
         await asyncio.wait_for(self._first_state.wait(), timeout=10)
         t0 = time.perf_counter()
         res = await self.pool.solve(self.snapshot().model_dump(mode="json"), "balanced", self.settings)
@@ -102,6 +107,29 @@ class PlannerService:
             self.incidents.pop(inc.id, None)
             await self._journal("incident_resolved", f"Сбой снят: {inc.description}", incident_ids=[inc.id])
             self._request("incident" if self.incidents else "resolved")
+
+    async def _on_guard(self, env: Envelope) -> None:
+        g = env.payload
+        self.guard_triggers += 1
+        self._guard_pending = (f"защита от блокировки пропустила {g['train_id']} с {self.world.stations[g['station_id']].name} "
+                               f"вне плана ({'поле стояло' if g['reason'] == 'stalled' else 'поезд ждал'} "
+                               f"{mins(max(g['stalled_s'], g['held_s']))} мин)")
+
+    async def _guard_replan(self, why: str) -> None:
+        """The approved order has already been broken (a guard let a train go, or the plan has not been
+        executable for a while with no decision): rebuild the plan from the current state automatically.
+        Journaled and counted — this is a safety net, not a way to plan."""
+        snap = self.snapshot()
+        res = await self.pool.solve(snap.model_dump(mode="json"), "balanced", self.settings)
+        plan = Plan.model_validate(res["plan"])
+        plan.strategy = "guard"
+        await self._approve(plan, self.version)
+        for v in self.proposed():
+            v.status = "stale"
+        await self._journal("guard_replan", f"План перестроен автоматически: {why}. Новый план v{self.version}.")
+        await self._publish_variants()
+        await self._sync_hold()
+        log.warning("guard re-plan #%d: %s", self.guard_triggers, why)
 
     def _request(self, reason: str) -> None:
         self._reasons.add(reason)
@@ -225,6 +253,19 @@ class PlannerService:
             await self._maybe_refresh(fc)
         else:
             self._forecast_fails += 1
+            # keep the index on screen: forecast by the timetable order until the dispatcher picks a new plan
+            self.forecast = forecast_plan(snap.model_copy(update={"hint": []}), self.settings) or self.forecast
+        if self._guard_pending and (self._gen_task is None or self._gen_task.done()):
+            why, self._guard_pending = self._guard_pending, None
+            await self._guard_replan(why)
+            return
+        self._broken_since = (self._broken_since or snap.now) if self._forecast_fails else None
+        if self._broken_since is not None and snap.now - self._broken_since >= GUARD_BROKEN_S \
+                and (self._gen_task is None or self._gen_task.done()):
+            self.guard_triggers += 1
+            self._broken_since = None
+            await self._guard_replan(f"план неисполним {mins(GUARD_BROKEN_S)} мин, а решение не принято")
+            return
         # the approved plan no longer fits where the trains are (its order cycles, or the field has stopped
         # moving): re-plan from the current state with CP-SAT
         stalled = self.field.get("stalled_s", 0) >= self.settings["planner"]["replan_deviation_s"] * 3
@@ -241,7 +282,7 @@ class PlannerService:
         await self.bus.publish("kpi.index", {
             "index": src.index.model_dump(mode="json"), "kpi": src.kpi.model_dump(mode="json"),
             "plan_version": self.version, "last_solve_ms": self.last_solve_ms, "forecast_ok": fc is not None,
-            "plan_broken": self._forecast_fails >= 3,
+            "plan_broken": self._forecast_fails >= 3, "deadlock_guard_triggered_total": self.guard_triggers,
         }, source="planner", sim_time=self.now)
 
     async def _live_cards(self, snap: Snapshot) -> None:
