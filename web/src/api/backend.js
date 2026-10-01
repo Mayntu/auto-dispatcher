@@ -55,6 +55,8 @@ export const api = {
   /** {type: obstacle|train_failure|segment_closed, segment_id?, train_id?, km?, est_min_min, est_max_min, description?} */
   createIncident: (body) => call('POST', '/incidents', body),
   resolveIncident: (id) => call('POST', `/incidents/${encodeURIComponent(id)}/resolve`),
+  /** «Сменить направление» на свободном перегоне; 409 с причиной, если перегон занят. */
+  setDirection: (segmentId, direction) => call('POST', '/dc/direction', { segment_id: segmentId, direction }),
   // ── ручное изменение времени на ГИД и указания диспетчера (tasks/02-manual-drag-*, API ещё не в бэкенде) ──
   manualBounds: (trainId, stationId) => call('GET', `/plan/manual/bounds?train_id=${encodeURIComponent(trainId)}&station_id=${encodeURIComponent(stationId)}`),
   manualPreview: (req) => call('POST', '/plan/manual/preview', req),

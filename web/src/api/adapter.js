@@ -238,8 +238,9 @@ export function disruptionFromSpec(d, now) {
   if (g) {
     const from = SECTION.stations[g.from].km;
     const at = d.km != null ? (d.km - from) * 1000 : g.length / 2;
-    const p0 = d.type === 'speed_restriction' ? Number(d.params?.from_m ?? at - 500) : at - 500;
-    const p1 = d.type === 'speed_restriction' ? Number(d.params?.to_m ?? at + 500) : at + 500;
+    const warn = d.type === 'speed_restriction' && d.params?.km_from != null;
+    const p0 = warn ? (Math.min(d.params.km_from, d.params.km_to) - from) * 1000 : at - 500;
+    const p1 = warn ? (Math.max(d.params.km_from, d.params.km_to) - from) * 1000 : at + 500;
     // Позиции на ребре считаются от его start_node.
     posStart = Math.max(0, Math.round(g.reversed ? g.length - p1 : p0));
     posEnd = Math.min(g.length, Math.round(g.reversed ? g.length - p0 : p1));
@@ -259,7 +260,7 @@ export function disruptionFromSpec(d, now) {
     durMin: d.est_min_s,
     durMax: d.est_max_s,
     durExpected: d.est_expected_s ?? Math.round((d.est_min_s + d.est_max_s) / 2),
-    speedLimit: kind === 'signal' ? Number(d.params?.speed_kmh ?? 20) : undefined,
+    speedLimit: kind === 'signal' ? Number(d.params?.v_kmh ?? d.params?.speed_kmh ?? 20) : undefined,
     anchors: [],
     resolvedAt,
     note: d.description,

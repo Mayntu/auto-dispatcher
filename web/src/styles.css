@@ -797,3 +797,9 @@ button.dz-row:hover { background: rgba(255, 255, 255, .7); }
 .dz-steps-more { align-self: flex-start; font-size: 12.5px; padding: 0; }
 .dz-steps-none { font-size: 13px; }
 .dz-foot .dz-reject { flex: 0 0 auto; }
+/* смена направления перегона кликом по стрелке (live) */
+.ab-dir-hit { fill: transparent; stroke: none; }
+.ab-dir.turnable { cursor: pointer; pointer-events: auto; }
+.ab-dir.turnable:hover .ab-dir-hit { fill: rgba(0, 0, 0, .08); }
+.ab-dir.manual line, .ab-dir.manual path { stroke: var(--accent); fill: var(--accent); }
+.ab-dir.changing { opacity: .45; }

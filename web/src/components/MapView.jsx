@@ -11,7 +11,8 @@ import { blockSets, durationOf, isBlocking, ownTrack } from '../core/scheduler';
 import { CATEGORIES, edgeFraction, SECTION, stationName } from '../core/section';
 import { fmtHM } from '../core/time';
 import { isActive, runningPlan } from '../engine/engine';
-import { useSmoothNow } from '../engine/store';
+import { engine, useSmoothNow } from '../engine/store';
+import { can } from '../engine/roles';
 import { acceptsDrag, currentDragKind, EVENT_BY_KIND, readDragKind } from './EventPalette';
 import { useSize } from './ui';
 import { makeTrees, TreesLayer } from './MapScenery';
@@ -954,7 +955,10 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
             for (const b of blocks) if (Math.max(a, c) > b.f0 && Math.min(a, c) < b.f1) for (const tr of trs) occ.add(`${b.id}:${tr}`);
           }
         }
-        const dirLive = s.live?.directions?.[g.specId]?.direction ?? null;
+        const dirInfo = s.live?.directions?.[g.specId];
+        const dirLive = dirInfo?.direction ?? null;
+        // С сервером диспетчер меняет направление кликом по стрелке (POST /api/dc/direction, только свободный перегон).
+        const canTurn = s.liveMode && can(s.user, 'section') && !dirInfo?.changing;
         const { u, n } = flat.segs[i];
         const at = (fr, track, off) => {
           const c = flat.onTrack(i, track, fr);
@@ -1015,8 +1019,17 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
               const w1 = { x: tip.x - u.x * 5 * z * sgn + n.x * 3.5 * z, y: tip.y - u.y * 5 * z * sgn + n.y * 3.5 * z };
               const w2 = { x: tip.x - u.x * 5 * z * sgn - n.x * 3.5 * z, y: tip.y - u.y * 5 * z * sgn - n.y * 3.5 * z };
               return (
-                <g className="ab-dir">
-                  <title>{tr('Установленное направление автоблокировки')}</title>
+                <g
+                  className={`ab-dir ${canTurn ? 'turnable' : ''} ${dirInfo?.changing ? 'changing' : ''} ${dirInfo?.manual ? 'manual' : ''}`}
+                  onPointerDown={canTurn ? (e) => e.stopPropagation() : undefined}
+                  onClick={canTurn ? (e) => { e.stopPropagation(); engine.setDirection(i, dirLive === 'odd' ? 'even' : 'odd'); } : undefined}
+                >
+                  <title>
+                    {tr('Установленное направление автоблокировки')}
+                    {dirInfo?.changing ? ` · ${tr('меняется')}` : dirInfo?.manual ? ` · ${tr('задано диспетчером')}` : ''}
+                    {canTurn ? ` · ${tr('клик — сменить направление')}` : ''}
+                  </title>
+                  <circle cx={c.x} cy={c.y} r={L + 4} className="ab-dir-hit" />
                   <line x1={tail.x} y1={tail.y} x2={tip.x} y2={tip.y} />
                   <path d={`M${tip.x} ${tip.y} L${w1.x} ${w1.y} L${w2.x} ${w2.y} Z`} />
                 </g>

@@ -224,6 +224,9 @@ export function startLive(engine) {
         const from = g ? SECTION.stations[g.from].km : null;
         const at = sp.pos ?? (g ? g.length / 2 : 0);
         const onSeg = g && sp.kind !== 'breakdown' && sp.kind !== 'delay';
+        const kmAt = (m) => Math.round((from + (g.reversed ? g.length - m : m) / 1000) * 100) / 100;
+        // Предупреждение — отрезок ±1.5 км вокруг точки броска, в пределах перегона.
+        const warning = onSeg && sp.kind === 'signal' ? { km_from: kmAt(Math.max(0, at - 1500)), km_to: kmAt(Math.min(g.length, at + 1500)), v_kmh: sp.speedLimit ?? 40 } : {};
         ok(
           await api.createIncident({
             type: SPEC_TYPE[sp.kind],
@@ -232,6 +235,7 @@ export function startLive(engine) {
             train_id: sp.trainId ?? null,
             est_min_min: sp.minMin,
             est_max_min: sp.maxMin,
+            ...warning,
             ...(sp.note ? { description: sp.note } : {}),
           }),
           'создание события',
@@ -254,6 +258,14 @@ export function startLive(engine) {
     },
     refine() {
       unsupported('уточнение длительности сбоя');
+    },
+    /** Смена установленного направления на перегоне (ДЦ, §11.3): только на свободном перегоне. */
+    async setDirection(segment, direction) {
+      if (!engine.allowed('section', 'смена направления')) return;
+      const g = SECTION.segments[segment];
+      const r = await api.setDirection(g.specId, direction);
+      if (r.status === 409) engine.toast(m('Направление не сменить: {r}', { r: r.detail ?? '' }), 'warn');
+      else ok(r, 'смена направления');
     },
     async resolve(id) {
       if (engine.allowed('scenario', 'отметка об устранении')) ok(await api.resolveIncident(id), 'отметка об устранении');

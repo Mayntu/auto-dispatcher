@@ -47,3 +47,9 @@
     ждёт `plan.pins` в `Plan` и событие WS `planner.pin_violated` — сейчас все пути отвечают 404. Формат, который ждёт фронт,
     — в `web/src/api/adapter.js` (`boundsFromSpec`, `previewFromSpec`, `pinFromSpec`). В памятке упомянут
     `tasks/02-manual-drag-*.md`, в репозитории его пока нет.
+
+### Перепроверка после 48c0d88 (realism 5, 5.5, 6, 9)
+
+- п. 1 — **исправлено**: у `dwell` в плане заполнен `track_id` (`I`, `2`, `3`, `4`).
+- п. 5 — **частично**: `speed_restriction` (предупреждение) принимается и подключён на фронте; `signal_failure`, `train_delay` — по-прежнему нет.
+- п. 2–4, 6–11 — без изменений (`/api/plan/pins`, `/api/scenarios`, `/api/settings` → 404; `train_delay` → 422 `unknown segment`).
