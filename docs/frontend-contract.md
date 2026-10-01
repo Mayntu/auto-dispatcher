@@ -1,4 +1,4 @@
-# Контракт бэкенд ↔ фронтенд (MVP, после realism-шага 1)
+# Контракт бэкенд ↔ фронтенд (после realism-шага 5)
 
 Источник правды по моделям — `app/railcore/models.py` и Swagger на `http://localhost:8000/docs`. Здесь — то, что нужно, чтобы собрать экран, и **заранее зафиксированный формат полей автоблокировки** (появятся в realism-шагах 3–4).
 
@@ -63,7 +63,7 @@
 
 ## `Plan` → нитки ГИД
 
-`entries[]`: `{train_id, kind: run|dwell, segment_id|station_id, start, end, stop, unplanned}`. Нитка поезда: `dwell` — горизонтальный отрезок на оси пункта (`station.km`), `run` — отрезок между осями пунктов (`direction` поезда из `timetable`: `odd` — к большему км). `meetings[]`: `{kind: crossing|overtake, station_id, time, waiting_train, passing_train, wait_s}` — подсвечивать на ГИД.
+`entries[]`: `{train_id, kind: run|dwell, segment_id|station_id, track_id, start, end, stop, unplanned}`; у `dwell` — `track_id`, путь станции, назначенный планом (с учётом полезной длины и платформ), ДЦ ставит поезд на него. Попутные поезда могут идти по перегону пакетом (два `run` одного направления перекрываются по времени). Нитка поезда: `dwell` — горизонтальный отрезок на оси пункта (`station.km`), `run` — отрезок между осями пунктов (`direction` поезда из `timetable`: `odd` — к большему км). `meetings[]`: `{kind: crossing|overtake, station_id, time, waiting_train, passing_train, wait_s}` — подсвечивать на ГИД.
 
 ## `Variant` (карточка решения)
 
@@ -84,9 +84,9 @@
 
 `plan.kpi.robust_total_delay_s` — строка «если сбой затянется», **только когда не `null`**. Хвост «Призрак» на ГИД: нитки `variant.plan.entries` точками.
 
-## Заранее: автоблокировка (realism-шаги 3–4)
+## Автоблокировка (realism-шаги 3–5, уже отдаётся)
 
-Фиксируем формат сейчас, чтобы мнемосхему и ГИД рисовать сразу под него (§8, §9.1, §27.2):
+Формат для мнемосхемы и ГИД (§8, §9.1, §27.2):
 
 `GET /api/infra` → `infra.blocks: [{id: "R1-STP-B3", segment_id, index, from_m, to_m}]` (координаты от начала перегона в нечётном направлении, без зазоров), `infra.signals` добавятся `{id: "R1-STP-P3N", kind: "block|pre_entry", direction, segment_id, pos_m}` (проходные и предвходные), `stations[].simultaneous_reception: bool`.
 
@@ -96,7 +96,7 @@
 "blocks":     [{"id": "R1-STP-B3", "occupied_by": "2003" | null, "obstacle": false}],
 "signals":    [... , {"id": "R1-STP-P3N", "aspect": "green|yellow|red"}],   // все сигналы, включая проходные
 "directions": {"R1-STP": {"direction": "odd|even|null", "changing": false}}, // стрелка направления на перегоне
-"warnings":   [{"segment_id": "SEV-R1", "from_m": 3000, "to_m": 6000, "v_kmh": 40}]  // предупреждения (шаг 6)
+"warnings":   [{"segment_id": "SEV-R1", "from_m": 3000, "to_m": 6000, "v_kmh": 40}]  // предупреждения — ПОЯВИТСЯ в шаге 6
 ```
 
 `TrainState.block_id` — блок-участок головы поезда. Настройки интервалов (`headway_s`, `tau_cross_s`, `tau_np_s`, `direction_change_s`) — в `GET /api/infra` → `intervals`.
