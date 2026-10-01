@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from app.common.config import load_settings
 from app.railcore.infra import get_world
 
 WORLD = get_world()
@@ -27,23 +28,39 @@ def test_gid_window_never_empty_for_48_hours():
 
 
 def test_normative_timetable_is_conflict_free():
-    """One train per single-track segment (+ clearance), never more trains than tracks at a station."""
+    """Automatic block: oncoming trains never share a segment (+ clearance), followers keep the headway and
+    never overtake on the line; never more trains than tracks at a station; tau_np at sidings."""
+    iv = load_settings()["intervals"]
+    clear = max(iv["tau_cross_s"], iv["direction_change_s"])
     runs = defaultdict(list)
     visits = defaultdict(list)
+    arrivals = defaultdict(list)
     for t in TT:
         for a, b in zip(t.stops, t.stops[1:]):
-            runs[WORLD.segment_between(a.station_id, b.station_id).id].append((a.dep, b.arr, t.id))
+            runs[WORLD.segment_between(a.station_id, b.station_id).id].append((a.dep, b.arr, t.id, t.direction))
         for s in t.stops[1:-1]:
             visits[s.station_id] += [(s.arr, 1), (s.dep, -1)]
+        for s in t.stops[1:]:
+            if not WORLD.stations[s.station_id].simultaneous_reception:
+                arrivals[s.station_id].append((s.arr, t.id, t.direction))
     for seg, rs in runs.items():
         rs.sort()
-        for (s1, e1, a), (s2, _, b) in zip(rs, rs[1:]):
-            assert s2 >= e1 + 60 - 1, f"{seg}: {b} enters before {a} clears"
+        for x, (s1, e1, a, da) in enumerate(rs):
+            for s2, e2, b, db in rs[x + 1:]:
+                if da != db:
+                    assert s2 >= e1 + clear - 1, f"{seg}: oncoming {b} enters before {a} clears"
+                else:
+                    assert s2 >= s1 + iv["headway_s"] - 1 and e2 >= e1 + iv["headway_s"] - 1, \
+                        f"{seg}: {b} follows {a} closer than the headway"
     for st, ev in visits.items():
         level = 0
         for _, d in sorted(ev, key=lambda x: (x[0], x[1])):
             level += d
             assert level <= WORLD.capacity(st), f"{st} over capacity"
+    for st, arrs in arrivals.items():
+        arrs.sort()
+        for (ta, a, da), (tb, b, db) in zip(arrs, arrs[1:]):
+            assert da == db or tb - ta >= iv["tau_np_s"] - 1, f"{st}: oncoming {a}, {b} within tau_np"
 
 
 def test_scenario_trains_depart_in_first_two_hours():

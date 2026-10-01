@@ -11,11 +11,12 @@ from dataclasses import dataclass
 
 from app.railcore.models import Incident, IncidentType
 
-MVP_TYPES = {IncidentType.OBSTACLE, IncidentType.TRAIN_FAILURE, IncidentType.SEGMENT_CLOSED}
+MVP_TYPES = {IncidentType.OBSTACLE, IncidentType.TRAIN_FAILURE, IncidentType.SEGMENT_CLOSED, IncidentType.SPEED_RESTRICTION}
 DEFAULT_DESCRIPTION = {
     IncidentType.OBSTACLE: "Скот на пути, бригада выехала",
     IncidentType.TRAIN_FAILURE: "Неисправность локомотива поезда {train}",
     IncidentType.SEGMENT_CLOSED: "Закрытие перегона для работ",
+    IncidentType.SPEED_RESTRICTION: "Предупреждение об ограничении скорости",
 }
 
 

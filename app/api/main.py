@@ -49,15 +49,36 @@ class Requester:
             raise HTTPException(504, "Сервис не ответил вовремя")
 
 
+# §9.4, §27.4: interval names and definitions for the settings screen
+INTERVAL_LABELS = {
+    "headway_s": {"name": "Межпоездной интервал",
+                  "hint": "Минимальный интервал между попутными поездами на перегоне с автоблокировкой."},
+    "tau_cross_s": {"name": "Станционный интервал скрещения (τск)",
+                    "hint": "От прибытия поезда на раздельный пункт до отправления встречного на освободившийся перегон."},
+    "tau_np_s": {"name": "Станционный интервал неодновременного прибытия (τнп)",
+                 "hint": "Между прибытиями встречных поездов на пункт, где одновременный приём запрещён (разъезды)."},
+    "direction_change_s": {"name": "Время смены направления",
+                           "hint": "Смена установленного направления на свободном перегоне."},
+}
+
+
 class IncidentCreate(BaseModel):
-    type: str = Field(description="obstacle | train_failure | segment_closed")
+    type: str = Field(description="obstacle | train_failure | segment_closed (окно) | speed_restriction (предупреждение)")
     segment_id: str | None = None
     train_id: str | None = None
     km: float | None = None
+    km_from: float | None = Field(None, description="Предупреждение: начало, км")
+    km_to: float | None = Field(None, description="Предупреждение: конец, км")
+    v_kmh: float | None = Field(None, description="Предупреждение: допустимая скорость, км/ч")
     est_min_min: float = Field(description="Оценка длительности, минимум, мин")
     est_max_min: float = Field(description="Оценка длительности, максимум, мин")
     actual_min: float | None = Field(None, description="Фактическая длительность (для сценариев), мин")
     description: str | None = None
+
+
+class DirectionRequest(BaseModel):
+    segment_id: str
+    direction: str = Field(description="odd | even")
 
 
 class ApplyRequest(BaseModel):
@@ -106,6 +127,7 @@ def create_app(bus: EventBus, world: World, settings: dict,
             "thresholds": settings["index"]["thresholds"],
             "station_order": world.station_order,
             "intervals": settings["intervals"],
+            "interval_labels": INTERVAL_LABELS,
             "segment_times": {
                 seg.id: {cat: {d.value: round(rts.get(cat, seg.id, d).t_pp / 60) for d in Direction}
                          for cat in world.categories}
@@ -129,10 +151,20 @@ def create_app(bus: EventBus, world: World, settings: dict,
 
     @app.post("/api/incidents", response_model=Incident, summary="Создать сбой (запускает генерацию вариантов)")
     async def create_incident(body: IncidentCreate) -> dict:
-        res = await req.request("cmd.field.create_incident", body.model_dump())
+        payload = body.model_dump()
+        if body.type == "speed_restriction":
+            payload["params"] = {"km_from": body.km_from, "km_to": body.km_to, "v_kmh": body.v_kmh}
+        res = await req.request("cmd.field.create_incident", payload)
         if not res["ok"]:
             raise HTTPException(422, res.get("reason"))
         return res["incident"]
+
+    @app.post("/api/dc/direction", summary="Сменить направление на перегоне (только свободный перегон)")
+    async def set_direction(body: DirectionRequest) -> dict:
+        res = await req.request("cmd.field.set_direction", body.model_dump())
+        if not res["ok"]:
+            raise HTTPException(409, res.get("reason"))
+        return {"ok": True, "directions": res["directions"]}
 
     @app.post("/api/incidents/{incident_id}/resolve", response_model=Incident, summary="Снять сбой")
     async def resolve_incident(incident_id: str) -> dict:

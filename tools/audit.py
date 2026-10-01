@@ -42,29 +42,63 @@ def check_plan(plan: Plan, snap, world, rts, settings) -> list[str]:
     for e in plan.entries:
         by_train[e.train_id].append(e)
 
-    # 1. single-track segment: one train at a time (+ clearance), both directions
+    iv = settings["intervals"]
+    direction = {t.id: t.direction.value for t in snap.trains}
+    # 1. automatic block on a single track: oncoming trains never share a segment (+ clearance); followers
+    #    keep the headway at both ends and never overtake on the line
     runs = defaultdict(list)
     for e in plan.entries:
         if e.kind == "run":
             runs[e.segment_id].append(e)
     for seg, rs in runs.items():
-        rs.sort(key=lambda e: e.start)
-        for a, b in zip(rs, rs[1:]):
-            if b.start < a.end + clear - TOL:
-                errs.append(f"segment {seg}: {b.train_id} enters at {b.start:.0f} before {a.train_id} clears ({a.end + clear:.0f})")
+        for x in range(len(rs)):
+            for y in range(x + 1, len(rs)):
+                a, b = sorted((rs[x], rs[y]), key=lambda e: e.start)
+                if direction[a.train_id] != direction[b.train_id]:
+                    if b.start < a.end + clear - TOL:
+                        errs.append(f"segment {seg}: oncoming {b.train_id} enters at {b.start:.0f} before {a.train_id} clears ({a.end + clear:.0f})")
+                else:
+                    on_line = a.start <= now + TOL or b.start <= now + TOL
+                    if not on_line and b.start < a.start + iv["headway_s"] - TOL:
+                        errs.append(f"segment {seg}: {b.train_id} follows {a.train_id} closer than the headway")
+                    if b.end < a.end - TOL:
+                        errs.append(f"segment {seg}: {b.train_id} overtakes {a.train_id} on the line")
 
-    # 2. station capacity: never more trains than tracks
-    for st in world.station_order:
-        ev = []
-        for e in plan.entries:
-            if e.kind == "dwell" and e.station_id == st:
-                ev += [(e.start, 1), (e.end, -1)]
-        level = 0
-        for _, d in sorted(ev, key=lambda x: (x[0], x[1])):
-            level += d
-            if level > world.capacity(st):
-                errs.append(f"station {st}: {level} trains on {world.capacity(st)} tracks")
-                break
+    # 2. station tracks: one train per track at a time, useful length, platforms for passenger stops
+    by_track = defaultdict(list)
+    for e in plan.entries:
+        if e.kind == "dwell":
+            if e.track_id is None:
+                errs.append(f"{e.train_id}: no track at {e.station_id}")
+                continue
+            by_track[(e.station_id, e.track_id)].append(e)
+            st = world.stations[e.station_id]
+            track = next(t for t in st.tracks if t.id == e.track_id)
+            cat = world.categories[trains[e.train_id].category]
+            at_now = states.get(e.train_id) and states[e.train_id].station_id == e.station_id
+            if track.length_m < cat.length_m and not at_now:
+                errs.append(f"{e.train_id} ({cat.length_m:.0f} m) on {e.station_id} track {e.track_id} ({track.length_m} m)")
+            stop = next(x for x in trains[e.train_id].stops if x.station_id == e.station_id)
+            first_or_last = stop is trains[e.train_id].stops[0]
+            has_platforms = any(t.platform for t in st.tracks)  # a siding has none: a stop there is technical
+            if (stop.stop and cat.id != "freight" and not first_or_last and has_platforms and not track.platform
+                    and not at_now):
+                errs.append(f"{e.train_id}: passenger stop at {e.station_id} on track {e.track_id} without a platform")
+    for (st_id, tr_id), es in by_track.items():
+        es.sort(key=lambda e: e.start)
+        for a, b in zip(es, es[1:]):
+            if b.start < a.end - TOL:
+                errs.append(f"station {st_id} track {tr_id}: {b.train_id} arrives before {a.train_id} leaves")
+
+    # 3. tau_np: stations without simultaneous reception never receive oncoming trains within tau_np
+    for st in world.infra.stations:
+        if st.simultaneous_reception:
+            continue
+        arrs = sorted((e.start, e.train_id) for e in plan.entries if e.kind == "dwell" and e.station_id == st.id
+                      and e.start > now + TOL and trains[e.train_id].stops[0].station_id != st.id)
+        for (ta, a), (tb, b) in zip(arrs, arrs[1:]):
+            if direction[a] != direction[b] and tb - ta < iv["tau_np_s"] - TOL:
+                errs.append(f"{st.id}: oncoming {a} and {b} received {tb - ta:.0f} s apart (< tau_np)")
 
     closures = [i for i in snap.incidents if i.type in (IncidentType.OBSTACLE, IncidentType.SEGMENT_CLOSED)]
     for tid, es in by_train.items():

@@ -16,7 +16,9 @@ from dataclasses import dataclass, field
 
 from app.bus.base import EventBus
 from app.bus.envelope import Envelope
-from app.field.autoblock import AutoBlock
+from app.field.autoblock import SIGNAL_STOP_M, AutoBlock
+from app.railcore.warnings import restriction_of, restrictions_by_segment
+from app.railcore.warnings import validate as validate_warning
 from app.field.incidents import FieldIncident, IncidentError, make_incident
 from app.railcore.infra import World
 from app.railcore.models import Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus
@@ -27,6 +29,7 @@ log = logging.getLogger("field")
 SUBSTEP_S = 1.0
 STALL_OVERRIDE_S = 600.0
 YELLOW_KMH = 60.0
+MANUAL_DIR_S = 900  # a direction set by the dispatcher holds this long unless a train uses it first
 STARVE_OVERRIDE_S = 900.0  # one train held only by a stale plan order this long -> let it go if safe
 VISIBLE_AHEAD_S = 3 * 3600
 VISIBLE_BEHIND_S = 3 * 3600  # nothing moved this long -> the DC lets a physically possible move go out of plan order
@@ -71,6 +74,10 @@ class FieldSim:
         self.plan_overrides = 0
         self._guard_events: list[dict] = []
         self.ab = AutoBlock(world, settings)
+        self._last_arrival: dict[tuple[str, str], float] = {}
+        self._warn: dict[str, tuple] = {}
+        self.manual_dir: dict[str, tuple[Direction, float]] = {}  # dispatcher's direction command, until
+        self._tau_np_breaches: list[str] = []
 
     # ---- plan -------------------------------------------------------------------------------
     def set_plan(self, plan: Plan) -> None:
@@ -104,6 +111,12 @@ class FieldSim:
         else:
             if seg_id not in self.world.segments:
                 raise IncidentError("unknown segment")
+            if req["type"] == IncidentType.SPEED_RESTRICTION:
+                try:
+                    req = {**req, "params": validate_warning(req.get("params") or req, seg_id, self.world)}
+                except ValueError as e:
+                    raise IncidentError(str(e)) from None
+                km = (req["params"]["km_from"] + req["params"]["km_to"]) / 2
             if km is None:
                 a, b = self.world.segment_km(seg_id)
                 km = (a + b) / 2
@@ -235,12 +248,15 @@ class FieldSim:
         if not self.ab.can_enter(seg.id, d):
             # automatic block: the exit opens only for the established direction and a free first block section.
             # Only a train whose turn it is may ask to turn a free segment round (takes direction_change_s) —
-            # otherwise trains on both ends would keep flipping the direction against each other
-            self.ab.request_direction(seg.id, d, t, self._segment_empty(seg.id))
+            # otherwise trains on both ends would keep flipping the direction against each other;
+            # a direction the dispatcher set by hand is not turned round by the automatics
+            if seg.id not in self.manual_dir or self.manual_dir[seg.id][0] == d:
+                self.ab.request_direction(seg.id, d, t, self._segment_empty(seg.id))
             return None
         tr.order_blocked_since = None
         self._last_progress = t
-        rt = self.rts.get(cat.id, seg.id, tr.train.direction, tr.train.v_max_override_kmh)
+        self.manual_dir.pop(seg.id, None)  # the dispatcher's direction has been used
+        rt = self._rt(tr, seg.id)
         if tr.stopped:
             tr.energy_kwh += rt.e_start_kwh
         tr.loc, tr.progress, tr.held_at_obstacle, tr.track_id = "segment", 0.0, False, None
@@ -249,7 +265,7 @@ class FieldSim:
     def _on_segment(self, tr: SimTrain, t: float, h: float) -> dict | None:
         tid = tr.train.id
         seg = self._seg(tr, tr.idx)
-        rt = self.rts.get(tr.train.category, seg.id, tr.train.direction, tr.train.v_max_override_kmh)
+        rt = self._rt(tr, seg.id)
         if self._broken(tid):
             tr.speed_kmh = 0.0
             return None
@@ -260,6 +276,16 @@ class FieldSim:
                 stop_pos = self.world.pos_of_km(seg.id, inc.km, tr.train.direction) - OBSTACLE_STOP_M
                 if tr.progress * seg.length_m <= stop_pos + 1:
                     cap = min(cap, max(tr.progress, stop_pos / seg.length_m))
+        ahead = tr.route[tr.idx + 1]
+        if not self.world.stations[ahead].simultaneous_reception:
+            # tau_np: a siding receives an oncoming train only tau_np after the previous one arrived;
+            # meanwhile the train waits at the entry signal
+            opposite = Direction.EVEN if tr.train.direction == Direction.ODD else Direction.ODD
+            last = self._last_arrival.get((ahead, opposite.value))
+            if last is not None and t - last < self.settings["intervals"]["tau_np_s"]:
+                entry = (seg.length_m - SIGNAL_STOP_M) / seg.length_m
+                if tr.progress <= entry + 1e-9:
+                    cap = min(cap, max(tr.progress, entry))
         head = tr.progress * seg.length_m
         max_head, held_signal, yellow = self.ab.stop_point(seg.id, tid, head, tr.train.direction)
         cap = min(cap, max_head / seg.length_m)
@@ -281,6 +307,9 @@ class FieldSim:
             rate = min(max((1.0 - tr.progress) / max(run.end - t, 1.0), slowest), rate)
         if yellow:  # yellow ahead: no faster than 60 km/h towards the next signal
             rate = min(rate, YELLOW_KMH / 3.6 / seg.length_m)
+        v_warn = self._warning_limit(tr, seg, head, head + rate * h * seg.length_m)
+        if v_warn is not None:  # warning: no faster than its speed while any part of the train is in it
+            rate = min(rate, v_warn / 3.6 / seg.length_m)
         new_p = min(tr.progress + rate * h, cap)
         if new_p > tr.progress:
             self._last_progress = t
@@ -299,6 +328,11 @@ class FieldSim:
             will_stop = tr.idx == len(tr.route) - 1 or (dwell.stop if dwell else tr.train.stops[tr.idx].stop)
             tr.track_id = self._pick_track(tr, st_id, will_stop)
             tr.held_signal = None
+            if not self.world.stations[st_id].simultaneous_reception:
+                other = self._last_arrival.get((st_id, "even" if tr.train.direction == Direction.ODD else "odd"))
+                if other is not None and t - other < self.settings["intervals"]["tau_np_s"]:
+                    self._tau_np_breaches.append(f"tau_np:{st_id}:{tid}:{t:.0f}")
+                self._last_arrival[(st_id, tr.train.direction.value)] = t
             return {"kind": "arrived", "station_id": st_id, "track_id": tr.track_id}
         return event
 
@@ -322,9 +356,13 @@ class FieldSim:
         closed_entries = {(st, d) for st in self.world.station_order for d in Direction
                           if self._occupancy(st, "") >= self.world.capacity(st)}
         self.ab.tick_directions(self.now)
+        self._warn = restrictions_by_segment([fi.incident for fi in self.active()], self.world)
         busy = {seg for _, seg, _, _, _ in on_seg}
+        for seg_id, (d, until) in list(self.manual_dir.items()):
+            if self.now >= until:
+                del self.manual_dir[seg_id]
         for seg_id, order in self._seg_order.items():
-            if seg_id in busy or self.ab.dirs[seg_id].changing_to is not None:
+            if seg_id in busy or self.ab.dirs[seg_id].changing_to is not None or seg_id in self.manual_dir:
                 continue
             nxt = next((self.trains[tid] for _, tid in order if self.trains[tid].loc != "done"
                         and seg_id not in self.trains[tid].done_segments), None)
@@ -369,8 +407,36 @@ class FieldSim:
                 opposite_needs = True
         return not opposite_needs or same + 1 <= self.world.capacity(station_id) - 1
 
+    def _rt(self, tr: SimTrain, seg_id: str):
+        return self.rts.get(tr.train.category, seg_id, tr.train.direction, tr.train.v_max_override_kmh,
+                            self._warn.get(seg_id, ()))
+
+    def _warning_limit(self, tr: SimTrain, seg, head_from: float, head_to: float) -> float | None:
+        """Lowest warning speed over the stretch the train's body covers while its head moves head_from..head_to."""
+        v = None
+        length = self._cat(tr).length_m
+        for r in self._warn.get(seg.id, ()):
+            a, b = (r.from_m, r.to_m) if tr.train.direction == Direction.ODD else (seg.length_m - r.to_m, seg.length_m - r.from_m)
+            if head_to > a and head_from - length < b:
+                v = r.v_kmh if v is None else min(v, r.v_kmh)
+        return v
+
+    def set_direction(self, seg_id: str, d: Direction) -> None:
+        """Dispatcher's command: turn a segment round. Only a free segment; holds 15 min or until used."""
+        if seg_id not in self.world.segments:
+            raise IncidentError("unknown segment")
+        if not self._segment_empty(seg_id):
+            raise IncidentError("перегон занят — сменить направление нельзя")
+        st = self.ab.dirs[seg_id]
+        if st.direction != d or st.changing_to not in (None, d):
+            st.changing_to, st.change_done_at = d, self.now + self.ab.change_s
+            if st.direction is None:
+                st.direction, st.changing_to = d, None
+        self.manual_dir[seg_id] = (d, self.now + MANUAL_DIR_S)
+
     def _segment_turn(self, tr: SimTrain, seg_id: str) -> bool:
-        """Every train planned onto this segment before this one has already passed it."""
+        """Every train planned onto this segment before this one has passed it — or, if it runs the same way,
+        has at least entered it: followers run in a packet behind it, spaced by the block signals."""
         my_run = self._run.get((tr.train.id, seg_id))
         if my_run is None:
             return True
@@ -378,7 +444,10 @@ class FieldSim:
             if start >= my_run.start:
                 break
             o = self.trains[other_id]
-            if other_id != tr.train.id and o.loc != "done" and seg_id not in o.done_segments:
+            if other_id == tr.train.id or o.loc == "done" or seg_id in o.done_segments:
+                continue
+            on_it = o.loc == "segment" and self._seg(o, o.idx).id == seg_id
+            if not (on_it and o.train.direction == tr.train.direction):
                 return False
         return True
 
@@ -423,6 +492,11 @@ class FieldSim:
         if not free:
             return None
         cat = self._cat(tr)
+        planned = self._dwell.get((tr.train.id, station_id))
+        if planned is not None and planned.track_id:  # the DC sets the route to the track the plan assigned
+            match = next((t for t in free if t.id == planned.track_id), None)
+            if match is not None and match.length_m >= cat.length_m:
+                return match.id
         fits = [t for t in free if t.length_m >= cat.length_m] or free
         needs_platform = will_stop and cat.id != "freight" and tr.train.stops[tr.route.index(station_id)].stop
 
@@ -474,6 +548,15 @@ class FieldSim:
             if established is not None and established != tr.train.direction:
                 now_bad.add(f"against-direction:{seg.id}:{tr.train.id}")
         now_bad |= {f"block:{b}" for b, ts in per_block.items() if len(ts) > 1}
+        for tr in self.trains.values():  # a warning is never exceeded
+            if tr.loc == "segment":
+                seg = self._seg(tr, tr.idx)
+                head = tr.progress * seg.length_m
+                v_warn = self._warning_limit(tr, seg, head, head)
+                if v_warn is not None and tr.speed_kmh > v_warn + 2:
+                    now_bad.add(f"warning:{seg.id}:{tr.train.id}")
+        now_bad |= set(self._tau_np_breaches)
+        self._tau_np_breaches.clear()
         now_bad |= {f"oncoming:{s}" for s, ds in dirs_on_seg.items() if len(ds) > 1}
         for st in self.world.station_order:
             n = sum(1 for tr in self.trains.values() if tr.loc == "station" and tr.route[tr.idx] == st)
@@ -535,11 +618,16 @@ class FieldSim:
             "sim_time": self.now,
             "trains": [self._train_state(tr).model_dump(mode="json") for tr in self.trains.values() if self._visible(tr)],
             "incidents": [fi.incident.model_dump(mode="json") for fi in self.active()],
+            "warnings": [{"id": fi.incident.id, "segment_id": fi.incident.segment_id, **fi.incident.params,
+                          "from_m": r.from_m, "to_m": r.to_m}
+                         for fi in self.active() for r in [restriction_of(fi.incident, self.world)] if r is not None],
             "closed_segments": sorted({fi.incident.segment_id for fi in self.active()
                                        if fi.incident.type in CLOSING_TYPES}),
             "occupied_segments": occupied,
             "signals": self.signals(),
-            **{k: v for k, v in self.ab.snapshot().items() if k != "block_aspects"},
+            **{k: v for k, v in self.ab.snapshot().items() if k not in ("block_aspects", "directions")},
+            "directions": {seg: {**v, "manual": seg in self.manual_dir}
+                           for seg, v in self.ab.snapshot()["directions"].items()},
             "safety_violations": self.safety_violations,
             "plan_overrides": self.plan_overrides,
             "counters": self.counters(),
@@ -611,6 +699,9 @@ class FieldService:
                 else:
                     result["incident"] = inc.model_dump(mode="json")
                     await self.bus.publish("incident.resolved", inc, source="field", sim_time=self.sim.now)
+            elif cmd == "set_direction":
+                self.sim.set_direction(p["segment_id"], Direction(p["direction"]))
+                result["directions"] = self.sim.ab.snapshot()["directions"]
             elif cmd == "clock":
                 if p.get("paused") is not None:
                     self.paused = bool(p["paused"])

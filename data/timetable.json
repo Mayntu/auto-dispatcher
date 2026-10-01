@@ -8,41 +8,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 4500.0,
+     "dep": 300.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 5460.0,
-     "dep": 5514.0,
+     "arr": 1254.0,
+     "dep": 1308.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 6364.0,
-     "dep": 6418.0,
+     "arr": 2073.0,
+     "dep": 2127.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 7218.0,
-     "dep": 7272.0,
-     "stop": false,
+     "arr": 2884.0,
+     "dep": 3645.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 8172.0,
-     "dep": 8226.0,
+     "arr": 4606.0,
+     "dep": 4660.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 9036.0,
+     "arr": 5372.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -57,41 +57,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 5179.0,
+     "dep": 600.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 6049.0,
-     "dep": 6181.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "STP",
-     "arr": 7188.0,
-     "dep": 7278.0,
+     "arr": 1403.0,
+     "dep": 1457.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "STP",
+     "arr": 2327.0,
+     "dep": 2944.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "R2",
-     "arr": 8611.0,
-     "dep": 8665.0,
+     "arr": 3878.0,
+     "dep": 3932.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 9515.0,
-     "dep": 9569.0,
+     "arr": 4697.0,
+     "dep": 4751.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 10529.0,
+     "arr": 5598.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -106,41 +106,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 900.0,
+     "dep": 1457.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 1460.0,
-     "dep": 1478.0,
+     "arr": 2092.0,
+     "dep": 2110.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 2181.0,
-     "dep": 2301.0,
+     "arr": 2807.0,
+     "dep": 3932.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 3001.0,
-     "dep": 3019.0,
-     "stop": false,
+     "arr": 4559.0,
+     "dep": 4751.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 3762.0,
-     "dep": 3780.0,
+     "arr": 5299.0,
+     "dep": 5317.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 4440.0,
+     "arr": 6078.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -155,41 +155,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 1500.0,
+     "dep": 1852.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 2162.0,
-     "dep": 2180.0,
+     "arr": 2635.0,
+     "dep": 2653.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 2807.0,
-     "dep": 3061.0,
+     "arr": 3397.0,
+     "dep": 4619.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 3821.0,
-     "dep": 3881.0,
+     "arr": 5246.0,
+     "dep": 5307.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 4541.0,
-     "dep": 4559.0,
-     "stop": false,
+     "arr": 5970.0,
+     "dep": 6406.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 5119.0,
+     "arr": 6918.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -204,41 +204,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 2100.0,
+     "dep": 2419.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 2660.0,
-     "dep": 2682.0,
+     "arr": 2922.0,
+     "dep": 2944.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 3342.0,
-     "dep": 3881.0,
+     "arr": 3585.0,
+     "dep": 5306.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 4581.0,
-     "dep": 4603.0,
-     "stop": false,
+     "arr": 5945.0,
+     "dep": 6185.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 5230.0,
-     "dep": 5520.0,
+     "arr": 6776.0,
+     "dep": 7166.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 6240.0,
+     "arr": 7787.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -253,41 +253,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 3000.0,
+     "dep": 3030.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 3720.0,
-     "dep": 3822.0,
+     "arr": 3651.0,
+     "dep": 5359.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 4509.0,
-     "dep": 4641.0,
-     "stop": true,
+     "arr": 6125.0,
+     "dep": 6152.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 5401.0,
-     "dep": 5461.0,
+     "arr": 6751.0,
+     "dep": 7293.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 6121.0,
-     "dep": 6143.0,
+     "arr": 7959.0,
+     "dep": 7981.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 6703.0,
+     "arr": 8459.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -302,41 +302,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 6764.0,
+     "dep": 5543.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 7634.0,
-     "dep": 8257.0,
-     "stop": true,
+     "arr": 6346.0,
+     "dep": 6400.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 9504.0,
-     "dep": 9594.0,
+     "arr": 7233.0,
+     "dep": 7287.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 10954.0,
-     "dep": 11008.0,
+     "arr": 8142.0,
+     "dep": 8196.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 11918.0,
-     "dep": 12365.0,
-     "stop": true,
+     "arr": 8961.0,
+     "dep": 9015.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 13385.0,
+     "arr": 9862.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -351,41 +351,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 6302.0,
+     "dep": 6152.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 7286.0,
-     "dep": 7340.0,
+     "arr": 7106.0,
+     "dep": 7160.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 8250.0,
-     "dep": 8671.0,
+     "arr": 7962.0,
+     "dep": 8202.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 9531.0,
-     "dep": 9585.0,
+     "arr": 9050.0,
+     "dep": 9104.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 10485.0,
-     "dep": 10539.0,
+     "arr": 9937.0,
+     "dep": 9991.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 11349.0,
+     "arr": 10703.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -406,35 +406,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 12305.0,
-     "dep": 12359.0,
+     "arr": 12299.0,
+     "dep": 12353.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 13216.0,
-     "dep": 13270.0,
-     "stop": false,
+     "arr": 13155.0,
+     "dep": 14011.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 14148.0,
-     "dep": 14202.0,
+     "arr": 14859.0,
+     "dep": 14913.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 15102.0,
-     "dep": 15156.0,
+     "arr": 15746.0,
+     "dep": 15800.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 15966.0,
+     "arr": 16512.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -449,41 +449,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 11412.0,
+     "dep": 11403.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 12398.0,
-     "dep": 12452.0,
+     "arr": 12206.0,
+     "dep": 12260.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 13412.0,
-     "dep": 16030.0,
-     "stop": true,
+     "arr": 13093.0,
+     "dep": 13147.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 17423.0,
-     "dep": 17477.0,
+     "arr": 13951.0,
+     "dep": 14005.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 18327.0,
-     "dep": 18381.0,
+     "arr": 14770.0,
+     "dep": 14824.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 19341.0,
+     "arr": 15671.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -504,35 +504,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 13460.0,
-     "dep": 13482.0,
+     "arr": 13403.0,
+     "dep": 13425.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 14142.0,
-     "dep": 14241.0,
+     "arr": 14066.0,
+     "dep": 14919.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 15001.0,
-     "dep": 15303.0,
-     "stop": true,
+     "arr": 15601.0,
+     "dep": 15623.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 15990.0,
-     "dep": 16050.0,
+     "arr": 16161.0,
+     "dep": 16221.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 16770.0,
+     "arr": 16842.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -553,35 +553,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 14520.0,
-     "dep": 14616.0,
+     "arr": 14421.0,
+     "dep": 14830.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 15243.0,
-     "dep": 15270.0,
-     "stop": false,
+     "arr": 15421.0,
+     "dep": 15661.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 15970.0,
-     "dep": 16069.0,
+     "arr": 16300.0,
+     "dep": 16360.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 16729.0,
-     "dep": 16751.0,
+     "arr": 17026.0,
+     "dep": 17048.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 17311.0,
+     "arr": 17526.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -596,41 +596,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 16830.0,
+     "dep": 16902.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 17850.0,
-     "dep": 18387.0,
-     "stop": true,
+     "arr": 17856.0,
+     "dep": 17910.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 19357.0,
-     "dep": 20618.0,
-     "stop": true,
+     "arr": 18675.0,
+     "dep": 18729.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 21478.0,
-     "dep": 21532.0,
+     "arr": 19449.0,
+     "dep": 19503.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 22492.0,
-     "dep": 23120.0,
-     "stop": true,
+     "arr": 20336.0,
+     "dep": 20390.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 23990.0,
+     "arr": 21102.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -645,41 +645,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 17371.0,
+     "dep": 17586.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 18181.0,
-     "dep": 18235.0,
+     "arr": 18389.0,
+     "dep": 18443.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 19135.0,
-     "dep": 19225.0,
-     "stop": false,
+     "arr": 19313.0,
+     "dep": 19509.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 20558.0,
-     "dep": 20612.0,
+     "arr": 20443.0,
+     "dep": 20497.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 21462.0,
-     "dep": 21516.0,
+     "arr": 21262.0,
+     "dep": 21316.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 22476.0,
+     "arr": 22163.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -694,41 +694,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 26100.0,
+     "dep": 22223.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 27060.0,
-     "dep": 27114.0,
+     "arr": 23177.0,
+     "dep": 23231.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 27964.0,
-     "dep": 28018.0,
-     "stop": false,
+     "arr": 24033.0,
+     "dep": 24475.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 28818.0,
-     "dep": 28872.0,
+     "arr": 25323.0,
+     "dep": 25377.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 29772.0,
-     "dep": 29826.0,
+     "arr": 26210.0,
+     "dep": 26264.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 30636.0,
+     "arr": 26976.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -749,35 +749,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 23060.0,
-     "dep": 23078.0,
+     "arr": 22988.0,
+     "dep": 23006.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 23738.0,
-     "dep": 23901.0,
+     "arr": 23668.0,
+     "dep": 23788.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 24601.0,
-     "dep": 24619.0,
-     "stop": false,
+     "arr": 24415.0,
+     "dep": 25045.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 25362.0,
-     "dep": 25380.0,
+     "arr": 25593.0,
+     "dep": 25611.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 26040.0,
+     "arr": 26175.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -792,41 +792,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 24670.0,
+     "dep": 23006.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 25540.0,
-     "dep": 27781.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "STP",
-     "arr": 28788.0,
-     "dep": 28878.0,
+     "arr": 23809.0,
+     "dep": 23863.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "STP",
+     "arr": 24733.0,
+     "dep": 25863.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "R2",
-     "arr": 30211.0,
-     "dep": 30265.0,
+     "arr": 26797.0,
+     "dep": 26851.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 31115.0,
-     "dep": 31169.0,
+     "arr": 27616.0,
+     "dep": 27670.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 32129.0,
+     "arr": 28517.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -841,41 +841,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 23100.0,
+     "dep": 23674.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 23760.0,
-     "dep": 23778.0,
+     "arr": 24457.0,
+     "dep": 24475.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 24405.0,
-     "dep": 24661.0,
-     "stop": true,
+     "arr": 24985.0,
+     "dep": 25007.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 25421.0,
-     "dep": 25481.0,
+     "arr": 25803.0,
+     "dep": 27024.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 26141.0,
-     "dep": 26159.0,
-     "stop": false,
+     "arr": 27687.0,
+     "dep": 27986.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 26719.0,
+     "arr": 28498.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -890,41 +890,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 24050.0,
+     "dep": 24358.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 24610.0,
-     "dep": 24632.0,
-     "stop": false,
+     "arr": 25048.0,
+     "dep": 26270.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 25292.0,
-     "dep": 25481.0,
+     "arr": 26964.0,
+     "dep": 27723.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 26181.0,
-     "dep": 26203.0,
+     "arr": 28339.0,
+     "dep": 28361.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 26830.0,
-     "dep": 27120.0,
+     "arr": 28899.0,
+     "dep": 29591.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 27840.0,
+     "arr": 30212.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -945,35 +945,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 25320.0,
-     "dep": 25422.0,
+     "arr": 25221.0,
+     "dep": 25713.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 26143.0,
-     "dep": 26241.0,
+     "arr": 26481.0,
+     "dep": 27024.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 27001.0,
-     "dep": 27061.0,
+     "arr": 27663.0,
+     "dep": 28873.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 27721.0,
-     "dep": 27743.0,
+     "arr": 29539.0,
+     "dep": 29561.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 28303.0,
+     "arr": 30039.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -988,41 +988,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 28363.0,
+     "dep": 27123.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 29233.0,
-     "dep": 29832.0,
-     "stop": true,
+     "arr": 27926.0,
+     "dep": 27980.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 31101.0,
-     "dep": 31191.0,
+     "arr": 28813.0,
+     "dep": 28867.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 32524.0,
-     "dep": 32578.0,
-     "stop": false,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "OZR",
-     "arr": 33488.0,
-     "dep": 33556.0,
+     "arr": 29708.0,
+     "dep": 30410.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
+     "station_id": "OZR",
+     "arr": 31303.0,
+     "dep": 31357.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "YUZ",
-     "arr": 34576.0,
+     "arr": 32204.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1037,41 +1037,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 27900.0,
+     "dep": 28577.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 28860.0,
-     "dep": 28914.0,
+     "arr": 29531.0,
+     "dep": 29585.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 29824.0,
-     "dep": 30271.0,
-     "stop": true,
+     "arr": 30350.0,
+     "dep": 30404.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 31131.0,
-     "dep": 31185.0,
+     "arr": 31124.0,
+     "dep": 31178.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 32085.0,
-     "dep": 32139.0,
+     "arr": 32011.0,
+     "dep": 32065.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 32949.0,
+     "arr": 32777.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1086,41 +1086,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 32536.0,
+     "dep": 32966.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 33496.0,
-     "dep": 33550.0,
+     "arr": 33920.0,
+     "dep": 33974.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 34498.0,
-     "dep": 34552.0,
-     "stop": false,
+     "arr": 35183.0,
+     "dep": 36437.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 35748.0,
-     "dep": 35802.0,
-     "stop": false,
+     "arr": 37472.0,
+     "dep": 40271.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 36702.0,
-     "dep": 36756.0,
+     "arr": 41232.0,
+     "dep": 41286.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 37566.0,
+     "arr": 41998.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1135,41 +1135,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 33009.0,
+     "dep": 32837.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 33819.0,
-     "dep": 33873.0,
+     "arr": 33640.0,
+     "dep": 33694.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 34833.0,
-     "dep": 37630.0,
-     "stop": true,
+     "arr": 34527.0,
+     "dep": 34581.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 39083.0,
-     "dep": 40354.0,
-     "stop": true,
+     "arr": 35385.0,
+     "dep": 35439.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 41264.0,
-     "dep": 41318.0,
+     "arr": 36204.0,
+     "dep": 36258.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 42278.0,
+     "arr": 37105.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1190,35 +1190,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 35060.0,
-     "dep": 35082.0,
+     "arr": 35003.0,
+     "dep": 35025.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 35742.0,
-     "dep": 35841.0,
+     "arr": 35701.0,
+     "dep": 35761.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 36601.0,
-     "dep": 36903.0,
-     "stop": true,
+     "arr": 36377.0,
+     "dep": 36399.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 37590.0,
-     "dep": 37650.0,
+     "arr": 36937.0,
+     "dep": 37032.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 38370.0,
+     "arr": 37653.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1239,35 +1239,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 36120.0,
-     "dep": 36216.0,
+     "arr": 36021.0,
+     "dep": 36997.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 36843.0,
-     "dep": 36870.0,
+     "arr": 37560.0,
+     "dep": 37587.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 37570.0,
-     "dep": 37669.0,
+     "arr": 38186.0,
+     "dep": 38246.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 38329.0,
-     "dep": 38351.0,
-     "stop": false,
+     "arr": 38940.0,
+     "dep": 39384.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 38911.0,
+     "arr": 39915.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1282,41 +1282,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 38430.0,
+     "dep": 38995.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 39390.0,
-     "dep": 39444.0,
+     "arr": 39949.0,
+     "dep": 40003.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 40294.0,
-     "dep": 40348.0,
-     "stop": false,
+     "arr": 40805.0,
+     "dep": 41129.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 41148.0,
-     "dep": 41202.0,
+     "arr": 41977.0,
+     "dep": 42031.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 42102.0,
-     "dep": 42156.0,
+     "arr": 42864.0,
+     "dep": 42918.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 42966.0,
+     "arr": 43630.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1331,41 +1331,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 38971.0,
+     "dep": 38521.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 39781.0,
-     "dep": 39835.0,
+     "arr": 39324.0,
+     "dep": 39378.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 41118.0,
-     "dep": 41208.0,
+     "arr": 40211.0,
+     "dep": 40265.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 42541.0,
-     "dep": 42595.0,
+     "arr": 41069.0,
+     "dep": 41123.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 43445.0,
-     "dep": 43499.0,
+     "arr": 41888.0,
+     "dep": 41942.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 44459.0,
+     "arr": 42789.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1380,41 +1380,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 47700.0,
+     "dep": 43416.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 48660.0,
-     "dep": 48714.0,
+     "arr": 44370.0,
+     "dep": 44424.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 49564.0,
-     "dep": 49618.0,
+     "arr": 45189.0,
+     "dep": 45243.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 50418.0,
-     "dep": 50472.0,
+     "arr": 46081.0,
+     "dep": 46135.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 51372.0,
-     "dep": 51426.0,
+     "arr": 46968.0,
+     "dep": 47022.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 52236.0,
+     "arr": 47734.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1429,41 +1429,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 45920.0,
+     "dep": 43868.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 46790.0,
-     "dep": 49381.0,
-     "stop": true,
+     "arr": 44671.0,
+     "dep": 44725.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 50388.0,
-     "dep": 50478.0,
-     "stop": false,
+     "arr": 45595.0,
+     "dep": 49113.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 51811.0,
-     "dep": 51865.0,
-     "stop": false,
+     "arr": 50375.0,
+     "dep": 50836.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 52715.0,
-     "dep": 52769.0,
+     "arr": 51729.0,
+     "dep": 51783.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 53729.0,
+     "arr": 52630.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1478,41 +1478,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 44100.0,
+     "dep": 44725.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 44660.0,
-     "dep": 44678.0,
+     "arr": 45213.0,
+     "dep": 45231.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 45381.0,
-     "dep": 45501.0,
+     "arr": 46075.0,
+     "dep": 46791.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 46201.0,
-     "dep": 46219.0,
-     "stop": false,
+     "arr": 47418.0,
+     "dep": 47658.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 46962.0,
-     "dep": 46980.0,
+     "arr": 48206.0,
+     "dep": 48224.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 47640.0,
+     "arr": 48788.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1527,41 +1527,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 44700.0,
+     "dep": 44773.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 45360.0,
-     "dep": 45378.0,
+     "arr": 45351.0,
+     "dep": 45369.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 46005.0,
-     "dep": 46261.0,
-     "stop": true,
+     "arr": 46113.0,
+     "dep": 46135.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 47021.0,
-     "dep": 47081.0,
+     "arr": 46731.0,
+     "dep": 47022.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 47741.0,
-     "dep": 47759.0,
+     "arr": 47661.0,
+     "dep": 47679.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 48319.0,
+     "arr": 48214.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1576,41 +1576,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 45300.0,
+     "dep": 46152.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 45860.0,
-     "dep": 45882.0,
-     "stop": false,
+     "arr": 46683.0,
+     "dep": 47721.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 46581.0,
-     "dep": 47081.0,
+     "arr": 48415.0,
+     "dep": 48475.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 47781.0,
-     "dep": 47803.0,
+     "arr": 49091.0,
+     "dep": 49113.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 48430.0,
-     "dep": 48720.0,
+     "arr": 49651.0,
+     "dep": 50017.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 49440.0,
+     "arr": 50638.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1625,41 +1625,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 46200.0,
+     "dep": 46230.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 46920.0,
-     "dep": 47022.0,
+     "arr": 46851.0,
+     "dep": 46911.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 47709.0,
-     "dep": 47841.0,
-     "stop": true,
+     "arr": 47598.0,
+     "dep": 47625.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 48601.0,
-     "dep": 48661.0,
+     "arr": 48224.0,
+     "dep": 48475.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 49321.0,
-     "dep": 49343.0,
+     "arr": 49141.0,
+     "dep": 49163.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 49903.0,
+     "arr": 49641.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1674,41 +1674,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 49500.0,
+     "dep": 49003.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 50460.0,
-     "dep": 50514.0,
+     "arr": 49957.0,
+     "dep": 50011.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 51424.0,
-     "dep": 51871.0,
-     "stop": true,
+     "arr": 50776.0,
+     "dep": 50830.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 52731.0,
-     "dep": 52785.0,
+     "arr": 51550.0,
+     "dep": 51604.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 53685.0,
-     "dep": 53739.0,
+     "arr": 52437.0,
+     "dep": 52491.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 54549.0,
+     "arr": 53203.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1723,41 +1723,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 49963.0,
+     "dep": 49701.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 50833.0,
-     "dep": 51432.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "STP",
-     "arr": 52701.0,
-     "dep": 52791.0,
+     "arr": 50504.0,
+     "dep": 50558.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "STP",
+     "arr": 51428.0,
+     "dep": 51610.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "R2",
-     "arr": 54125.0,
-     "dep": 54179.0,
+     "arr": 52544.0,
+     "dep": 52598.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 55089.0,
-     "dep": 55318.0,
-     "stop": true,
+     "arr": 53363.0,
+     "dep": 53417.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 56338.0,
+     "arr": 54264.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1772,41 +1772,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 54298.0,
+     "dep": 54324.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 55258.0,
-     "dep": 55312.0,
+     "arr": 55352.0,
+     "dep": 55406.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 56162.0,
-     "dep": 56216.0,
+     "arr": 56171.0,
+     "dep": 56225.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 57348.0,
-     "dep": 57402.0,
+     "arr": 57272.0,
+     "dep": 57326.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 58302.0,
-     "dep": 58356.0,
+     "arr": 58159.0,
+     "dep": 58213.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 59166.0,
+     "arr": 58925.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1827,35 +1827,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 55467.0,
-     "dep": 55521.0,
+     "arr": 55461.0,
+     "dep": 55515.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 56481.0,
-     "dep": 59230.0,
+     "arr": 56786.0,
+     "dep": 58960.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 60623.0,
-     "dep": 60677.0,
+     "arr": 59894.0,
+     "dep": 59948.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 61527.0,
-     "dep": 61581.0,
-     "stop": false,
+     "arr": 60750.0,
+     "dep": 60816.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 62541.0,
+     "arr": 61791.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1876,35 +1876,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 56660.0,
-     "dep": 56682.0,
+     "arr": 56603.0,
+     "dep": 56625.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 57342.0,
-     "dep": 57441.0,
+     "arr": 57266.0,
+     "dep": 57361.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 58201.0,
-     "dep": 58503.0,
+     "arr": 58000.0,
+     "dep": 58334.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 59190.0,
-     "dep": 59250.0,
+     "arr": 58925.0,
+     "dep": 58985.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 59970.0,
+     "arr": 59606.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1919,41 +1919,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 57000.0,
+     "dep": 57030.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 57720.0,
-     "dep": 57816.0,
+     "arr": 57651.0,
+     "dep": 57711.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 58443.0,
-     "dep": 58470.0,
+     "arr": 58274.0,
+     "dep": 58301.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 59170.0,
-     "dep": 59269.0,
+     "arr": 58900.0,
+     "dep": 58991.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 59929.0,
-     "dep": 59951.0,
+     "arr": 59657.0,
+     "dep": 59679.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 60511.0,
+     "arr": 60157.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -1968,41 +1968,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 60030.0,
+     "dep": 59666.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 61356.0,
-     "dep": 61587.0,
-     "stop": true,
+     "arr": 60756.0,
+     "dep": 60810.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 62497.0,
-     "dep": 62551.0,
+     "arr": 61575.0,
+     "dep": 61629.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 63351.0,
-     "dep": 63405.0,
+     "arr": 62349.0,
+     "dep": 62403.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 64305.0,
-     "dep": 64359.0,
+     "arr": 63236.0,
+     "dep": 63290.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 65169.0,
+     "arr": 64002.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2017,41 +2017,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 60810.0,
+     "dep": 60310.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 61941.0,
-     "dep": 61995.0,
+     "arr": 61151.0,
+     "dep": 61205.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 63321.0,
-     "dep": 63411.0,
-     "stop": false,
+     "arr": 62343.0,
+     "dep": 62409.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 64744.0,
-     "dep": 64798.0,
+     "arr": 63343.0,
+     "dep": 63397.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 65648.0,
-     "dep": 65702.0,
+     "arr": 64162.0,
+     "dep": 64216.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 66662.0,
+     "arr": 65063.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2066,41 +2066,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 69392.0,
+     "dep": 71808.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 70352.0,
-     "dep": 70406.0,
+     "arr": 72762.0,
+     "dep": 72816.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 71256.0,
-     "dep": 71310.0,
-     "stop": false,
+     "arr": 74025.0,
+     "dep": 74401.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 72110.0,
-     "dep": 72164.0,
+     "arr": 75298.0,
+     "dep": 75352.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 73064.0,
-     "dep": 73118.0,
+     "arr": 76185.0,
+     "dep": 76239.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 73928.0,
+     "arr": 76951.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2121,35 +2121,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 66260.0,
-     "dep": 66278.0,
+     "arr": 66188.0,
+     "dep": 66206.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 66938.0,
-     "dep": 67101.0,
+     "arr": 66831.0,
+     "dep": 66988.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 67861.0,
-     "dep": 68027.0,
+     "arr": 67615.0,
+     "dep": 67634.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 68654.0,
-     "dep": 68672.0,
-     "stop": false,
+     "arr": 68378.0,
+     "dep": 69366.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 69332.0,
+     "arr": 69968.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2164,41 +2164,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 67520.0,
+     "dep": 72209.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 68390.0,
-     "dep": 71049.0,
+     "arr": 73049.0,
+     "dep": 74294.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 72080.0,
-     "dep": 72170.0,
-     "stop": false,
+     "arr": 75292.0,
+     "dep": 75686.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 73503.0,
-     "dep": 73557.0,
+     "arr": 76620.0,
+     "dep": 76674.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 74407.0,
-     "dep": 74461.0,
-     "stop": false,
+     "arr": 77476.0,
+     "dep": 79311.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 75421.0,
+     "arr": 80286.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2213,41 +2213,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 66722.0,
+     "dep": 66302.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 67382.0,
-     "dep": 67400.0,
+     "arr": 66880.0,
+     "dep": 66898.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 67967.0,
-     "dep": 67989.0,
-     "stop": false,
+     "arr": 67432.0,
+     "dep": 67799.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 68689.0,
-     "dep": 68749.0,
+     "arr": 68426.0,
+     "dep": 68486.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 69409.0,
-     "dep": 69427.0,
+     "arr": 69125.0,
+     "dep": 69143.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 69987.0,
+     "arr": 69617.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2262,41 +2262,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 66900.0,
+     "dep": 66901.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 67460.0,
-     "dep": 67482.0,
+     "arr": 67404.0,
+     "dep": 67426.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 68142.0,
-     "dep": 68749.0,
+     "arr": 68101.0,
+     "dep": 68567.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 69449.0,
-     "dep": 69471.0,
+     "arr": 69367.0,
+     "dep": 69389.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 70098.0,
-     "dep": 70412.0,
+     "arr": 69927.0,
+     "dep": 69987.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 71132.0,
+     "arr": 70608.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2317,35 +2317,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 68520.0,
-     "dep": 68714.0,
+     "arr": 68421.0,
+     "dep": 68596.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 69401.0,
-     "dep": 69509.0,
+     "arr": 69187.0,
+     "dep": 69427.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 70269.0,
-     "dep": 70329.0,
+     "arr": 70066.0,
+     "dep": 70126.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 70989.0,
-     "dep": 71011.0,
+     "arr": 70792.0,
+     "dep": 70814.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 71571.0,
+     "arr": 71292.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2360,41 +2360,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 71192.0,
+     "dep": 70800.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 72152.0,
-     "dep": 72206.0,
+     "arr": 71754.0,
+     "dep": 71808.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 73116.0,
-     "dep": 73563.0,
-     "stop": true,
+     "arr": 72573.0,
+     "dep": 72627.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 74423.0,
-     "dep": 74477.0,
+     "arr": 73347.0,
+     "dep": 73401.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 75377.0,
-     "dep": 75431.0,
+     "arr": 74234.0,
+     "dep": 74288.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 76241.0,
+     "arr": 75000.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2409,41 +2409,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 71631.0,
+     "dep": 71352.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 72501.0,
-     "dep": 73124.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "STP",
-     "arr": 74393.0,
-     "dep": 74483.0,
+     "arr": 72155.0,
+     "dep": 72209.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "STP",
+     "arr": 73341.0,
+     "dep": 73407.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "R2",
-     "arr": 75816.0,
-     "dep": 75870.0,
+     "arr": 74341.0,
+     "dep": 74395.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 76780.0,
-     "dep": 77040.0,
-     "stop": true,
+     "arr": 75160.0,
+     "dep": 75214.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 78060.0,
+     "arr": 76061.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2458,41 +2458,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 76020.0,
+     "dep": 76528.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 76980.0,
-     "dep": 77034.0,
+     "arr": 77482.0,
+     "dep": 77536.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 77884.0,
-     "dep": 77938.0,
+     "arr": 78301.0,
+     "dep": 78355.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 78948.0,
-     "dep": 79002.0,
+     "arr": 79075.0,
+     "dep": 79129.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 79902.0,
-     "dep": 79956.0,
+     "arr": 79962.0,
+     "dep": 80016.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 80766.0,
+     "arr": 80728.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2507,41 +2507,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 76304.0,
+     "dep": 78225.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 77114.0,
-     "dep": 77168.0,
-     "stop": false,
+     "arr": 79065.0,
+     "dep": 80022.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 78128.0,
-     "dep": 80832.0,
+     "arr": 81020.0,
+     "dep": 81198.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 82285.0,
-     "dep": 83554.0,
+     "arr": 82169.0,
+     "dep": 83122.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 84464.0,
-     "dep": 84518.0,
+     "arr": 84015.0,
+     "dep": 84069.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 85478.0,
+     "arr": 84916.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2562,35 +2562,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 78260.0,
-     "dep": 78282.0,
+     "arr": 78203.0,
+     "dep": 78225.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 78942.0,
-     "dep": 79041.0,
+     "arr": 78901.0,
+     "dep": 80560.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 79801.0,
-     "dep": 80103.0,
-     "stop": true,
+     "arr": 81176.0,
+     "dep": 81198.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 80790.0,
-     "dep": 80850.0,
+     "arr": 81736.0,
+     "dep": 82303.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 81570.0,
+     "arr": 82924.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2605,41 +2605,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 78600.0,
+     "dep": 78630.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 79320.0,
-     "dep": 79416.0,
+     "arr": 79251.0,
+     "dep": 79311.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 80043.0,
-     "dep": 80070.0,
+     "arr": 79874.0,
+     "dep": 79901.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 80772.0,
-     "dep": 80869.0,
+     "arr": 80500.0,
+     "dep": 81217.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 81529.0,
-     "dep": 81551.0,
-     "stop": false,
+     "arr": 81911.0,
+     "dep": 82151.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 82111.0,
+     "arr": 82682.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2654,41 +2654,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 82171.0,
+     "dep": 81288.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 82981.0,
-     "dep": 83035.0,
+     "arr": 82091.0,
+     "dep": 82145.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 84318.0,
-     "dep": 84408.0,
-     "stop": false,
+     "arr": 83015.0,
+     "dep": 83896.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 85741.0,
-     "dep": 85795.0,
+     "arr": 84830.0,
+     "dep": 84884.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 86645.0,
-     "dep": 86699.0,
+     "arr": 85649.0,
+     "dep": 85703.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 87659.0,
+     "arr": 86550.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2703,41 +2703,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 81630.0,
+     "dep": 81289.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 82590.0,
-     "dep": 82644.0,
+     "arr": 82243.0,
+     "dep": 82297.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 83494.0,
-     "dep": 83548.0,
+     "arr": 83062.0,
+     "dep": 83116.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 84348.0,
-     "dep": 84402.0,
+     "arr": 83836.0,
+     "dep": 83890.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 85302.0,
-     "dep": 85356.0,
+     "arr": 84723.0,
+     "dep": 84777.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 86166.0,
+     "arr": 85489.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2752,41 +2752,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 91341.0,
+     "dep": 87137.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 92211.0,
-     "dep": 92389.0,
-     "stop": true,
+     "arr": 87940.0,
+     "dep": 87994.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 93349.0,
-     "dep": 93439.0,
+     "arr": 88827.0,
+     "dep": 88881.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 94772.0,
-     "dep": 94826.0,
-     "stop": false,
+     "arr": 89722.0,
+     "dep": 90376.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 95676.0,
-     "dep": 95730.0,
+     "arr": 91269.0,
+     "dep": 91323.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 96690.0,
+     "arr": 92170.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2801,41 +2801,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 90270.0,
+     "dep": 87200.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 91596.0,
-     "dep": 91650.0,
+     "arr": 88154.0,
+     "dep": 88208.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 92500.0,
-     "dep": 92554.0,
-     "stop": false,
+     "arr": 89010.0,
+     "dep": 89782.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 93355.0,
-     "dep": 93409.0,
-     "stop": false,
+     "arr": 90667.0,
+     "dep": 90721.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 94309.0,
-     "dep": 94363.0,
+     "arr": 91682.0,
+     "dep": 91736.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 95173.0,
+     "arr": 92448.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2850,41 +2850,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 87300.0,
+     "dep": 87994.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 87860.0,
-     "dep": 87878.0,
+     "arr": 88482.0,
+     "dep": 88500.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 88538.0,
-     "dep": 91631.0,
+     "arr": 89307.0,
+     "dep": 90727.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 92467.0,
-     "dep": 92605.0,
+     "arr": 91354.0,
+     "dep": 91372.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 93292.0,
-     "dep": 93456.0,
-     "stop": true,
+     "arr": 91920.0,
+     "dep": 91938.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 94176.0,
+     "arr": 92650.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2899,41 +2899,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 87900.0,
+     "dep": 88981.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 88560.0,
-     "dep": 88578.0,
+     "arr": 89764.0,
+     "dep": 89782.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 89145.0,
-     "dep": 89167.0,
-     "stop": false,
+     "arr": 90316.0,
+     "dep": 92071.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 89867.0,
-     "dep": 90043.0,
+     "arr": 92698.0,
+     "dep": 92758.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 90703.0,
-     "dep": 90721.0,
+     "arr": 93528.0,
+     "dep": 93546.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 91281.0,
+     "arr": 94020.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2954,35 +2954,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 89060.0,
-     "dep": 89082.0,
+     "arr": 89003.0,
+     "dep": 89025.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 89742.0,
-     "dep": 89928.0,
+     "arr": 89787.0,
+     "dep": 91372.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 90688.0,
-     "dep": 90903.0,
+     "arr": 92011.0,
+     "dep": 92694.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 91590.0,
-     "dep": 91656.0,
+     "arr": 93285.0,
+     "dep": 93724.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 92376.0,
+     "arr": 94345.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -2997,41 +2997,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 89436.0,
+     "dep": 89782.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 90156.0,
-     "dep": 90216.0,
+     "arr": 90403.0,
+     "dep": 92071.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 90843.0,
-     "dep": 90870.0,
+     "arr": 92634.0,
+     "dep": 92661.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 91570.0,
-     "dep": 91669.0,
+     "arr": 93260.0,
+     "dep": 93546.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 92329.0,
-     "dep": 92351.0,
+     "arr": 94212.0,
+     "dep": 94234.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 92911.0,
+     "arr": 94712.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3046,41 +3046,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 92436.0,
+     "dep": 92710.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 93396.0,
-     "dep": 93450.0,
+     "arr": 93664.0,
+     "dep": 93718.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 94529.0,
-     "dep": 94832.0,
-     "stop": true,
+     "arr": 94483.0,
+     "dep": 94537.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 95692.0,
-     "dep": 95746.0,
+     "arr": 95276.0,
+     "dep": 95330.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 96646.0,
-     "dep": 96700.0,
+     "arr": 96163.0,
+     "dep": 96217.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 97510.0,
+     "arr": 96929.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3095,41 +3095,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 93360.0,
+     "dep": 92508.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 94230.0,
-     "dep": 94488.0,
+     "arr": 93348.0,
+     "dep": 94272.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 95662.0,
-     "dep": 95752.0,
-     "stop": false,
+     "arr": 95270.0,
+     "dep": 95336.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 97115.0,
-     "dep": 97169.0,
+     "arr": 96270.0,
+     "dep": 96324.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 98430.0,
-     "dep": 98484.0,
+     "arr": 97089.0,
+     "dep": 97143.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 99444.0,
+     "arr": 97990.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3144,41 +3144,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 97404.0,
+     "dep": 98050.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 98424.0,
-     "dep": 98490.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "R2",
-     "arr": 99400.0,
-     "dep": 99454.0,
+     "arr": 99004.0,
+     "dep": 99058.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "R2",
+     "arr": 99860.0,
+     "dep": 100788.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "STP",
-     "arr": 100548.0,
-     "dep": 100602.0,
+     "arr": 101636.0,
+     "dep": 101690.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 101502.0,
-     "dep": 101556.0,
+     "arr": 102523.0,
+     "dep": 102577.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 102366.0,
+     "arr": 103289.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3193,41 +3193,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 99920.0,
+     "dep": 98180.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 100790.0,
-     "dep": 101562.0,
-     "stop": true,
+     "arr": 98983.0,
+     "dep": 99037.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 102522.0,
-     "dep": 102612.0,
+     "arr": 99870.0,
+     "dep": 99924.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 103945.0,
-     "dep": 103999.0,
+     "arr": 100728.0,
+     "dep": 100782.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 104849.0,
-     "dep": 104903.0,
+     "arr": 101547.0,
+     "dep": 101601.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 105863.0,
+     "arr": 102448.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3248,35 +3248,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 99860.0,
-     "dep": 99882.0,
+     "arr": 99803.0,
+     "dep": 99825.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 100542.0,
-     "dep": 100642.0,
+     "arr": 100473.0,
+     "dep": 101733.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 101402.0,
-     "dep": 101703.0,
-     "stop": true,
+     "arr": 102378.0,
+     "dep": 102400.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 102390.0,
-     "dep": 102450.0,
+     "arr": 102938.0,
+     "dep": 102998.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 103170.0,
+     "arr": 103619.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3291,41 +3291,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 100236.0,
+     "dep": 100200.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 100956.0,
-     "dep": 101016.0,
+     "arr": 100821.0,
+     "dep": 101607.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 101643.0,
-     "dep": 101670.0,
-     "stop": false,
+     "arr": 102198.0,
+     "dep": 102438.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 102409.0,
-     "dep": 102582.0,
+     "arr": 103077.0,
+     "dep": 103137.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 103242.0,
-     "dep": 103264.0,
-     "stop": false,
+     "arr": 103831.0,
+     "dep": 104212.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 103824.0,
+     "arr": 104743.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3340,41 +3340,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 103884.0,
+     "dep": 103349.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 104694.0,
-     "dep": 104748.0,
+     "arr": 104152.0,
+     "dep": 104206.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 105648.0,
-     "dep": 105738.0,
+     "arr": 105039.0,
+     "dep": 105093.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 107071.0,
-     "dep": 107125.0,
+     "arr": 105897.0,
+     "dep": 105951.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 107975.0,
-     "dep": 108029.0,
+     "arr": 106716.0,
+     "dep": 106770.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 108989.0,
+     "arr": 107617.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3389,41 +3389,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 103411.0,
+     "dep": 103679.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 104737.0,
-     "dep": 104910.0,
-     "stop": true,
+     "arr": 104861.0,
+     "dep": 104915.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 105880.0,
-     "dep": 107131.0,
+     "arr": 105717.0,
+     "dep": 105957.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 108003.0,
-     "dep": 108057.0,
+     "arr": 106805.0,
+     "dep": 106859.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 109017.0,
-     "dep": 109520.0,
-     "stop": true,
+     "arr": 107692.0,
+     "dep": 107746.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 110390.0,
+     "arr": 108458.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3438,41 +3438,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 112524.0,
+     "dep": 114730.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 113484.0,
-     "dep": 113538.0,
+     "arr": 115684.0,
+     "dep": 115738.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 114388.0,
-     "dep": 114442.0,
+     "arr": 116503.0,
+     "dep": 116557.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 115242.0,
-     "dep": 115296.0,
+     "arr": 117277.0,
+     "dep": 117331.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 116196.0,
-     "dep": 116250.0,
-     "stop": false,
+     "arr": 118605.0,
+     "dep": 118845.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 117060.0,
+     "arr": 119685.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3493,35 +3493,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 109460.0,
-     "dep": 109478.0,
+     "arr": 109388.0,
+     "dep": 109406.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 110138.0,
-     "dep": 110301.0,
+     "arr": 110068.0,
+     "dep": 110294.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 111061.0,
-     "dep": 111159.0,
-     "stop": true,
+     "arr": 110995.0,
+     "dep": 111013.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 111786.0,
-     "dep": 111804.0,
+     "arr": 111663.0,
+     "dep": 111681.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 112464.0,
+     "arr": 112245.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3536,41 +3536,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 111478.0,
+     "dep": 110625.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 112607.0,
-     "dep": 112661.0,
+     "arr": 111428.0,
+     "dep": 111482.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 113621.0,
-     "dep": 115302.0,
-     "stop": true,
+     "arr": 112670.0,
+     "dep": 112724.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 116695.0,
-     "dep": 116749.0,
+     "arr": 113528.0,
+     "dep": 113582.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 117599.0,
-     "dep": 117653.0,
-     "stop": false,
+     "arr": 114490.0,
+     "dep": 115744.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 118613.0,
+     "arr": 116719.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3585,41 +3585,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 109501.0,
+     "dep": 109500.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 110188.0,
-     "dep": 110206.0,
+     "arr": 110078.0,
+     "dep": 110096.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 111099.0,
-     "dep": 111121.0,
-     "stop": false,
+     "arr": 110815.0,
+     "dep": 112037.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 111821.0,
-     "dep": 111881.0,
+     "arr": 112664.0,
+     "dep": 112730.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 112601.0,
-     "dep": 112667.0,
-     "stop": true,
+     "arr": 113369.0,
+     "dep": 113387.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 113287.0,
+     "arr": 113861.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3634,41 +3634,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 110450.0,
+     "dep": 110100.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 111010.0,
-     "dep": 111032.0,
+     "arr": 110603.0,
+     "dep": 110625.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 111692.0,
-     "dep": 111881.0,
+     "arr": 111301.0,
+     "dep": 111361.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 112641.0,
-     "dep": 112734.0,
-     "stop": true,
+     "arr": 111977.0,
+     "dep": 111999.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 113421.0,
-     "dep": 113544.0,
+     "arr": 112537.0,
+     "dep": 112632.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 114264.0,
+     "arr": 113253.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3689,35 +3689,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 111720.0,
-     "dep": 111846.0,
+     "arr": 111621.0,
+     "dep": 112597.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 112674.0,
-     "dep": 112701.0,
-     "stop": false,
+     "arr": 113188.0,
+     "dep": 113588.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 113401.0,
-     "dep": 113681.0,
+     "arr": 114227.0,
+     "dep": 114287.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 114341.0,
-     "dep": 114363.0,
+     "arr": 114953.0,
+     "dep": 114975.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 114923.0,
+     "arr": 115453.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3732,41 +3732,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 114324.0,
+     "dep": 113722.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 115284.0,
-     "dep": 115338.0,
+     "arr": 114676.0,
+     "dep": 114730.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 116248.0,
-     "dep": 116755.0,
-     "stop": true,
+     "arr": 115495.0,
+     "dep": 115549.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 117615.0,
-     "dep": 117669.0,
+     "arr": 116269.0,
+     "dep": 116323.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 118569.0,
-     "dep": 118623.0,
+     "arr": 117156.0,
+     "dep": 117210.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 119433.0,
+     "arr": 117922.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3781,41 +3781,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 114983.0,
+     "dep": 117982.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 115853.0,
-     "dep": 116259.0,
-     "stop": true,
+     "arr": 118785.0,
+     "dep": 118839.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 117585.0,
-     "dep": 117675.0,
+     "arr": 119672.0,
+     "dep": 119726.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 119008.0,
-     "dep": 119062.0,
-     "stop": false,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "OZR",
-     "arr": 119972.0,
-     "dep": 120038.0,
+     "arr": 120567.0,
+     "dep": 121218.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
+     "station_id": "OZR",
+     "arr": 122427.0,
+     "dep": 122481.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "YUZ",
-     "arr": 121058.0,
+     "arr": 123328.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3830,41 +3830,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 118673.0,
+     "dep": 118530.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 119978.0,
-     "dep": 120032.0,
+     "arr": 119484.0,
+     "dep": 119538.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 120915.0,
-     "dep": 120969.0,
-     "stop": false,
+     "arr": 120340.0,
+     "dep": 120627.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 122165.0,
-     "dep": 122219.0,
-     "stop": false,
+     "arr": 121512.0,
+     "dep": 121578.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 123119.0,
-     "dep": 123173.0,
+     "arr": 122539.0,
+     "dep": 122593.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 123983.0,
+     "arr": 123305.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3879,41 +3879,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 119615.0,
+     "dep": 119745.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 120425.0,
-     "dep": 120479.0,
+     "arr": 120585.0,
+     "dep": 120639.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 121439.0,
-     "dep": 123001.0,
-     "stop": true,
+     "arr": 121518.0,
+     "dep": 121572.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 124394.0,
-     "dep": 124448.0,
+     "arr": 122427.0,
+     "dep": 122481.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 125364.0,
-     "dep": 125494.0,
-     "stop": true,
+     "arr": 123246.0,
+     "dep": 123300.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 126514.0,
+     "arr": 124147.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3928,41 +3928,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 120917.0,
+     "dep": 120900.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 121477.0,
-     "dep": 121499.0,
-     "stop": false,
+     "arr": 121431.0,
+     "dep": 122599.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 122159.0,
-     "dep": 122241.0,
+     "arr": 123293.0,
+     "dep": 123353.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 122941.0,
-     "dep": 122963.0,
+     "arr": 124077.0,
+     "dep": 124099.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 123590.0,
-     "dep": 123694.0,
+     "arr": 124640.0,
+     "dep": 125221.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 124414.0,
+     "arr": 125842.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -3977,41 +3977,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 121836.0,
+     "dep": 121800.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 122556.0,
-     "dep": 123650.0,
+     "arr": 122421.0,
+     "dep": 123306.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 124388.0,
-     "dep": 124454.0,
+     "arr": 123897.0,
+     "dep": 124137.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 125214.0,
-     "dep": 125274.0,
+     "arr": 124776.0,
+     "dep": 124836.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 125934.0,
-     "dep": 125956.0,
+     "arr": 125502.0,
+     "dep": 125524.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 126516.0,
+     "arr": 126002.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4026,41 +4026,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 124474.0,
+     "dep": 124207.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 125434.0,
-     "dep": 125488.0,
+     "arr": 125161.0,
+     "dep": 125215.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 126338.0,
-     "dep": 126392.0,
+     "arr": 125980.0,
+     "dep": 126034.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 127192.0,
-     "dep": 127246.0,
+     "arr": 126754.0,
+     "dep": 126808.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 128146.0,
-     "dep": 128200.0,
+     "arr": 127641.0,
+     "dep": 127695.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 129010.0,
+     "arr": 128407.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4081,35 +4081,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 125322.0,
-     "dep": 126055.0,
+     "arr": 125292.0,
+     "dep": 125562.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 127162.0,
-     "dep": 127252.0,
-     "stop": false,
+     "arr": 126560.0,
+     "dep": 126814.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 128585.0,
-     "dep": 128639.0,
+     "arr": 127748.0,
+     "dep": 127802.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 129489.0,
-     "dep": 129543.0,
+     "arr": 128567.0,
+     "dep": 128621.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 130503.0,
+     "arr": 129468.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4124,41 +4124,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 134100.0,
+     "dep": 129528.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 135060.0,
-     "dep": 135114.0,
+     "arr": 130482.0,
+     "dep": 130536.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 135964.0,
-     "dep": 136018.0,
-     "stop": false,
+     "arr": 131338.0,
+     "dep": 132510.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 136818.0,
-     "dep": 136872.0,
-     "stop": false,
+     "arr": 133395.0,
+     "dep": 133449.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 137772.0,
-     "dep": 137826.0,
+     "arr": 134410.0,
+     "dep": 134464.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 138636.0,
+     "arr": 135176.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4173,41 +4173,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 132320.0,
+     "dep": 129902.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 133190.0,
-     "dep": 135781.0,
-     "stop": true,
+     "arr": 130705.0,
+     "dep": 130759.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 136788.0,
-     "dep": 136878.0,
+     "arr": 131592.0,
+     "dep": 131646.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 138211.0,
-     "dep": 138265.0,
+     "arr": 132450.0,
+     "dep": 132504.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 139115.0,
-     "dep": 139169.0,
-     "stop": false,
+     "arr": 133306.0,
+     "dep": 134047.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 140129.0,
+     "arr": 135022.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4222,41 +4222,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 130500.0,
+     "dep": 130759.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 131060.0,
-     "dep": 131078.0,
+     "arr": 131271.0,
+     "dep": 131289.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 131781.0,
-     "dep": 131901.0,
+     "arr": 132072.0,
+     "dep": 133455.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 132601.0,
-     "dep": 132619.0,
+     "arr": 134080.0,
+     "dep": 134098.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 133362.0,
-     "dep": 133380.0,
-     "stop": false,
+     "arr": 134701.0,
+     "dep": 134719.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 134040.0,
+     "arr": 135502.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4271,41 +4271,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 131100.0,
+     "dep": 132565.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 131760.0,
-     "dep": 131778.0,
+     "arr": 133348.0,
+     "dep": 133366.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 132405.0,
-     "dep": 132661.0,
+     "arr": 133900.0,
+     "dep": 134774.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 133421.0,
-     "dep": 133481.0,
+     "arr": 135401.0,
+     "dep": 135461.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 134141.0,
-     "dep": 134159.0,
+     "arr": 136100.0,
+     "dep": 136118.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 134719.0,
+     "arr": 136592.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4326,35 +4326,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 132260.0,
-     "dep": 132282.0,
+     "arr": 132213.0,
+     "dep": 132235.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 132942.0,
-     "dep": 133481.0,
+     "arr": 132901.0,
+     "dep": 134098.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 134181.0,
-     "dep": 134203.0,
+     "arr": 134714.0,
+     "dep": 134736.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 134830.0,
-     "dep": 135120.0,
+     "arr": 135274.0,
+     "dep": 135334.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 135840.0,
+     "arr": 135982.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4369,41 +4369,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 132600.0,
+     "dep": 133366.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 133320.0,
-     "dep": 133422.0,
+     "arr": 133987.0,
+     "dep": 135334.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 134109.0,
-     "dep": 134241.0,
-     "stop": true,
+     "arr": 135897.0,
+     "dep": 135924.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 135001.0,
-     "dep": 135061.0,
+     "arr": 136523.0,
+     "dep": 136583.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 135721.0,
-     "dep": 135743.0,
-     "stop": false,
+     "arr": 137277.0,
+     "dep": 137517.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 136303.0,
+     "arr": 138048.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4418,41 +4418,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 135900.0,
+     "dep": 136042.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 136860.0,
-     "dep": 136914.0,
+     "arr": 136996.0,
+     "dep": 137050.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 137824.0,
-     "dep": 138271.0,
-     "stop": true,
+     "arr": 137815.0,
+     "dep": 137869.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 139131.0,
-     "dep": 139185.0,
+     "arr": 138589.0,
+     "dep": 138643.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 140085.0,
-     "dep": 140139.0,
+     "arr": 139476.0,
+     "dep": 139530.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 140949.0,
+     "arr": 140242.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4467,41 +4467,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 136363.0,
+     "dep": 136652.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 137233.0,
-     "dep": 137832.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "STP",
-     "arr": 139101.0,
-     "dep": 139191.0,
+     "arr": 137457.0,
+     "dep": 137511.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "STP",
+     "arr": 138384.0,
+     "dep": 138649.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "R2",
-     "arr": 140524.0,
-     "dep": 140578.0,
+     "arr": 139583.0,
+     "dep": 139637.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 141488.0,
-     "dep": 141966.0,
-     "stop": true,
+     "arr": 140402.0,
+     "dep": 140456.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 142986.0,
+     "arr": 141303.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4516,41 +4516,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 140946.0,
+     "dep": 141495.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 141906.0,
-     "dep": 141960.0,
+     "arr": 142449.0,
+     "dep": 142503.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 142810.0,
-     "dep": 142864.0,
-     "stop": false,
+     "arr": 143305.0,
+     "dep": 144123.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 143748.0,
-     "dep": 143802.0,
+     "arr": 144971.0,
+     "dep": 145025.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 144702.0,
-     "dep": 144756.0,
+     "arr": 145858.0,
+     "dep": 145912.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 145566.0,
+     "arr": 146624.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4565,41 +4565,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 143121.0,
+     "dep": 141515.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 143991.0,
-     "dep": 144762.0,
-     "stop": true,
+     "arr": 142318.0,
+     "dep": 142372.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 145722.0,
-     "dep": 145812.0,
+     "arr": 143205.0,
+     "dep": 143259.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 147145.0,
-     "dep": 147199.0,
+     "arr": 144063.0,
+     "dep": 144117.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 148049.0,
-     "dep": 148103.0,
+     "arr": 144882.0,
+     "dep": 144936.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 149063.0,
+     "arr": 145783.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4620,35 +4620,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 143060.0,
-     "dep": 143082.0,
+     "arr": 143003.0,
+     "dep": 143025.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 143742.0,
-     "dep": 143841.0,
+     "arr": 143701.0,
+     "dep": 145031.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 144601.0,
-     "dep": 144903.0,
-     "stop": true,
+     "arr": 145713.0,
+     "dep": 145735.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 145590.0,
-     "dep": 145650.0,
+     "arr": 146273.0,
+     "dep": 146333.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 146370.0,
+     "arr": 146954.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4669,35 +4669,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 144120.0,
-     "dep": 144216.0,
+     "arr": 144051.0,
+     "dep": 144942.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 144843.0,
-     "dep": 144870.0,
-     "stop": false,
+     "arr": 145533.0,
+     "dep": 145773.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 145570.0,
-     "dep": 145782.0,
+     "arr": 146412.0,
+     "dep": 146472.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 146442.0,
-     "dep": 146464.0,
-     "stop": false,
+     "arr": 147166.0,
+     "dep": 147629.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 147024.0,
+     "arr": 148160.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4712,41 +4712,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 146564.0,
+     "dep": 147014.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 147890.0,
-     "dep": 148109.0,
-     "stop": true,
+     "arr": 147968.0,
+     "dep": 148022.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 149079.0,
-     "dep": 150331.0,
+     "arr": 148824.0,
+     "dep": 149374.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 151191.0,
-     "dep": 151245.0,
+     "arr": 150222.0,
+     "dep": 150276.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 152205.0,
-     "dep": 152720.0,
-     "stop": true,
+     "arr": 151109.0,
+     "dep": 151163.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 153590.0,
+     "arr": 151875.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4761,41 +4761,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 147084.0,
+     "dep": 146766.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 147894.0,
-     "dep": 147948.0,
+     "arr": 147569.0,
+     "dep": 147623.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 148848.0,
-     "dep": 148938.0,
+     "arr": 148456.0,
+     "dep": 148510.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 150271.0,
-     "dep": 150325.0,
+     "arr": 149314.0,
+     "dep": 149368.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 151175.0,
-     "dep": 151229.0,
+     "arr": 150133.0,
+     "dep": 150187.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 152189.0,
+     "arr": 151034.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4810,41 +4810,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 155700.0,
+     "dep": 151094.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 156660.0,
-     "dep": 156714.0,
+     "arr": 152048.0,
+     "dep": 152102.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 157564.0,
-     "dep": 157618.0,
+     "arr": 152867.0,
+     "dep": 152921.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 158418.0,
-     "dep": 158472.0,
-     "stop": false,
+     "arr": 153678.0,
+     "dep": 154393.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 159372.0,
-     "dep": 159426.0,
+     "arr": 155354.0,
+     "dep": 155408.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 160236.0,
+     "arr": 156120.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4865,35 +4865,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 152660.0,
-     "dep": 152678.0,
+     "arr": 152588.0,
+     "dep": 152606.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 153338.0,
-     "dep": 153501.0,
+     "arr": 153231.0,
+     "dep": 153738.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 154201.0,
-     "dep": 154219.0,
+     "arr": 154345.0,
+     "dep": 154363.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 154962.0,
-     "dep": 154980.0,
+     "arr": 154873.0,
+     "dep": 154891.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 155640.0,
+     "arr": 155455.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4908,41 +4908,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 154270.0,
+     "dep": 152606.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 155140.0,
-     "dep": 157381.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "STP",
-     "arr": 158388.0,
-     "dep": 158478.0,
+     "arr": 153409.0,
+     "dep": 153463.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "STP",
+     "arr": 154333.0,
+     "dep": 155092.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "R2",
-     "arr": 159811.0,
-     "dep": 159865.0,
+     "arr": 156026.0,
+     "dep": 156080.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 160715.0,
-     "dep": 160769.0,
+     "arr": 156845.0,
+     "dep": 156899.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 161729.0,
+     "arr": 157746.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -4957,41 +4957,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 152700.0,
+     "dep": 152830.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 153360.0,
-     "dep": 153378.0,
+     "arr": 153613.0,
+     "dep": 153631.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 154005.0,
-     "dep": 154261.0,
+     "arr": 154165.0,
+     "dep": 154405.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 155021.0,
-     "dep": 155081.0,
+     "arr": 155032.0,
+     "dep": 155408.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 155741.0,
-     "dep": 155759.0,
+     "arr": 156047.0,
+     "dep": 156065.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 156319.0,
+     "arr": 156600.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5006,41 +5006,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 153650.0,
+     "dep": 154500.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 154210.0,
-     "dep": 154232.0,
-     "stop": false,
+     "arr": 155031.0,
+     "dep": 156107.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 154892.0,
-     "dep": 155081.0,
+     "arr": 156801.0,
+     "dep": 156861.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 155781.0,
-     "dep": 155803.0,
+     "arr": 157477.0,
+     "dep": 157499.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 156430.0,
-     "dep": 156720.0,
+     "arr": 158037.0,
+     "dep": 158097.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 157440.0,
+     "arr": 158718.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5061,35 +5061,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 154920.0,
-     "dep": 155022.0,
+     "arr": 154821.0,
+     "dep": 155255.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 155709.0,
-     "dep": 155841.0,
+     "arr": 155846.0,
+     "dep": 156086.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 156601.0,
-     "dep": 156661.0,
+     "arr": 156725.0,
+     "dep": 156861.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 157321.0,
-     "dep": 157343.0,
+     "arr": 157527.0,
+     "dep": 157549.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 157903.0,
+     "arr": 158027.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5104,41 +5104,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 157500.0,
+     "dep": 159048.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 158460.0,
-     "dep": 158514.0,
-     "stop": false,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "R2",
-     "arr": 159424.0,
-     "dep": 159871.0,
+     "arr": 160336.0,
+     "dep": 161590.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
+     "station_id": "R2",
+     "arr": 162621.0,
+     "dep": 162675.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "STP",
-     "arr": 160731.0,
-     "dep": 160785.0,
+     "arr": 163825.0,
+     "dep": 163879.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 161685.0,
-     "dep": 161739.0,
+     "arr": 164811.0,
+     "dep": 164865.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 162549.0,
+     "arr": 165577.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5153,41 +5153,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 157963.0,
+     "dep": 158087.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 158833.0,
-     "dep": 159432.0,
-     "stop": true,
+     "arr": 158890.0,
+     "dep": 158944.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 160701.0,
-     "dep": 160791.0,
+     "arr": 159777.0,
+     "dep": 159831.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 162124.0,
-     "dep": 162178.0,
+     "arr": 160635.0,
+     "dep": 160689.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 163290.0,
-     "dep": 163344.0,
+     "arr": 161454.0,
+     "dep": 161508.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 164304.0,
+     "arr": 162355.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5202,41 +5202,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 162611.0,
+     "dep": 162092.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 163421.0,
-     "dep": 163475.0,
+     "arr": 162895.0,
+     "dep": 162949.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 164459.0,
-     "dep": 167230.0,
+     "arr": 163819.0,
+     "dep": 163885.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 168623.0,
-     "dep": 168677.0,
+     "arr": 164819.0,
+     "dep": 164873.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 169527.0,
-     "dep": 169581.0,
+     "arr": 165638.0,
+     "dep": 165692.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 170541.0,
+     "arr": 166539.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5251,41 +5251,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 162264.0,
+     "dep": 162415.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 163284.0,
-     "dep": 163350.0,
-     "stop": true,
-     "min_dwell_s": 0
-    },
-    {
-     "station_id": "R2",
-     "arr": 164260.0,
-     "dep": 164314.0,
+     "arr": 163369.0,
+     "dep": 163423.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
+     "station_id": "R2",
+     "arr": 164632.0,
+     "dep": 164879.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
      "station_id": "STP",
-     "arr": 165348.0,
-     "dep": 165402.0,
+     "arr": 165727.0,
+     "dep": 165781.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 166302.0,
-     "dep": 166356.0,
+     "arr": 166614.0,
+     "dep": 166668.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 167166.0,
+     "arr": 167380.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5306,35 +5306,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 164660.0,
-     "dep": 164682.0,
-     "stop": false,
+     "arr": 164631.0,
+     "dep": 164871.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 165342.0,
-     "dep": 165441.0,
+     "arr": 165565.0,
+     "dep": 165787.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 166201.0,
-     "dep": 166503.0,
-     "stop": true,
+     "arr": 166482.0,
+     "dep": 166504.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 167190.0,
-     "dep": 167250.0,
+     "arr": 167042.0,
+     "dep": 167102.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 167970.0,
+     "arr": 167723.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5355,35 +5355,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 165720.0,
-     "dep": 165816.0,
+     "arr": 165621.0,
+     "dep": 165711.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 166443.0,
-     "dep": 166470.0,
-     "stop": false,
+     "arr": 166302.0,
+     "dep": 166542.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 167170.0,
-     "dep": 167269.0,
+     "arr": 167181.0,
+     "dep": 167241.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 167929.0,
-     "dep": 167951.0,
+     "arr": 167907.0,
+     "dep": 167929.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 168511.0,
+     "arr": 168407.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5398,41 +5398,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 168267.0,
+     "dep": 167783.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 169289.0,
-     "dep": 169587.0,
-     "stop": true,
+     "arr": 168737.0,
+     "dep": 168791.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 170497.0,
-     "dep": 170551.0,
+     "arr": 169556.0,
+     "dep": 169610.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 171351.0,
-     "dep": 171405.0,
-     "stop": false,
+     "arr": 170367.0,
+     "dep": 170433.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 172305.0,
-     "dep": 172359.0,
+     "arr": 171394.0,
+     "dep": 171448.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 173169.0,
+     "arr": 172160.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5447,41 +5447,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 168942.0,
+     "dep": 168548.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 170073.0,
-     "dep": 170127.0,
+     "arr": 169351.0,
+     "dep": 169405.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 171321.0,
-     "dep": 171411.0,
+     "arr": 170373.0,
+     "dep": 170427.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 172804.0,
-     "dep": 175606.0,
-     "stop": true,
+     "arr": 171231.0,
+     "dep": 171285.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 176526.0,
-     "dep": 176580.0,
+     "arr": 172050.0,
+     "dep": 172104.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 177540.0,
+     "arr": 172951.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5496,41 +5496,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 172775.0,
+     "dep": 173011.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 173735.0,
-     "dep": 173789.0,
+     "arr": 173965.0,
+     "dep": 174019.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 174639.0,
-     "dep": 174693.0,
+     "arr": 174784.0,
+     "dep": 174838.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 175493.0,
-     "dep": 175547.0,
-     "stop": false,
+     "arr": 175595.0,
+     "dep": 176356.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 176447.0,
-     "dep": 176501.0,
+     "arr": 177317.0,
+     "dep": 177371.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 177311.0,
+     "arr": 178083.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5545,41 +5545,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 178051.0,
+     "dep": 175996.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 178861.0,
-     "dep": 178915.0,
-     "stop": false,
+     "arr": 177088.0,
+     "dep": 178342.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 179815.0,
-     "dep": 179905.0,
+     "arr": 179391.0,
+     "dep": 179445.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 181238.0,
-     "dep": 181292.0,
-     "stop": false,
+     "arr": 180416.0,
+     "dep": 180796.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 182142.0,
-     "dep": 182196.0,
+     "arr": 181689.0,
+     "dep": 181743.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 183156.0,
+     "arr": 182590.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5600,35 +5600,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 174260.0,
-     "dep": 174278.0,
+     "arr": 174188.0,
+     "dep": 174206.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 174981.0,
-     "dep": 176327.0,
+     "arr": 174868.0,
+     "dep": 175655.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 177087.0,
-     "dep": 177303.0,
-     "stop": true,
+     "arr": 176262.0,
+     "dep": 176280.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 177930.0,
-     "dep": 177948.0,
+     "arr": 176790.0,
+     "dep": 176808.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 178608.0,
+     "arr": 177372.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5643,41 +5643,41 @@
     {
      "station_id": "YUZ",
      "arr": null,
-     "dep": 174300.0,
+     "dep": 174544.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 174960.0,
-     "dep": 174978.0,
+     "arr": 175157.0,
+     "dep": 175175.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 175545.0,
-     "dep": 175567.0,
-     "stop": false,
+     "arr": 175799.0,
+     "dep": 176956.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 176267.0,
-     "dep": 176507.0,
+     "arr": 177583.0,
+     "dep": 177643.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 177227.0,
-     "dep": 177371.0,
-     "stop": true,
+     "arr": 178282.0,
+     "dep": 178300.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 177991.0,
+     "arr": 178774.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5698,35 +5698,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 175520.0,
-     "dep": 177287.0,
-     "stop": true,
+     "arr": 175403.0,
+     "dep": 175425.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 178007.0,
-     "dep": 178067.0,
+     "arr": 176101.0,
+     "dep": 176280.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 178767.0,
-     "dep": 178789.0,
+     "arr": 176896.0,
+     "dep": 176918.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 179416.0,
-     "dep": 179983.0,
+     "arr": 177456.0,
+     "dep": 177516.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 180703.0,
+     "arr": 178137.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5747,35 +5747,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 176520.0,
-     "dep": 176616.0,
+     "arr": 176421.0,
+     "dep": 177516.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 177243.0,
-     "dep": 177270.0,
+     "arr": 178079.0,
+     "dep": 178106.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 177970.0,
-     "dep": 178069.0,
+     "arr": 178705.0,
+     "dep": 179681.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 178789.0,
-     "dep": 178921.0,
-     "stop": true,
+     "arr": 180583.0,
+     "dep": 180605.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 179541.0,
+     "arr": 181083.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5790,41 +5790,41 @@
     {
      "station_id": "SEV",
      "arr": null,
-     "dep": 179617.0,
+     "dep": 179311.0,
      "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 180748.0,
-     "dep": 180802.0,
-     "stop": false,
+     "arr": 180403.0,
+     "dep": 182457.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 182128.0,
-     "dep": 182218.0,
+     "arr": 183418.0,
+     "dep": 183472.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 183551.0,
-     "dep": 183605.0,
+     "arr": 184276.0,
+     "dep": 184330.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 184515.0,
-     "dep": 185072.0,
-     "stop": true,
+     "arr": 185096.0,
+     "dep": 185150.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 186092.0,
+     "arr": 185997.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5845,35 +5845,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 179923.0,
-     "dep": 179977.0,
+     "arr": 179917.0,
+     "dep": 179971.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 180887.0,
-     "dep": 181298.0,
-     "stop": true,
+     "arr": 180736.0,
+     "dep": 180790.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 182158.0,
-     "dep": 182212.0,
+     "arr": 181510.0,
+     "dep": 181564.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 183112.0,
-     "dep": 183166.0,
+     "arr": 182397.0,
+     "dep": 182451.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 183976.0,
+     "arr": 183163.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5894,35 +5894,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 185012.0,
-     "dep": 185066.0,
-     "stop": false,
+     "arr": 185044.0,
+     "dep": 185267.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 185916.0,
-     "dep": 185970.0,
-     "stop": false,
+     "arr": 186476.0,
+     "dep": 187637.0,
+     "stop": true,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 186948.0,
-     "dep": 187002.0,
+     "arr": 188485.0,
+     "dep": 188539.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R1",
-     "arr": 187902.0,
-     "dep": 187956.0,
+     "arr": 189372.0,
+     "dep": 189426.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 188766.0,
+     "arr": 190138.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5943,35 +5943,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 184959.0,
-     "dep": 185013.0,
+     "arr": 184952.0,
+     "dep": 185006.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 185973.0,
-     "dep": 188830.0,
-     "stop": true,
+     "arr": 185839.0,
+     "dep": 185893.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "R2",
-     "arr": 190223.0,
-     "dep": 190277.0,
+     "arr": 186697.0,
+     "dep": 186751.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 191127.0,
-     "dep": 191181.0,
+     "arr": 187516.0,
+     "dep": 187570.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "YUZ",
-     "arr": 192141.0,
+     "arr": 188417.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -5992,35 +5992,35 @@
     },
     {
      "station_id": "R1",
-     "arr": 186260.0,
-     "dep": 186282.0,
+     "arr": 186203.0,
+     "dep": 186225.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 186942.0,
-     "dep": 187041.0,
+     "arr": 186866.0,
+     "dep": 186961.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 187801.0,
-     "dep": 188103.0,
-     "stop": true,
+     "arr": 187577.0,
+     "dep": 187599.0,
+     "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "OZR",
-     "arr": 188790.0,
-     "dep": 188850.0,
+     "arr": 188137.0,
+     "dep": 188232.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "YUZ",
-     "arr": 189570.0,
+     "arr": 188897.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
@@ -6041,35 +6041,35 @@
     },
     {
      "station_id": "OZR",
-     "arr": 187320.0,
-     "dep": 187416.0,
+     "arr": 187221.0,
+     "dep": 188197.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R2",
-     "arr": 188043.0,
-     "dep": 188070.0,
+     "arr": 188760.0,
+     "dep": 188787.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "STP",
-     "arr": 188770.0,
-     "dep": 188869.0,
+     "arr": 189386.0,
+     "dep": 189446.0,
      "stop": true,
      "min_dwell_s": 60
     },
     {
      "station_id": "R1",
-     "arr": 189529.0,
-     "dep": 189551.0,
+     "arr": 190112.0,
+     "dep": 190134.0,
      "stop": false,
      "min_dwell_s": 0
     },
     {
      "station_id": "SEV",
-     "arr": 190111.0,
+     "arr": 190618.0,
      "dep": null,
      "stop": true,
      "min_dwell_s": 0
