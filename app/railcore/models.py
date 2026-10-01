@@ -271,7 +271,7 @@ class JournalEntry(BaseModel):
     time: float  # sim seconds
     kind: Literal["incident_created", "incident_resolved", "variants_proposed", "variant_applied",
                   "variant_rejected", "variants_stale", "return_offered", "no_decision_needed",
-                  "decisions_archived", "plan_broken", "decision_hold", "guard_replan"]
+                  "decisions_archived", "plan_broken", "decision_hold", "guard_replan", "signal_stop"]
     text: str
     incident_ids: list[str] = []
     variant_id: str | None = None

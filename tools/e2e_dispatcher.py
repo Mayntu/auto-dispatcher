@@ -76,11 +76,14 @@ class Monitor:
                 elif on_field and not f["incidents"] and not f["paused"] and f["sim_time"] - self.last_move_t > 1800:
                     self.stall = True
                 if s["index"] and not f["incidents"]:
-                    d = s["index"]["kpi"]["total_delay_s"]
+                    # forecast delay of the SAME trains (trains entering the horizon bring their own delay)
+                    d = dict(s["index"]["kpi"]["delayed_trains"])
                     if self.quiet_since is None:
                         self.quiet_since, self.quiet_delay = f["sim_time"], d
                     elif f["sim_time"] - self.quiet_since >= 1800:
-                        self.max_quiet_growth = max(self.max_quiet_growth, (d - self.quiet_delay) / 60)
+                        common = set(d) & set(self.quiet_delay)
+                        growth = sum(d[t] - self.quiet_delay[t] for t in common) / 60
+                        self.max_quiet_growth = max(self.max_quiet_growth, growth)
                         self.quiet_since, self.quiet_delay = f["sim_time"], d
                 elif f["incidents"]:
                     self.quiet_since = None
@@ -94,14 +97,22 @@ class Monitor:
 
 
 async def ws_probe(stats: dict) -> None:
-    async with websockets.connect(BASE.replace("http", "ws") + "/ws", max_size=None) as ws:
-        first = json.loads(await ws.recv())
-        stats["snapshot"] = first.get("type") == "snapshot"
-        while not stats.get("stop"):
-            m = json.loads(await asyncio.wait_for(ws.recv(), 10))
-            stats["msgs"] = stats.get("msgs", 0) + 1
-            if m.get("type") == "field.state":
-                stats.setdefault("lat", []).append((time.time() - m["ts_wall"]) * 1000)
+    """A UI-like WS client: reconnects on failure (the server may still be starting), counts messages and
+    measures delivery latency of field.state."""
+    while not stats.get("stop"):
+        try:
+            async with websockets.connect(BASE.replace("http", "ws") + "/ws", max_size=None) as ws:
+                first = json.loads(await ws.recv())
+                stats["snapshot"] = stats.get("snapshot", True) and first.get("type") == "snapshot"
+                while not stats.get("stop"):
+                    m = json.loads(await asyncio.wait_for(ws.recv(), 10))
+                    stats["msgs"] = stats.get("msgs", 0) + 1
+                    if m.get("type") == "field.state":
+                        stats.setdefault("lat", []).append((time.time() - m["ts_wall"]) * 1000)
+        except Exception as e:  # noqa: BLE001
+            stats["reconnects"] = stats.get("reconnects", 0) + 1
+            stats["last_error"] = repr(e)
+            await asyncio.sleep(1)
 
 
 async def wait_sim(mon: Monitor, t: float) -> None:
@@ -297,6 +308,9 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     R.check(abs(mon.now - t) < 1, "пауза останавливает время")
     await c.post("/api/sim/clock", json={"paused": False, "speed": speed})
     while mon.state["field"]["incidents"]:
+        for v in (await c.get("/api/variants")).json():  # keep the current plan, so the line is not held at ×1
+            if v["status"] == "proposed":
+                await c.post(f"/api/plan/variants/{v['id']}/reject")
         await asyncio.sleep(1)
     await wait_sim(mon, mon.now + 300)
     v0 = (await c.get("/api/plan")).json()["version"]
@@ -344,11 +358,16 @@ async def main() -> None:
         R.check(not mon.stall, "нет остановки движения (блокировки) без сбоев")
         R.check(not due_stuck, f"все поезда, которым по графику пора было прибыть (2+ ч назад), прибыли {due_stuck or ''}")
         R.check(f["counters"]["in_transit"] + f["counters"]["at_stations"] > 0, f"движение продолжается: {f['counters']}")
+        R.check(len(f.get("blocks", [])) == 33 and len(f.get("directions", {})) == 5
+                and sum(s["kind"] in ("block", "pre_entry") for s in f["signals"]) == 56,
+                "в field.state автоблокировка: 33 блок-участка, 56 проходных/предвходных, направления 5 перегонов")
         R.check(mon.max_quiet_growth <= 10, f"без сбоев прогноз не растёт: макс. рост {mon.max_quiet_growth:.1f} мин за 30 мин")
         R.check(mon.http_5xx == 0, f"ответов 5xx: {mon.http_5xx}")
         lat = sorted(ws_stats.get("lat", [0]))
         p95 = lat[int(len(lat) * 0.95) - 1] if lat else 0
-        R.check(ws_stats.get("snapshot") and p95 < 500, f"WS: snapshot при подключении, {ws_stats.get('msgs', 0)} сообщений, p95 доставки {p95:.0f} мс")
+        R.check(ws_stats.get("snapshot") and ws_stats.get("msgs", 0) > 100 and p95 < 500,
+                f"WS: snapshot при подключении, {ws_stats.get('msgs', 0)} сообщений, p95 доставки {p95:.0f} мс, "
+                f"переподключений {ws_stats.get('reconnects', 0)}")
         print(f"\n{len(R.notes)} ok, {len(R.fails)} FAIL за {time.time() - t0:.0f} с")
         for x in R.fails:
             print("  ", x)

@@ -51,7 +51,7 @@ def due_trains_finished(sim: FieldSim, slack_s: float = 2 * 3600) -> list[str]:
     Returns the ones that have not (empty = fine)."""
     due = [t for t in sim.trains.values() if t.train.stops[-1].arr <= sim.now - slack_s]
     assert due, "nothing was due yet — run longer"
-    return [t.train.id for t in due if t.loc != "done"]
+    return [t.train.id for t in due if not (t.loc == "done" or (t.loc == "station" and t.idx == len(t.route) - 1))]
 
 
 def service_tick(sim: FieldSim, plan: Plan) -> Plan:

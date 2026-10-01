@@ -209,7 +209,10 @@ def run(seed: int) -> dict:
         res["overrides"] = sim.plan_overrides
         due = [t for t in sim.trains.values() if t.train.stops[-1].arr <= sim.now - DUE_SLACK_S]
         res["due"] = len(due)
-        res["stuck"] = [(t.train.id, t.loc, t.route[t.idx] if t.loc != "none" else "") for t in due if t.loc != "done"]
+        arrived = lambda t: t.loc == "done" or (t.loc == "station" and t.idx == len(t.route) - 1)  # noqa: E731
+        res["stuck"] = [(t.train.id, t.loc, t.route[t.idx] if t.loc != "none" else "") for t in due if not arrived(t)]
+        res["max_late_min"] = round(max((t.arrived_at - t.train.stops[-1].arr for t in due if arrived(t)
+                                         and t.arrived_at is not None), default=0) / 60)
     except Exception:
         res["errors"].append(traceback.format_exc(limit=6))
     return res
@@ -260,7 +263,7 @@ def main() -> None:
             failed += bool(bad)
             mark = "FAIL" if bad else "ok  "
             print(f"{mark} seed={r['seed']:3} {r['policy']:7} {'MASS' if r['mass'] else '    '} inc={r['incidents']} "
-                  f"end={r.get('end')} fin={r.get('finished')}/due {r.get('due')} solves={r['solves']} maxsolve={r['max_solve_ms']}ms "
+                  f"end={r.get('end')} fin={r.get('finished')}/due {r.get('due')} late≤{r.get('max_late_min')}м solves={r['solves']} maxsolve={r['max_solve_ms']}ms "
                   f"gap={r['promise_gap']:.1f} stale={r['stale_applies']} quiet+={r['max_quiet_growth_min']} "
                   f"ffail={r['forecast_fail']} ovr={r.get('overrides', 0)} guard={r.get('guard_replans', 0)} "
                   f"{' | '.join(bad)}", flush=True)

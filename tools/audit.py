@@ -68,7 +68,7 @@ def check_plan(plan: Plan, snap, world, rts, settings) -> list[str]:
 
     closures = [i for i in snap.incidents if i.type in (IncidentType.OBSTACLE, IncidentType.SEGMENT_CLOSED)]
     for tid, es in by_train.items():
-        es.sort(key=lambda e: (e.start, e.kind != "dwell"))
+        es.sort(key=lambda e: (e.start, e.end))  # a zero-length run (train at the very end) precedes the dwell
         train = trains[tid]
         cat = world.categories[train.category]
         stops = {s.station_id: s for s in train.stops}

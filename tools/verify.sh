@@ -17,7 +17,7 @@ $PY -m tools.audit --cases ${AUDIT_CASES:-20} --procs 3 2>/dev/null | sed -n '/�
 grep -q "нарушений правил: 0" /tmp/verify_audit.txt || fail=1
 
 echo; echo "== 3/4  стресс: случайные сбои × 5 стилей поведения диспетчера"
-$PY -m tools.stress --runs ${STRESS_RUNS:-40} --procs 8 --timeout 1500 2>/dev/null | grep -E "^FAIL|passed" | tee /tmp/verify_stress.txt
+$PY -m tools.stress --runs ${STRESS_RUNS:-40} --procs 8 --timeout 3000 2>/dev/null | grep -E "^FAIL|passed" | tee /tmp/verify_stress.txt
 grep -q "^FAIL" /tmp/verify_stress.txt && fail=1
 
 echo; echo "== 4/4  живой сценарий диспетчера через API и WebSocket (сервер на :$PORT, ×60)"

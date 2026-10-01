@@ -66,6 +66,7 @@ class Current:
     remaining: int  # minimum time to reach nodes[0], before the stop supplement
     sup_end: int
     e_rest: float
+    progress: float = 0.0  # where on the segment (trains running in a packet keep their order)
 
 
 @dataclass
@@ -179,7 +180,7 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
                         after = (1 - max(stop_pos, st.pos_m) / seg_len) * leg.t_pp + leg.sup_start
                         remaining = max(remaining, rem + after)
             remaining += failures.get(train.id, 0)
-            current = Current(leg.segment_id, round(remaining), leg.sup_end, rest * leg.e_pp)
+            current = Current(leg.segment_id, round(remaining), leg.sup_end, rest * leg.e_pp, st.progress)
         else:
             first = route.index(st.station_id)
             nodes = [make_node(k) for k in range(first, len(route))]

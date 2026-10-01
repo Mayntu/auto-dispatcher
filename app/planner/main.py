@@ -62,6 +62,7 @@ class PlannerService:
         await self.bus.subscribe("incident.*", self._on_incident)
         await self.bus.subscribe("cmd.planner.*", self._on_cmd)
         await self.bus.subscribe("field.guard", self._on_guard)
+        await self.bus.subscribe("field.train_event", self._on_train_event)
         await asyncio.wait_for(self._first_state.wait(), timeout=10)
         t0 = time.perf_counter()
         res = await self.pool.solve(self.snapshot().model_dump(mode="json"), "balanced", self.settings)
@@ -107,6 +108,11 @@ class PlannerService:
             self.incidents.pop(inc.id, None)
             await self._journal("incident_resolved", f"Сбой снят: {inc.description}", incident_ids=[inc.id])
             self._request("incident" if self.incidents else "resolved")
+
+    async def _on_train_event(self, env: Envelope) -> None:
+        e = env.payload
+        if e.get("kind") == "held_at_signal":
+            await self._journal("signal_stop", f"{e['train_id']}: стоянка у проходного {e['signal_id']} — {e['reason']}")
 
     async def _on_guard(self, env: Envelope) -> None:
         g = env.payload

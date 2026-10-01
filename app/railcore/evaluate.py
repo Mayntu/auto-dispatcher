@@ -94,20 +94,34 @@ def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, stops: d
             edges[a].append((d, dwell))
         if t.current:
             lb[(tid, 0, "a")] = max(lb[(tid, 0, "a")], t.current.remaining + t.current.sup_end * stops[(tid, 0)])
-            users[t.current.segment_id].append((float("-inf"), None, (tid, 0, "a")))
+            # trains on the segment now come first, leader before followers (a packet keeps its order)
+            users[t.current.segment_id].append((-1e12 - t.current.progress, None, (tid, 0, "a"), float("-inf")))
         for i, leg in enumerate(t.legs):
             run = leg.t_pp + leg.sup_start * stops[(tid, i)] + leg.sup_end * stops[(tid, i + 1)]
             edges[(tid, i, "d")].append(((tid, i + 1, "a"), run))
-            key = plan_start.get((tid, leg.segment_id), float("inf"))
-            if key == float("inf") and t.nodes[i].sched_dep is not None:
-                key = t.nodes[i].sched_dep  # not in the plan yet (entered the horizon later): by timetable
-            users[leg.segment_id].append((key, (tid, i, "d"), (tid, i + 1, "a")))
+            key = plan_start.get((tid, leg.segment_id))
+            sched = t.nodes[i].sched_dep if t.nodes[i].sched_dep is not None else float("inf")
+            users[leg.segment_id].append((key, (tid, i, "d"), (tid, i + 1, "a"), sched))
 
-    for seg_users in users.values():
-        seg_users.sort(key=lambda u: u[0])
-        for (_, _, end_a), (_, start_b, _) in zip(seg_users, seg_users[1:]):
+    for seg, seg_users in users.items():
+        planned = [u for u in seg_users if u[0] is not None]
+        ordered = []
+        for u in seg_users:
+            if u[0] is not None:
+                ordered.append((u[0], 0, u))
+                continue
+            # a train new to the horizon is queued by its timetable time, but never ahead of a planned train
+            # that the timetable sent onto this segment earlier — otherwise late trains starve behind every
+            # newcomer (a late freight waiting hours while passenger trains keep entering the horizon)
+            floor = max((p[0] for p in planned if p[3] <= u[3]), default=float("-inf"))
+            ordered.append((max(u[3], floor), 1, u))
+        ordered.sort(key=lambda x: (x[0], x[1]))
+        seg_users[:] = [u for _, _, u in ordered]
+        for (_, _, end_a, _), (_, start_b, end_b, _) in zip(seg_users, seg_users[1:]):
             if start_b is not None:
                 edges[end_a].append((start_b, clear_s))
+            else:  # both on the segment now: the follower arrives after the leader
+                edges[end_a].append((end_b, 0.0))
 
     # station tracks (§12.5): spread visits over the tracks in plan order; on each track the next
     # train arrives only after the previous one has left

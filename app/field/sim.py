@@ -16,15 +16,17 @@ from dataclasses import dataclass, field
 
 from app.bus.base import EventBus
 from app.bus.envelope import Envelope
+from app.field.autoblock import AutoBlock
 from app.field.incidents import FieldIncident, IncidentError, make_incident
 from app.railcore.infra import World
-from app.railcore.models import Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus
+from app.railcore.models import Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus
 from app.railcore.problem import CLOSING_TYPES, OBSTACLE_STOP_M
 from app.railcore.running_time import RunningTimes
 
 log = logging.getLogger("field")
 SUBSTEP_S = 1.0
 STALL_OVERRIDE_S = 600.0
+YELLOW_KMH = 60.0
 STARVE_OVERRIDE_S = 900.0  # one train held only by a stale plan order this long -> let it go if safe
 VISIBLE_AHEAD_S = 3 * 3600
 VISIBLE_BEHIND_S = 3 * 3600  # nothing moved this long -> the DC lets a physically possible move go out of plan order
@@ -46,6 +48,7 @@ class SimTrain:
     track_id: str | None = None
     finished_at: float | None = None
     order_blocked_since: float | None = None  # ready to go, held only by the plan's order
+    held_signal: str | None = None  # block signal the train is standing at
     done_segments: set[str] = field(default_factory=set)
 
 
@@ -67,6 +70,7 @@ class FieldSim:
         self._last_progress = 0.0
         self.plan_overrides = 0
         self._guard_events: list[dict] = []
+        self.ab = AutoBlock(world, settings)
 
     # ---- plan -------------------------------------------------------------------------------
     def set_plan(self, plan: Plan) -> None:
@@ -131,6 +135,7 @@ class FieldSim:
             for fi in self.active():
                 if self.now >= fi.ends_at():
                     events.append(("incident.resolved", self.resolve_incident(fi.id).model_dump(mode="json")))
+            self._autoblock()
             for tr in self.trains.values():
                 ev = self._advance(tr, h)
                 if ev:
@@ -202,8 +207,7 @@ class FieldSim:
         if k == 0 or (stop.stop and cat.id != "freight"):
             if stop.dep is not None and t < stop.dep:  # never before the timetable at origin / passenger stops
                 return None
-        if self._broken(tid) or self._closed(seg.id) or any(
-                o.loc == "segment" and self._seg(o, o.idx).id == seg.id for o in self.trains.values()):
+        if self._broken(tid) or self._closed(seg.id):
             return None
         nxt = tr.route[k + 1]
         if self._occupancy(nxt, tid) >= self.world.capacity(nxt) or not self._direction_ok(tr, nxt):
@@ -227,6 +231,13 @@ class FieldSim:
             self._guard_events.append({"train_id": tid, "station_id": st_id, "time": t,
                                        "reason": "stalled" if self.stalled_s >= STALL_OVERRIDE_S else "starving",
                                        "stalled_s": round(self.stalled_s), "held_s": round(held)})
+        d = tr.train.direction
+        if not self.ab.can_enter(seg.id, d):
+            # automatic block: the exit opens only for the established direction and a free first block section.
+            # Only a train whose turn it is may ask to turn a free segment round (takes direction_change_s) —
+            # otherwise trains on both ends would keep flipping the direction against each other
+            self.ab.request_direction(seg.id, d, t, self._segment_empty(seg.id))
+            return None
         tr.order_blocked_since = None
         self._last_progress = t
         rt = self.rts.get(cat.id, seg.id, tr.train.direction, tr.train.v_max_override_kmh)
@@ -249,6 +260,17 @@ class FieldSim:
                 stop_pos = self.world.pos_of_km(seg.id, inc.km, tr.train.direction) - OBSTACLE_STOP_M
                 if tr.progress * seg.length_m <= stop_pos + 1:
                     cap = min(cap, max(tr.progress, stop_pos / seg.length_m))
+        head = tr.progress * seg.length_m
+        max_head, held_signal, yellow = self.ab.stop_point(seg.id, tid, head, tr.train.direction)
+        cap = min(cap, max_head / seg.length_m)
+        event = None
+        if held_signal and max_head <= head + 1e-6 and tr.held_signal != held_signal:
+            tr.held_signal = held_signal
+            event = {"kind": "held_at_signal", "station_id": None, "segment_id": seg.id, "signal_id": held_signal,
+                     "reason": "встречное направление" if self.ab.dirs[seg.id].direction != tr.train.direction
+                     else "блок-участок впереди занят"}
+        elif not held_signal or max_head > head + 1e-6:
+            tr.held_signal = None
         run = self._run.get((tid, seg.id))
         rate = 1.0 / rt.t_pp
         if run is not None:
@@ -257,6 +279,8 @@ class FieldSim:
             # if it arrives early it waits at the station, whose track was reserved when it left
             slowest = 1.0 / (1.3 * (rt.t_pp + rt.sup_start + rt.sup_end) + rt.sup_start + rt.sup_end)
             rate = min(max((1.0 - tr.progress) / max(run.end - t, 1.0), slowest), rate)
+        if yellow:  # yellow ahead: no faster than 60 km/h towards the next signal
+            rate = min(rate, YELLOW_KMH / 3.6 / seg.length_m)
         new_p = min(tr.progress + rate * h, cap)
         if new_p > tr.progress:
             self._last_progress = t
@@ -274,8 +298,39 @@ class FieldSim:
             dwell = self._dwell.get((tid, st_id))
             will_stop = tr.idx == len(tr.route) - 1 or (dwell.stop if dwell else tr.train.stops[tr.idx].stop)
             tr.track_id = self._pick_track(tr, st_id, will_stop)
+            tr.held_signal = None
             return {"kind": "arrived", "station_id": st_id, "track_id": tr.track_id}
-        return None
+        return event
+
+    # ---- automatic block ----------------------------------------------------------------------
+    def _segment_empty(self, seg_id: str) -> bool:
+        return not any(o.loc == "segment" and self._seg(o, o.idx).id == seg_id for o in self.trains.values())
+
+    def _autoblock(self) -> None:
+        """Occupancy and aspects for this tick, direction changes, and turning free segments round towards
+        the next train the plan sends onto them (automatic route setting by the plan, §11.3)."""
+        on_seg = []
+        for o in self.trains.values():
+            if o.loc == "segment":
+                seg = self._seg(o, o.idx)
+                on_seg.append((o.train.id, seg.id, o.progress * seg.length_m, self._cat(o).length_m, o.train.direction))
+        obstacles = []
+        for fi in self.active():
+            inc = fi.incident
+            if inc.type == IncidentType.OBSTACLE and inc.segment_id and inc.km is not None:
+                obstacles.append((inc.segment_id, self.world.pos_of_km(inc.segment_id, inc.km, Direction.ODD)))
+        closed_entries = {(st, d) for st in self.world.station_order for d in Direction
+                          if self._occupancy(st, "") >= self.world.capacity(st)}
+        self.ab.tick_directions(self.now)
+        busy = {seg for _, seg, _, _, _ in on_seg}
+        for seg_id, order in self._seg_order.items():
+            if seg_id in busy or self.ab.dirs[seg_id].changing_to is not None:
+                continue
+            nxt = next((self.trains[tid] for _, tid in order if self.trains[tid].loc != "done"
+                        and seg_id not in self.trains[tid].done_segments), None)
+            if nxt is not None:
+                self.ab.request_direction(seg_id, nxt.train.direction, self.now, True)
+        self.ab.update(on_seg, obstacles, closed_entries)
 
     def counters(self) -> dict:
         """Status line (§27.5): on the line / at stations / waiting to depart / arrived this shift."""
@@ -336,8 +391,8 @@ class FieldSim:
         if k == len(tr.route) - 1:
             return True
         seg = self.world.segment_between(station_id, tr.route[k + 1])
-        busy = any(o.loc == "segment" and self._seg(o, o.idx).id == seg.id for o in self.trains.values())
-        return not busy and not self._closed(seg.id) \
+        rollable = self.ab.can_enter(seg.id, tr.train.direction) or self._segment_empty(seg.id)
+        return rollable and not self._closed(seg.id) \
             and self._occupancy(tr.route[k + 1], tr.train.id) < self.world.capacity(tr.route[k + 1])
 
     def _my_turn_at(self, tr: SimTrain, station_id: str) -> bool:
@@ -381,33 +436,45 @@ class FieldSim:
         return min(fits, key=rank).id
 
     def signals(self) -> list[dict]:
-        """MVP aspects: exit is green when the next segment is free and open; entry is green when the
-        station has a free track."""
+        """All signal aspects: entry green when the station has a free track; exit green when the automatic
+        block lets this direction onto the segment; block and pre-entry signals from the automatic block."""
         out = []
         order = self.world.station_order
-        on_seg = {self._seg(o, o.idx).id for o in self.trains.values() if o.loc == "segment"}
         for i, st in enumerate(order):
             free_track = self._occupancy(st, "") < self.world.capacity(st)
-            for d, nxt in (("odd", i + 1), ("even", i - 1)):
-                prv = i - 1 if d == "odd" else i + 1
+            for d, nxt in ((Direction.ODD, i + 1), (Direction.EVEN, i - 1)):
+                prv = i - 1 if d == Direction.ODD else i + 1
                 if 0 <= prv < len(order):
-                    out.append({"id": f"{st}-{d}-entry", "station_id": st, "direction": d, "kind": "entry",
+                    out.append({"id": f"{st}-{d.value}-entry", "station_id": st, "direction": d.value, "kind": "entry",
                                 "aspect": "green" if free_track else "red"})
                 if 0 <= nxt < len(order):
                     seg = self.world.segment_between(st, order[nxt]).id
-                    ok = seg not in on_seg and not self._closed(seg)
-                    out.append({"id": f"{st}-{d}-exit", "station_id": st, "direction": d, "kind": "exit",
+                    ok = self.ab.can_enter(seg, d) and not self._closed(seg)
+                    out.append({"id": f"{st}-{d.value}-exit", "station_id": st, "direction": d.value, "kind": "exit",
                                 "aspect": "green" if ok else "red", "segment_id": seg})
+        for sig in self.world.infra.signals:
+            if sig.segment_id:
+                out.append({"id": sig.id, "segment_id": sig.segment_id, "direction": sig.direction.value,
+                            "kind": sig.kind, "pos_m": sig.pos_m, "aspect": self.ab.aspects.get(sig.id, "green")})
         return out
 
     def _safety(self, events: list) -> None:
         now_bad: set[str] = set()
-        per_seg: dict[str, int] = {}
+        per_block: dict[str, set[str]] = {}
+        dirs_on_seg: dict[str, set] = {}
         for tr in self.trains.values():
-            if tr.loc == "segment":
-                s = self._seg(tr, tr.idx).id
-                per_seg[s] = per_seg.get(s, 0) + 1
-        now_bad |= {f"segment:{s}" for s, n in per_seg.items() if n > 1}
+            if tr.loc != "segment":
+                continue
+            seg = self._seg(tr, tr.idx)
+            for blk in self.ab.blocks_covered(seg.id, tr.progress * seg.length_m, self._cat(tr).length_m,
+                                              tr.train.direction):
+                per_block.setdefault(blk.id, set()).add(tr.train.id)
+            dirs_on_seg.setdefault(seg.id, set()).add(tr.train.direction)
+            established = self.ab.dirs[seg.id].direction
+            if established is not None and established != tr.train.direction:
+                now_bad.add(f"against-direction:{seg.id}:{tr.train.id}")
+        now_bad |= {f"block:{b}" for b, ts in per_block.items() if len(ts) > 1}
+        now_bad |= {f"oncoming:{s}" for s, ds in dirs_on_seg.items() if len(ds) > 1}
         for st in self.world.station_order:
             n = sum(1 for tr in self.trains.values() if tr.loc == "station" and tr.route[tr.idx] == st)
             if n > self.world.capacity(st):
@@ -446,6 +513,8 @@ class FieldSim:
                   TrainStatus.STOPPED if tr.held_at_obstacle else TrainStatus.RUNNING)
         regime = "stop" if status != TrainStatus.RUNNING else (
             "accel" if tr.progress < 0.05 else "brake" if tr.progress > 0.95 else "cruise")
+        base["block_id"] = self.ab.block_at(seg.id, pos if tr.train.direction == Direction.ODD
+                                            else seg.length_m - pos).id
         return TrainState(**base, status=status, segment_id=seg.id, station_id=None, pos_m=round(pos, 1),
                           km=round(self.world.km_of(seg.id, pos, tr.train.direction), 3),
                           speed_kmh=round(tr.speed_kmh, 1), regime=regime,
@@ -470,6 +539,7 @@ class FieldSim:
                                        if fi.incident.type in CLOSING_TYPES}),
             "occupied_segments": occupied,
             "signals": self.signals(),
+            **{k: v for k, v in self.ab.snapshot().items() if k != "block_aspects"},
             "safety_violations": self.safety_violations,
             "plan_overrides": self.plan_overrides,
             "counters": self.counters(),

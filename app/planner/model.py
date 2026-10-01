@@ -36,9 +36,14 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
         warm = evaluate(tasks, hint, clear, now)
     except Deadlock:
         warm = {}
-    ub = max([p["horizon_s"] + 7200] + [d + 1800 for times in warm.values() for _, d, _ in times])
+    # upper bound for all times: beyond the horizon, the warm start and every timetable time in the problem with
+    # room for waiting — if the warm start fails (cycle) the timetable alone must still leave enough room
+    sched = [x for t in tasks for n in t.nodes for x in (n.sched_arr, n.sched_dep, n.dep_min, n.arr_fixed) if x is not None]
+    ub = max([p["horizon_s"] + 7200] + [d + 1800 for times in warm.values() for _, d, _ in times]
+             + [x + 4 * 3600 for x in sched])
     seg_intervals: dict[str, list] = {}
     seg_users: dict[str, list[tuple[str, object, object]]] = {}  # segment -> (train, dep expr, arr expr)
+    current_on: dict[str, list] = {}  # segment -> trains on it right now: (progress, train, arr expr, interval)
     station_intervals: dict[str, list] = {}
     station_dir_intervals: dict[tuple[str, str], list] = {}
     objective = []
@@ -97,8 +102,8 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
             m.Add(arr[0] >= t.current.remaining + t.current.sup_end * stop[0])
             m.Add(end == arr[0] + clear)
             size = m.NewIntVar(0, ub + clear, f"cs_{tid}")
-            seg_intervals.setdefault(t.current.segment_id, []).append(m.NewIntervalVar(0, size, end, f"cb_{tid}"))
-            seg_users.setdefault(t.current.segment_id, []).append((tid, 0, arr[0]))
+            current_on.setdefault(t.current.segment_id, []).append(
+                (t.current.progress, tid, arr[0], m.NewIntervalVar(0, size, end, f"cb_{tid}")))
         for i, leg in enumerate(t.legs):
             run = arr[i + 1] - dep[i]
             m.Add(run >= leg.t_pp + leg.sup_start * stop[i] + leg.sup_end * stop[i + 1])
@@ -110,6 +115,15 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
             seg_users.setdefault(leg.segment_id, []).append((tid, dep[i], arr[i + 1]))
         vars_by_train[tid] = list(zip(arr, dep, stop))
 
+    # trains already on a segment in a packet (automatic block allows followers): they keep their order and the
+    # segment is free for the next user only after the rearmost one has arrived
+    for seg_id, cur in current_on.items():
+        cur.sort(key=lambda c: -c[0])  # leader first
+        for (_, _, arr_a, _), (_, _, arr_b, _) in zip(cur, cur[1:]):
+            m.Add(arr_b >= arr_a)
+        seg_intervals.setdefault(seg_id, []).append(cur[-1][3])
+        for _, tid, arr_a, _ in cur:
+            seg_users.setdefault(seg_id, []).append((tid, 0, arr_a))
     for ivs in seg_intervals.values():
         m.AddNoOverlap(ivs)
     if keep_order:
