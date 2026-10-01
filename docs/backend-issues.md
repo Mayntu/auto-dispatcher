@@ -35,3 +35,8 @@
 
 9. **WS не пересылает `incident.updated`.** В `app/api/ws.py` `FORWARD` нет `incident.updated`; когда появится
    уточнение длительности (п. 3), фронт не узнает об изменении до следующего `field.state`.
+
+10. **Неподдерживаемый тип сбоя → вводящий в заблуждение текст ошибки.** `POST /api/incidents`
+    `{"type":"train_delay","train_id":"104","est_min_min":10,"est_max_min":20}` → 422 `unknown segment`.
+    Ожидал 422 «тип не поддерживается» (как для остальных типов вне MVP): в `FieldSim.create_incident` проверка
+    перегона идёт раньше проверки типа в `make_incident`, диспетчер видит непонятную причину.

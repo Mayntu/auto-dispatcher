@@ -62,8 +62,10 @@ export function startLive(engine) {
     const variants = variantsFromSpec(payload, ctx());
     const prev = st().pending;
     if (!variants.length) {
-      // Все карточки устарели — сервер сам пересчитывает (§27.5), показываем «считаем».
-      const stale = payload.variants?.some((v) => v.status === 'stale');
+      // Все карточки устарели без решения — сервер сам пересчитывает (§27.5), показываем «считаем».
+      // Если хоть одна применена или отклонена, остальные тоже помечаются stale: решение принято, карточки уходят в журнал.
+      const list = payload.variants ?? [];
+      const stale = list.length > 0 && list.every((v) => v.status === 'stale');
       return engine.set({ pending: stale ? { ...(prev ?? {}), id: prev?.id ?? uid('R'), status: 'computing', variants: [], disruptionIds: payload.incident_ids ?? [] } : undefined });
     }
     const sameBatch = prev?.status === 'ready' && variants.every((v) => prev.variants.some((x) => x.id === v.id));
