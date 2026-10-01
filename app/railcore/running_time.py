@@ -1,6 +1,8 @@
-"""Running times. MVP: no physics, t_pp = L / (0.9 * v); fixed start/stop supplements.
+"""Running times from the traction calculation (CLAUDE.md §10, `physics.py`).
 
-The interface (t_pp, sup_start, sup_end, energy) is what §10 physics will later fill in.
+For a category, segment, direction and speed override: `t_pp` — the fastest run passing both ends at line speed;
+`sup_start` / `sup_end` — the extra time when the train starts from / stops at that end; traction energies of the
+same runs. The interface is what the planner, the field and the ATO have used since the MVP.
 """
 
 from __future__ import annotations
@@ -8,11 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.railcore.infra import World
-from app.railcore.models import Direction, Segment, TrainCategory
-
-SUP_START_S = 60.0
-SUP_END_S = 60.0
-FREIGHT_UPHILL = {("STP-R2", Direction.ODD): 0.6}  # MVP stand-in for the 8 permille climb
+from app.railcore.models import Direction
+from app.railcore.physics import Restriction, line_speed_kmh, min_profile
+from app.railcore.physics import resistance_n as _resistance_ms
 
 
 @dataclass(frozen=True)
@@ -20,27 +20,14 @@ class RunTime:
     t_pp: float  # pass-to-pass, seconds
     sup_start: float  # extra when starting from a stop
     sup_end: float  # extra when stopping at the end
-    v_kmh: float  # effective running speed
-    e_pp_kwh: float  # traction energy at constant speed
-    e_start_kwh: float  # extra energy to accelerate from a stop
+    v_kmh: float  # line speed at the segment ends (passing a station on the main track)
+    e_pp_kwh: float  # traction energy of the pass-to-pass run
+    e_start_kwh: float  # extra energy when starting from a stop
 
 
-def effective_speed_kmh(cat: TrainCategory, seg: Segment, direction: Direction, v_override: float | None) -> float:
-    v = min(cat.v_max_kmh, seg.v_max_kmh, v_override or 1e9)
-    if cat.id == "freight":
-        v *= FREIGHT_UPHILL.get((seg.id, direction), 1.0)
-    return v
-
-
-def mean_grade(seg: Segment, direction: Direction) -> float:
-    """Length-weighted grade, permille, signed for the direction of travel (+ = uphill)."""
-    g = sum(z.permille * (z.to_m - z.from_m) for z in seg.grade_zones) / seg.length_m
-    return g if direction == Direction.ODD else -g
-
-
-def resistance_n(cat: TrainCategory, v_kmh: float, grade_permille: float = 0.0) -> float:
-    w0 = cat.davis_a + cat.davis_b * v_kmh + cat.davis_c * v_kmh**2
-    return (w0 + grade_permille) * cat.mass_t * 9.81
+def resistance_n(cat, v_kmh: float, grade_permille: float = 0.0) -> float:
+    """Davis + grade resistance, N (v in km/h) — kept for the ATO module."""
+    return _resistance_ms(cat, v_kmh / 3.6, grade_permille)
 
 
 class RunningTimes:
@@ -48,21 +35,27 @@ class RunningTimes:
         self.world = world
         self._cache: dict[tuple, RunTime] = {}
 
-    def get(self, category: str, segment_id: str, direction: Direction, v_override: float | None = None) -> RunTime:
-        key = (category, segment_id, direction, v_override)
+    def get(self, category: str, segment_id: str, direction: Direction, v_override: float | None = None,
+            restrictions: tuple[Restriction, ...] = ()) -> RunTime:
+        key = (category, segment_id, direction, v_override, restrictions)
         rt = self._cache.get(key)
         if rt is None:
             rt = self._cache[key] = self._compute(*key)
         return rt
 
-    def _compute(self, category: str, segment_id: str, direction: Direction, v_override: float | None) -> RunTime:
+    def _compute(self, category: str, segment_id: str, direction: Direction, v_override: float | None,
+                 restrictions: tuple[Restriction, ...]) -> RunTime:
         cat = self.world.categories[category]
         seg = self.world.segments[segment_id]
-        v_kmh = effective_speed_kmh(cat, seg, direction, v_override)
-        v = v_kmh / 3.6
-        e_pp = max(resistance_n(cat, v_kmh, mean_grade(seg, direction)), 0.0) * seg.length_m / 3.6e6
-        e_start = 0.5 * cat.mass_t * 1000 * (1 + cat.rotating_mass) * v * v / 3.6e6
-        return RunTime(seg.length_m / (0.9 * v), SUP_START_S, SUP_END_S, v_kmh, e_pp, e_start)
+        v = line_speed_kmh(seg, cat, v_override)
+
+        def run(v_in: float, v_out: float):
+            return min_profile(seg, cat, direction, v_in, v_out, v_override, restrictions)
+
+        pp, sp, ps = run(v, v), run(0.0, v), run(v, 0.0)
+        return RunTime(t_pp=pp.time_s, sup_start=max(0.0, sp.time_s - pp.time_s),
+                       sup_end=max(0.0, ps.time_s - pp.time_s), v_kmh=v,
+                       e_pp_kwh=pp.energy_kwh, e_start_kwh=max(0.0, sp.energy_kwh - pp.energy_kwh))
 
     def t_pass(self, category: str, segment_id: str, direction: Direction, pass_clear_m: float,
                v_override: float | None = None) -> float:

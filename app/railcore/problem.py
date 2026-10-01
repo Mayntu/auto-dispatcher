@@ -16,6 +16,7 @@ from app.railcore.meetings import find_meetings
 from app.railcore.models import (
     KPI, Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus,
 )
+from app.railcore.warnings import restrictions_by_segment
 from app.railcore.running_time import RunningTimes
 
 CLOSING_TYPES = {IncidentType.OBSTACLE, IncidentType.SEGMENT_CLOSED}
@@ -106,6 +107,12 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
     closed: dict[str, int] = {}
     obstacles: list[tuple[Incident, int]] = []
     failures: dict[str, int] = {}
+    # warnings: slower running times for trains that enter the segment while the warning is expected to last
+    warn = restrictions_by_segment(snap.incidents, world)
+    warn_until: dict[str, int] = {}
+    for inc in snap.incidents:
+        if inc.type == IncidentType.SPEED_RESTRICTION and inc.segment_id and inc.status == "active":
+            warn_until[inc.segment_id] = max(warn_until.get(inc.segment_id, 0), incident_remaining(inc, now, durations))
     for inc in snap.incidents:
         if inc.status != "active":
             continue
@@ -134,7 +141,13 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
         legs_all = []
         for k in range(last):
             seg = world.segment_between(route[k], route[k + 1])
-            rt = rts.get(cat.id, seg.id, train.direction, ov)
+            restr = ()
+            if seg.id in warn:
+                on_it_now = st is not None and st.on_field and st.segment_id == seg.id
+                enters = train.stops[k].dep
+                if on_it_now or enters is None or enters - now <= warn_until[seg.id]:
+                    restr = warn[seg.id]
+            rt = rts.get(cat.id, seg.id, train.direction, ov, restr)
             legs_all.append(Leg(seg.id, round(rt.t_pp), round(rt.sup_start), round(rt.sup_end), rt.e_pp_kwh, rt.e_start_kwh))
 
         def make_node(k: int) -> Node:
@@ -224,6 +237,25 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
     return tasks
 
 
+def _fill_tracks(entries: list[PlanEntry], tasks: list[Task]) -> None:
+    """A plan that did not come from CP-SAT (re-timing, fallback) has no track for trains new to the horizon:
+    give each a candidate track (fits, platform) free at that time — the main track first when passing."""
+    cands = {(t.train_id, n.station_id): (n.tracks, n.side_tracks) for t in tasks for n in t.nodes}
+    busy: dict[tuple[str, str], list[tuple[float, float]]] = {}
+    for e in entries:
+        if e.kind == "dwell" and e.track_id:
+            busy.setdefault((e.station_id, e.track_id), []).append((e.start, e.end))
+    for e in sorted((e for e in entries if e.kind == "dwell" and not e.track_id), key=lambda e: e.start):
+        tracks, side = cands.get((e.train_id, e.station_id), ([], []))
+        order = sorted(tracks, key=lambda tr: (tr in side) != bool(e.stop))  # passing: main; stopping: side
+        free = [tr for tr in order
+                if all(e.end <= s0 or e.start >= s1 for s0, s1 in busy.get((e.station_id, tr), []))]
+        pick = (free or order or [None])[0]
+        if pick is not None:
+            e.track_id = pick
+            busy.setdefault((e.station_id, pick), []).append((e.start, e.end))
+
+
 def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World, settings: dict, *,
                   solver: str, strategy: str | None, solve_ms: int, version: int = 0,
                   base_version: int | None = None) -> Plan:
@@ -271,6 +303,7 @@ def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World
         throughput += dest_arr <= horizon
         planned += sched_dest is not None and sched_dest <= horizon
 
+    _fill_tracks(entries, tasks)
     kpi = KPI(
         total_delay_s=total, weighted_delay_s=weighted, delayed_trains=sorted(delayed, key=lambda x: -x[1]),
         unplanned_stops=unplanned, energy_kwh=round(energy, 1), energy_ideal_kwh=round(energy_ideal, 1),

@@ -14,7 +14,7 @@
 | GET | `/api/infra` | `{infra: {stations, segments, signals, switches}, categories, timetable, sim_epoch, thresholds, station_order, segment_times}` — статичные данные, грузить один раз |
 | GET | `/api/state` | Снимок: `{field, plan, variants, index, fact, journal}` (то же, что WS `snapshot`) |
 | GET | `/api/plan` | Текущий утверждённый план `Plan` |
-| GET / POST | `/api/incidents` | Активные сбои / создать: `{type: obstacle\|train_failure\|segment_closed, segment_id?, train_id?, km?, est_min_min, est_max_min}` → `Incident`; 422 при ошибке |
+| GET / POST | `/api/incidents` | Активные сбои / создать: `{type: obstacle\|train_failure\|segment_closed\|speed_restriction, segment_id?, train_id?, km?, est_min_min, est_max_min}` → `Incident`; 422 при ошибке. «Окно (закрытие перегона)» = `segment_closed`; «Выдать предупреждение» = `speed_restriction` + `km_from`, `km_to`, `v_kmh` |
 | POST | `/api/incidents/{id}/resolve` | Снять сбой; 404 если не активен |
 | GET | `/api/variants` | Текущая пачка вариантов `Variant[]` (пусто = «Активных решений нет») |
 | POST | `/api/plan/apply` | `{variant_id, base_plan_version}` → `{ok, plan_version, index, total_delay_s}`; **409** — вариант устарел (`detail` — текст для диспетчера, система сама пересчитывает); 404 — нет такого |
@@ -24,6 +24,7 @@
 | POST | `/api/whatif` | `{modifications: [{kind: train_speed, target_id, value(км/ч)} \| {kind: incident_duration, target_id, value(мин)}]}` → `WhatIfResult` (≤ 3 с) |
 | GET | `/api/ato/{train_id}` | `SpeedProfile` на текущий/ближайший перегон; 404 если поезд завершил маршрут |
 | POST | `/api/sim/clock` | `{paused?, speed?}` |
+| POST | `/api/dc/direction` | `{segment_id, direction: odd\|even}` — «Сменить направление»; **409** с причиной, если перегон занят |
 | GET | `/api/system/metrics` | `{last_solve_ms, ui_p95_ms, safety_violations}` |
 
 ## WebSocket `/ws`
@@ -95,8 +96,8 @@
 ```jsonc
 "blocks":     [{"id": "R1-STP-B3", "occupied_by": "2003" | null, "obstacle": false}],
 "signals":    [... , {"id": "R1-STP-P3N", "aspect": "green|yellow|red"}],   // все сигналы, включая проходные
-"directions": {"R1-STP": {"direction": "odd|even|null", "changing": false}}, // стрелка направления на перегоне
-"warnings":   [{"segment_id": "SEV-R1", "from_m": 3000, "to_m": 6000, "v_kmh": 40}]  // предупреждения — ПОЯВИТСЯ в шаге 6
+"directions": {"R1-STP": {"direction": "odd|even|null", "changing": false, "manual": false}}, // стрелка направления; manual — задано диспетчером
+"warnings":   [{"id": "a1b2", "segment_id": "SEV-R1", "km_from": 3, "km_to": 6, "v_kmh": 40, "from_m": 3000, "to_m": 6000}]  // предупреждения
 ```
 
-`TrainState.block_id` — блок-участок головы поезда. Настройки интервалов (`headway_s`, `tau_cross_s`, `tau_np_s`, `direction_change_s`) — в `GET /api/infra` → `intervals`.
+`TrainState.block_id` — блок-участок головы поезда. Настройки интервалов (`headway_s`, `tau_cross_s`, `tau_np_s`, `direction_change_s`) — в `GET /api/infra` → `intervals`, их названия и определения для экрана — `interval_labels {key: {name, hint}}`.
