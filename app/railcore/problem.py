@@ -14,7 +14,7 @@ from app.railcore.index import compute_index
 from app.railcore.infra import World
 from app.railcore.meetings import find_meetings
 from app.railcore.models import (
-    KPI, Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus,
+    KPI, Direction, Incident, IncidentType, Pin, Plan, PlanEntry, Train, TrainState, TrainStatus,
 )
 from app.railcore.warnings import restrictions_by_segment
 from app.railcore.running_time import RunningTimes
@@ -33,6 +33,7 @@ class Snapshot(BaseModel):
     incidents: list[Incident] = []  # active only
     duration_override_s: dict[str, int] = {}  # incident id -> total duration (what-if)
     hint: list[PlanEntry] = []  # current plan, for warm start and fixed order
+    pins: list[Pin] = []  # the dispatcher's instructions (active, violated and the one being previewed)
 
 
 @dataclass
@@ -53,6 +54,10 @@ class Node:
     side_tracks: list[str] = field(default_factory=list)  # of those, the side (non-main) ones
     track_fixed: str | None = None  # the track the train stands on now
     simultaneous_reception: bool = True
+    pin_arr: int | None = None  # dispatcher's instruction: arrive exactly then
+    pin_dep: int | None = None  # dispatcher's instruction: depart exactly then
+    free_arr: bool = False  # preview of a drag: this event ignores the current plan's time as a lower bound
+    free_dep: bool = False
 
 
 @dataclass
@@ -63,6 +68,8 @@ class Leg:
     sup_end: int
     e_pp: float
     e_start: float
+    max_factor: float = 1.3  # longest run = factor x minimum; an arrival instruction may stretch it
+    fixed_run: int | None = None  # preview of a drag: the run keeps exactly this duration (speed unchanged)
 
 
 @dataclass
@@ -228,13 +235,34 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
                 n0.dep_min = max(n0.dep_min, failures[train.id])
 
         base_w = train.priority_override or settings["priority_weights"][cat.id]
+        legs = legs_all[first:]
+        apply_pins(train.id, nodes, legs, snap.pins, now, settings)
         tasks.append(Task(
             train_id=train.id, category=cat.id, direction=train.direction,
             weight=base_w * weight_mult.get(cat.id, 1.0), base_weight=base_w,
-            nodes=nodes, legs=legs_all[first:], current=current,
+            nodes=nodes, legs=legs, current=current,
             meta={"final_sched_arr": rel(train.stops[-1].arr)},
         ))
     return tasks
+
+
+def apply_pins(train_id: str, nodes: list[Node], legs: list[Leg], pins: list[Pin], now: float, settings: dict) -> None:
+    """The dispatcher's instructions on this train's future events (tasks/02 §3.4): an arrival instruction may
+    stretch the run into that station up to `manual.max_run_factor` x minimum."""
+    factor = settings.get("manual", {}).get("max_run_factor", 2.0)
+    for pin in pins:
+        if pin.train_id != train_id or pin.status not in ("active", "violated") or pin.time < now:
+            continue
+        for i, n in enumerate(nodes):
+            if n.station_id != pin.station_id:
+                continue
+            t = round(pin.time - now)
+            if pin.kind == "dep" and n.kind != "dest":
+                n.pin_dep = t
+            elif pin.kind == "arr" and n.kind != "origin" and n.arr_fixed is None:
+                n.pin_arr = t
+                if i > 0:
+                    legs[i - 1].max_factor = max(legs[i - 1].max_factor, factor)
 
 
 def _fill_tracks(entries: list[PlanEntry], tasks: list[Task]) -> None:
@@ -304,6 +332,7 @@ def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World
         planned += sched_dest is not None and sched_dest <= horizon
 
     _fill_tracks(entries, tasks)
+    pins = [p for p in snap.pins if p.status in ("active", "violated")]
     kpi = KPI(
         total_delay_s=total, weighted_delay_s=weighted, delayed_trains=sorted(delayed, key=lambda x: -x[1]),
         unplanned_stops=unplanned, energy_kwh=round(energy, 1), energy_ideal_kwh=round(energy_ideal, 1),
@@ -316,5 +345,5 @@ def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World
         version=version, base_version=base_version, created_at=now, horizon_end=now + horizon,
         entries=entries, meetings=find_meetings(entries, directions, base_dwell), kpi=kpi,
         index=compute_index(kpi, sum(t.base_weight for t in tasks), horizon, settings),
-        strategy=strategy, solver=solver, solve_ms=solve_ms,
+        strategy=strategy, solver=solver, solve_ms=solve_ms, pins=pins,
     )

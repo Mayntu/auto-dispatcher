@@ -53,5 +53,10 @@
     "pass_clear_m": 300,
     "ready_before_dep_s": 300,
     "leave_after_arr_s": 300
+  },
+  "manual": {
+    "max_run_factor": 2.0,
+    "snap_s": 60,
+    "reoptimize_min_gain_s": 60
   }
 }

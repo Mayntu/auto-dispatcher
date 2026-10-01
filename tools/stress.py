@@ -24,6 +24,8 @@ from multiprocessing import Pool
 from app.common.config import load_settings
 from app.field.incidents import IncidentError
 from app.field.sim import FieldSim
+from app.planner.manual import ManualError
+from app.planner.manual import preview as manual_preview
 from app.planner.pool import forecast_plan, retime_with_objective, solve_job
 from app.planner.snapshot import build_snapshot
 from app.planner.strategies import STRATEGIES, durations_for, pick_strategies
@@ -77,13 +79,22 @@ def run(seed: int) -> dict:
            "max_quiet_growth_min": 0.0, "stall": False, "max_fail_streak": 0, "overrides": 0,
            "guard_replans": 0}
 
+    pins: list = []  # the dispatcher's instructions from the train graph (tasks/02), on every third seed
+    with_pins = seed % 3 == 1
+    res["pins"] = res["pins_violated"] = 0
+    last_pin = 0.0
+
     def snap(plan):
-        return build_snapshot(sim.snapshot(), world.timetable, [fi.incident for fi in sim.active()], plan)
+        sn = build_snapshot(sim.snapshot(), world.timetable, [fi.incident for fi in sim.active()], plan)
+        return sn.model_copy(update={"pins": [p for p in pins if p.time > sim.now]})
 
     def solve(sn, strategy):
         t0 = time.perf_counter()
         p = Plan.model_validate(solve_job(sn.model_dump(mode="json"), strategy, settings)["plan"])
         res["solves"] += 1
+        times = {(e.train_id, e.station_id): e.end for e in p.entries if e.kind == "dwell"}
+        res["pins_violated"] += sum(1 for pn in sn.pins if (pn.train_id, pn.station_id) in times
+                                    and abs(times[(pn.train_id, pn.station_id)] - pn.time) > 60)
         res["max_solve_ms"] = max(res["max_solve_ms"], round((time.perf_counter() - t0) * 1000))
         return p
 
@@ -113,6 +124,28 @@ def run(seed: int) -> dict:
                     resolved_only = False
                 except IncidentError:
                     pass
+            if with_pins and pending_variants is None and sim.now - last_pin > 2700:
+                # as a dispatcher dragging a thread on the graph: hold a train 3-15 min at a station ahead,
+                # "keep order" applied at once; sometimes an old instruction is removed
+                last_pin = sim.now
+                if pins and rng.random() < 0.3:
+                    pins.pop(rng.randrange(len(pins)))
+                cands = [e for e in plan.entries if e.kind == "dwell" and sim.now + 600 < e.start < sim.now + 5400
+                         and e.station_id not in (world.trains[e.train_id].stops[0].station_id,
+                                                  world.trains[e.train_id].stops[-1].station_id)]
+                if cands:
+                    e = rng.choice(cands)
+                    try:
+                        r = manual_preview(snap(plan), world, RunningTimes(world), settings, plan, None, e.train_id,
+                                           e.station_id, "dep", e.end + rng.uniform(180, 900))
+                        if r["plan"] is not None and not r["conflicts"]:
+                            pins[:] = [p for p in pins if (p.train_id, p.station_id) != (e.train_id, e.station_id)]
+                            pins.append(r["pin"])
+                            plan = r["plan"]
+                            sim.set_plan(plan)
+                            res["pins"] += 1
+                    except ManualError:
+                        pass
             if policy == "replan" and sim.now - last_replan > 1800:
                 need_regen, last_replan = True, sim.now
 
@@ -266,6 +299,7 @@ def main() -> None:
                   f"end={r.get('end')} fin={r.get('finished')}/due {r.get('due')} late≤{r.get('max_late_min')}м solves={r['solves']} maxsolve={r['max_solve_ms']}ms "
                   f"gap={r['promise_gap']:.1f} stale={r['stale_applies']} quiet+={r['max_quiet_growth_min']} "
                   f"ffail={r['forecast_fail']} ovr={r.get('overrides', 0)} guard={r.get('guard_replans', 0)} "
+                  f"pins={r.get('pins', 0)}/{r.get('pins_violated', 0)} "
                   f"{' | '.join(bad)}", flush=True)
             for e in r["errors"]:
                 print(e, flush=True)

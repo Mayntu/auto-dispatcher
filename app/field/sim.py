@@ -52,6 +52,7 @@ class SimTrain:
     finished_at: float | None = None
     order_blocked_since: float | None = None  # ready to go, held only by the plan's order
     held_signal: str | None = None  # block signal the train is standing at
+    guard_released: str | None = None  # station where a deadlock guard let this train go out of plan
     done_segments: set[str] = field(default_factory=set)
 
 
@@ -71,10 +72,12 @@ class FieldSim:
         self.safety_violations = 0
         self._violating: set[str] = set()
         self._last_progress = 0.0
+        self._overdue = False
         self.plan_overrides = 0
         self._guard_events: list[dict] = []
         self.ab = AutoBlock(world, settings)
         self._last_arrival: dict[tuple[str, str], float] = {}
+        self._slow_factor: dict[tuple[str, str], float] = {}
         self._warn: dict[str, tuple] = {}
         self.manual_dir: dict[str, tuple[Direction, float]] = {}  # dispatcher's direction command, until
         self._tau_np_breaches: list[str] = []
@@ -83,6 +86,9 @@ class FieldSim:
     def set_plan(self, plan: Plan) -> None:
         self.plan = plan
         self._dwell = {(e.train_id, e.station_id): e for e in plan.entries if e.kind == "dwell"}
+        factor = self.settings.get("manual", {}).get("max_run_factor", 2.0)
+        self._slow_factor = {(p.train_id, p.station_id): factor for p in getattr(plan, "pins", [])
+                             if p.kind == "arr" and p.status in ("active", "violated")}
         self._run = {(e.train_id, e.segment_id): e for e in plan.entries if e.kind == "run"}
         order: dict[str, list[tuple[float, str]]] = {}
         for e in plan.entries:
@@ -149,10 +155,13 @@ class FieldSim:
                 if self.now >= fi.ends_at():
                     events.append(("incident.resolved", self.resolve_incident(fi.id).model_dump(mode="json")))
             self._autoblock()
+            self._overdue = False
             for tr in self.trains.values():
                 ev = self._advance(tr, h)
                 if ev:
                     events.append(("field.train_event", {**ev, "train_id": tr.train.id, "time": self.now}))
+            if not self._overdue:  # everybody waits for the plan's times: the field is not stalled
+                self._last_progress = self.now
             self._safety(events)
             events += [("field.guard", g) for g in self._guard_events]
             self._guard_events.clear()
@@ -230,17 +239,24 @@ class FieldSim:
             tr.order_blocked_since = tr.order_blocked_since or t
         else:
             tr.order_blocked_since = None
-        if t < dep_plan or not order_ok:
+        if t >= dep_plan:
+            self._overdue = True  # past its planned departure and still here: counts towards "the field stalled"
+        if (t < dep_plan or not order_ok) and tr.guard_released != st_id:  # once released, it stays released
             # waiting for the plan's time and order is right — unless the whole field has stopped, or this
             # train has been held only by the plan's order for long: then the plan no longer matches reality
             # and the DC lets a physically safe move through (counted: it must not hide planning bugs)
             starving = tr.order_blocked_since is not None and t - tr.order_blocked_since >= STARVE_OVERRIDE_S
             if (self.stalled_s < STALL_OVERRIDE_S and not starving) or not self._safe_out_of_order(tr, nxt):
                 return None
+        if (t < dep_plan or not order_ok) and tr.guard_released != st_id:
+            tr.guard_released = st_id  # one release per stop, however long the segment takes to turn round
             self.plan_overrides += 1
             held = t - (tr.order_blocked_since or t)
             log.warning("deadlock guard: %s leaves %s out of plan (field stalled %.0f s, held %.0f s)", tid, st_id,
                         self.stalled_s, held)
+            # the automatics would turn the free segment towards the next train of the (stale) plan again and
+            # the released train could never leave: hold the direction for it, as a dispatcher's command does
+            self.manual_dir[seg.id] = (tr.train.direction, t + MANUAL_DIR_S)
             self._guard_events.append({"train_id": tid, "station_id": st_id, "time": t,
                                        "reason": "stalled" if self.stalled_s >= STALL_OVERRIDE_S else "starving",
                                        "stalled_s": round(self.stalled_s), "held_s": round(held)})
@@ -254,6 +270,7 @@ class FieldSim:
                 self.ab.request_direction(seg.id, d, t, self._segment_empty(seg.id))
             return None
         tr.order_blocked_since = None
+        tr.guard_released = None
         self._last_progress = t
         self.manual_dir.pop(seg.id, None)  # the dispatcher's direction has been used
         rt = self._rt(tr, seg.id)
@@ -303,7 +320,8 @@ class FieldSim:
             # follow the plan's arrival time, but never crawl slower than the model allows (1.3x the running
             # time + the cost of a stop): a stale plan must not leave a train creeping along the line for hours;
             # if it arrives early it waits at the station, whose track was reserved when it left
-            slowest = 1.0 / (1.3 * (rt.t_pp + rt.sup_start + rt.sup_end) + rt.sup_start + rt.sup_end)
+            factor = self._slow_factor.get((tid, tr.route[tr.idx + 1]), 1.3)  # an arrival instruction may stretch it
+            slowest = 1.0 / (factor * (rt.t_pp + rt.sup_start + rt.sup_end) + rt.sup_start + rt.sup_end)
             rate = min(max((1.0 - tr.progress) / max(run.end - t, 1.0), slowest), rate)
         if yellow:  # yellow ahead: no faster than 60 km/h towards the next signal
             rate = min(rate, YELLOW_KMH / 3.6 / seg.length_m)
@@ -314,6 +332,8 @@ class FieldSim:
         if new_p > tr.progress:
             self._last_progress = t
         tr.held_at_obstacle = new_p >= cap - 1e-9 and cap < 1.0
+        if new_p <= tr.progress:
+            self._overdue = True  # standing on the line
         tr.speed_kmh = (new_p - tr.progress) * seg.length_m / h * 3.6
         tr.energy_kwh += rt.e_pp_kwh * (new_p - tr.progress)
         tr.progress = new_p

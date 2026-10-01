@@ -24,6 +24,9 @@ STRATEGIES = {
         Strategy("robust", "Устойчивый план", duration="max"),
         Strategy("fewer_stops", "Меньше остановок", lambda_stop_mult=4),
         Strategy("rescue", "Вспомогательный локомотив", duration="rescue"),
+        # the dispatcher's instruction from the train graph (tasks/02): both weigh like "balanced"
+        Strategy("keep_order", "Сохранить порядок"),
+        Strategy("reoptimize", "Переразвести"),
     ]
 }
 

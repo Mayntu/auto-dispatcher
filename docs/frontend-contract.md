@@ -101,3 +101,17 @@
 ```
 
 `TrainState.block_id` — блок-участок головы поезда. Настройки интервалов (`headway_s`, `tau_cross_s`, `tau_np_s`, `direction_change_s`) — в `GET /api/infra` → `intervals`, их названия и определения для экрана — `interval_labels {key: {name, hint}}`.
+
+## Указания диспетчера на ГИД (tasks/02, уже отдаётся)
+
+Перетаскивание прибытия/отправления поезда на пункте. Время — секунды симуляции.
+
+| Метод | Путь | Ответ |
+|---|---|---|
+| GET | `/api/plan/manual/bounds?train_id=&station_id=` | `{base_plan_version, train_id, station_id, point_type: stop\|pass\|origin\|destination, arr, dep, info}`; `arr`/`dep` = `{current, min, max, min_reason {code, text}, max_reason, locked, locked_reason}` или `null` (у станции отправления нет `arr`, у конечной — `dep`) |
+| POST | `/api/plan/manual/preview` | тело `{base_plan_version, train_id, station_id, kind: arr\|dep, time}` → `{time, clamped, dragged {arr, dep, dwell_s, prev_run_s, prev_avg_speed_kmh, v_max_kmh}, threads [{train_id, category, points [{station_id, km, arr, dep, stop}]}], affected [{train_id, delta_final_s, delta_max_s}], conflicts [{kind, trains, text}], total_delay_delta_s, index_forecast, delta_index, compute_ms}` |
+| POST | `/api/plan/manual/commit` | то же тело → `{variants: [Variant]}`: 1–2 карточки, `source: "manual"`, `strategy: keep_order\|reoptimize`, `manual {train_id, station_id, kind, from_time, to_time}`; применение — `POST /api/plan/apply` |
+| GET | `/api/plan/pins` | действующие указания `[Pin]`: `{id, train_id, station_id, kind, time, created_at, status: active\|violated, reason, description}` |
+| DELETE | `/api/plan/pins/{id}` | снять указание |
+
+Ошибки: `409 {error: "stale_plan", current_version}`, `423 {error: "locked", reason}`, `404 {error: "not_found"}`, `422 {error: "invalid_kind"}`. `Plan.pins` — указания в плане; WS `planner.pin_violated {pin, reason}`.
