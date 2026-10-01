@@ -53,7 +53,14 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
                 if not n.stop_fixed:
                     m.Add(dwell <= n.pass_threshold + ub * s)
                     objective.append(round(p["lambda_stop"] * lambda_stop_mult * SCALE) * s)
-            iv = m.NewIntervalVar(a, dwell, d, f"st_{tid}_{i}")
+            # the field (DC) gives a train its track at the next station when it enters the segment, so the
+            # track is held from the departure at the previous station, not from the arrival
+            if i > 0:
+                held = m.NewIntVar(0, ub + n.dest_dwell, f"h_{tid}_{i}")
+                m.Add(d == dep[i - 1] + held)
+                iv = m.NewIntervalVar(dep[i - 1], held, d, f"st_{tid}_{i}")
+            else:
+                iv = m.NewIntervalVar(a, dwell, d, f"st_{tid}_{i}")
             station_intervals.setdefault(n.station_id, []).append(iv)
             station_dir_intervals.setdefault((n.station_id, t.direction.value), []).append(iv)
             if (n.kind != "origin" and n.sched_arr is not None and n.arr_fixed is None
@@ -100,6 +107,9 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s if time_limit_s is not None else p["time_limit_s"]
+    if p.get("deterministic_time") and time_limit_s is None:  # reproducible runs (stress tests)
+        solver.parameters.max_deterministic_time = p["deterministic_time"]
+        solver.parameters.max_time_in_seconds = 30
     solver.parameters.num_workers = p.get("cpsat_workers", 4)
     solver.parameters.random_seed = 42
     # no repair_hint: OR-Tools 9.15 aborts the whole process in MinimizeL1DistanceWithHint on some models
@@ -114,3 +124,20 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
         for tid, vs in vars_by_train.items()
     }
     return sol, name, ms
+
+
+def objective(tasks: list[Task], sol: Solution, settings: dict, lambda_stop_mult: float = 1.0) -> float:
+    """The model's objective evaluated on any solution (e.g. the current order re-timed), same units."""
+    lam = settings["planner"]["lambda_stop"] * lambda_stop_mult
+    total = 0.0
+    for t in tasks:
+        times = sol[t.train_id]
+        for n, (arr, _, stop) in zip(t.nodes, times):
+            if (n.kind != "origin" and n.sched_arr is not None and n.arr_fixed is None
+                    and (n.kind == "dest" or (n.sched_stop and t.category != "freight"))):
+                total += t.weight * max(0, arr - n.sched_arr)
+            if n.kind == "mid" and not n.stop_fixed and stop:
+                total += lam
+        total += EPS_FINAL * times[-1][0]
+    return total
+

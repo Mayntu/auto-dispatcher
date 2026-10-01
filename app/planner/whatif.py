@@ -40,6 +40,8 @@ async def run_whatif(pool: SolverPool, world: World, snap: Snapshot, req: WhatIf
     """The baseline is the same re-optimisation without the modifications (solved in parallel), so the
     difference shows the effect of the changed parameter only, not the gain from re-planning itself."""
     mod_snap = apply_modifications(snap, req.modifications)
+    p = settings["planner"]
+    settings = {**settings, "planner": {**p, "time_limit_s": p.get("whatif_time_limit_s", p["time_limit_s"])}}
     base_res, res = await asyncio.gather(pool.solve(snap.model_dump(mode="json"), "balanced", settings),
                                          pool.solve(mod_snap.model_dump(mode="json"), "balanced", settings))
     base, plan = Plan.model_validate(base_res["plan"]), Plan.model_validate(res["plan"])

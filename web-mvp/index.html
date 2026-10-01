@@ -373,7 +373,15 @@ function renderSituation() {
   const proposed = S.variants ? S.variants.variants.filter(v => v.status === 'proposed') : [];
   const lateText = lateSched.slice(0, 4).map(([id, d]) => `${id} +${mins(d)}`).join(', ') + (lateSched.length > 4 ? ` и ещё ${lateSched.length - 4}` : '');
   let cls = 'ok', icon = '✅', main, sub = `В пути ${running}, на станциях ${onField.length - running}, ещё не отправились ${notYet}, прибыли ${done}.`, replan = false;
-  if (incs.length) {
+  const broken = (S.index && S.index.plan_broken) || (f.stalled_s || 0) >= 360;
+  if (broken && !incs.length) {
+    cls = 'bad'; icon = '⛔';
+    main = '<b>Текущий план перестал выполняться</b> — поезда разъехались не так, как он предполагал.';
+    sub = S.computing ? 'Система считает новые варианты от текущего положения поездов…'
+      : proposed.length ? 'Выберите один из новых вариантов справа — они посчитаны от текущего положения поездов.'
+      : 'Нажмите «Пересчитать план».';
+    replan = !proposed.length && !S.computing;
+  } else if (incs.length) {
     cls = 'bad'; icon = '⚠️';
     main = incs.map(i => `<b>${INC_ICON[i.type]} ${i.description}</b> — ${i.type === 'train_failure' ? 'поезд ' + i.train_id : segName(i.segment_id)}, с ${clock(i.started_at, false)}, оценка ${mins(i.est_min_s)}–${mins(i.est_max_s)} мин`).join('<br>');
     const held = onField.filter(t => t.status === 'broken' || (t.status === 'stopped' && t.segment_id)).map(t => t.train_id);

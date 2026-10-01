@@ -10,7 +10,7 @@ from concurrent.futures.process import BrokenProcessPool
 from functools import lru_cache
 
 from app.common.config import load_settings
-from app.planner.model import solve_cpsat
+from app.planner.model import objective, solve_cpsat
 from app.planner.strategies import STRATEGIES, durations_for
 from app.railcore.evaluate import Deadlock, evaluate
 from app.railcore.infra import get_world
@@ -43,6 +43,14 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
     if sol is None:
         solver = "fallback"
         sol = _fallback(tasks, snap, settings, strat)
+    elif status != "OPTIMAL" and snap.hint:
+        # not proven optimal within the time limit: never propose something worse than keeping the current order
+        try:
+            keep = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"], snap.now)
+            if objective(tasks, keep, settings, strat.lambda_stop_mult) < objective(tasks, sol, settings, strat.lambda_stop_mult):
+                sol, status = keep, "KEPT_CURRENT_ORDER"
+        except Deadlock:
+            pass
     plan = assemble_plan(tasks, sol, snap, world, settings, solver=solver, strategy=strategy_id, solve_ms=ms)
 
     # robustness: keep this plan's order, incidents at their max duration
@@ -73,6 +81,21 @@ def _fallback(tasks, snap: Snapshot, settings: dict, strat):
     if sol is None:
         raise RuntimeError(f"no plan found ({status})")
     return sol
+
+
+def retime_with_objective(snap: Snapshot, settings: dict, strategy_id: str = "balanced",
+                          durations: dict[str, int] | None = None) -> tuple[Plan, float] | None:
+    """The order of `snap.hint` re-timed from now, plus its value of the CP-SAT objective of `strategy_id`
+    (the same yardstick the solver used), so variants and the current plan compare like for like."""
+    world, rts = get_world(), _rts()
+    strat = STRATEGIES[strategy_id]
+    tasks = build_tasks(snap, world, rts, settings, durations, strat.weight_mult)
+    try:
+        sol = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"], snap.now)
+    except Deadlock:
+        return None
+    plan = assemble_plan(tasks, sol, snap, world, settings, solver="refresh", strategy=strategy_id, solve_ms=0)
+    return plan, objective(tasks, sol, settings, strat.lambda_stop_mult)
 
 
 def forecast_plan(snap: Snapshot, settings: dict, durations: dict[str, int] | None = None) -> Plan | None:

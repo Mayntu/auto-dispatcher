@@ -8,7 +8,7 @@ import time
 
 from app.bus.base import EventBus
 from app.bus.envelope import Envelope
-from app.planner.pool import SolverPool, forecast_plan
+from app.planner.pool import SolverPool, forecast_plan, retime_with_objective
 from app.planner.snapshot import build_snapshot
 from app.planner.strategies import STRATEGIES, durations_for
 from app.planner.variants import generate_variants
@@ -18,6 +18,7 @@ from app.railcore.models import Incident, Plan, Variant, WhatIfRequest
 from app.railcore.problem import Snapshot
 
 log = logging.getLogger("planner")
+STALE_MARGIN_S = 300  # objective units (weighted s): a variant this much worse than keeping the current plan is refused
 
 
 class PlannerService:
@@ -126,9 +127,13 @@ class PlannerService:
                 self._forecast_fails = 0
                 await self._maybe_refresh(fc)
             else:
-                # the approved order no longer fits where the trains are: re-plan from the current state
                 self._forecast_fails += 1
-                if self._forecast_fails == 3 and not any(v.status == "proposed" for v in self.variants.values()):
+            # the approved plan no longer fits where the trains are (its order cycles, or the field has
+            # stopped moving): re-plan from the current state with CP-SAT
+            stalled = self.field.get("stalled_s", 0) >= self.settings["planner"]["replan_deviation_s"] * 3
+            if self._forecast_fails == 3 or stalled:
+                if not any(v.status == "proposed" for v in self.variants.values()) \
+                        and (self._gen_task is None or self._gen_task.done()):
                     log.warning("current plan is no longer executable, generating variants")
                     self._dirty = True
                     if self._gen_task is None or self._gen_task.done():
@@ -188,13 +193,26 @@ class PlannerService:
         # the variant was solved a while ago; keep its order (the decision) and re-time it from now
         snap = self.snapshot().model_copy(update={"hint": v.plan.entries})
         durations = durations_for(STRATEGIES[v.strategy], snap.incidents, self.settings)
-        plan = forecast_plan(snap, self.settings, durations)
+        # compare like for like: the variant's order and the current one, both re-timed from now and scored
+        # with the objective the solver optimised for this strategy
+        new = retime_with_objective(snap, self.settings, v.strategy, durations)
+        cur = retime_with_objective(self.snapshot(), self.settings, v.strategy, durations)
+        plan = new[0] if new else None
+        current = cur[0] if cur else None
+        reason = None
         if plan is None:  # the order no longer fits where the trains are now
-            v.status = "stale"
+            reason = "Поезда уже разъехались не так, как предполагал вариант — пересчитываю варианты"
+        elif cur is not None and new[1] > cur[1] + STALE_MARGIN_S:
+            reason = (f"Пока вариант ждал решения, он стал хуже текущего плана (задержка "
+                      f"{round(plan.kpi.total_delay_s / 60)} мин против {round(current.kpi.total_delay_s / 60)}) — "
+                      f"пересчитываю варианты")
+        if reason:
+            for other in self.variants.values():  # the whole batch was computed for the same, now outdated state
+                if other.status == "proposed":
+                    other.status = "stale"
             await self._publish_variants()
             await self._on_cmd(env.model_copy(update={"type": "cmd.planner.replan", "corr_id": None}))
-            return await self._reply(env, ok=False, code=409,
-                                     reason="Поезда уже разъехались не так, как предполагал вариант — пересчитываю варианты")
+            return await self._reply(env, ok=False, code=409, reason=reason)
         plan.strategy, plan.solver, plan.solve_ms = v.strategy, v.plan.solver, v.plan.solve_ms
         plan.kpi.robust_total_delay_s = v.plan.kpi.robust_total_delay_s
         await self._approve(plan, base)

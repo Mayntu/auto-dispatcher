@@ -23,7 +23,7 @@
     "freight": 1
   },
   "planner": {
-    "time_limit_s": 1.5,
+    "time_limit_s": 3.5,
     "workers": 3,
     "horizon_s": 7200,
     "debounce_ms": 300,
@@ -32,7 +32,8 @@
     "lambda_side_track": 30,
     "replan_deviation_s": 120,
     "rescue_eta_s": 1800,
-    "rescue_haul_s": 600
+    "rescue_haul_s": 600,
+    "whatif_time_limit_s": 2.5
   },
   "sim": {
     "speed": 20,

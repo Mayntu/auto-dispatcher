@@ -24,7 +24,7 @@ from multiprocessing import Pool
 from app.common.config import load_settings
 from app.field.incidents import IncidentError
 from app.field.sim import FieldSim
-from app.planner.pool import forecast_plan, solve_job
+from app.planner.pool import forecast_plan, retime_with_objective, solve_job
 from app.planner.snapshot import build_snapshot
 from app.planner.strategies import STRATEGIES, durations_for, pick_strategies
 from app.railcore.infra import get_world
@@ -66,6 +66,7 @@ def run(seed: int) -> dict:
     settings = copy.deepcopy(load_settings())
     settings["planner"]["time_limit_s"] = 0.7
     settings["planner"]["cpsat_workers"] = 1  # deterministic: a failing seed reproduces
+    settings["planner"]["deterministic_time"] = 1.0  # work units, not wall time: independent of CPU load
     sim = FieldSim(world, RunningTimes(world), settings, seed=seed)
     policy = POLICIES[seed % len(POLICIES)]
     mass = seed % 7 == 0
@@ -119,7 +120,12 @@ def run(seed: int) -> dict:
                 ranked = sorted(pending_variants, key=lambda v: v[1].index.value, reverse=True)
                 strategy, chosen = ranked[-1] if policy == "worst" else ranked[0]
                 sn = snap(plan).model_copy(update={"hint": chosen.entries})
-                new = forecast_plan(sn, settings, durations_for(STRATEGIES[strategy], sn.incidents, settings))
+                durs = durations_for(STRATEGIES[strategy], sn.incidents, settings)
+                nv = retime_with_objective(sn, settings, strategy, durs)
+                cv = retime_with_objective(snap(plan), settings, strategy, durs)
+                new = nv[0] if nv else None
+                if nv is not None and cv is not None and nv[1] > cv[1] + 300:
+                    new = None  # the service refuses a variant that became worse than the current plan
                 if new is None:
                     res["stale_applies"] += 1
                     need_regen = True
@@ -135,10 +141,12 @@ def run(seed: int) -> dict:
                 res["forecast_fail"] += 1
                 fail_streak += 1
                 res["max_fail_streak"] = max(res["max_fail_streak"], fail_streak)
-                if fail_streak == 3 and pending_variants is None:  # as the planner service does
-                    need_regen = True
             else:
                 fail_streak = 0
+            # as the planner service does: broken plan or stopped field -> new variants from the current state
+            if pending_variants is None and (fail_streak == 3 or sim.stalled_s >= 3 * settings["planner"]["replan_deviation_s"]):
+                need_regen = True
+            if fc is not None:
                 lag = max((t["delay_s"] for t in sim.snapshot()["trains"] if t["on_field"]), default=0)
                 new_trains = {e.train_id for e in fc.entries} - {e.train_id for e in plan.entries}
                 if lag > settings["planner"]["replan_deviation_s"] or new_trains:

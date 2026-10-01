@@ -23,6 +23,11 @@ import websockets
 BASE = "http://127.0.0.1:8000"
 
 
+def set_base(url: str) -> None:
+    global BASE
+    BASE = url.rstrip("/")
+
+
 class Report:
     def __init__(self) -> None:
         self.fails: list[str] = []
@@ -54,7 +59,10 @@ class Monitor:
     async def run(self) -> None:
         while not self.stop:
             try:
+                t0 = time.time()
                 r = await self.c.get("/api/state")
+                if time.time() - t0 > 2:
+                    print(f"  ! /api/state answered in {time.time() - t0:.1f} s", flush=True)
                 if r.status_code >= 500:
                     self.http_5xx += 1
                 s = r.json()
@@ -101,12 +109,13 @@ async def wait_sim(mon: Monitor, t: float) -> None:
         await asyncio.sleep(0.5)
 
 
-async def wait_variants(c: httpx.AsyncClient, after_version: int | None, incident_id: str | None, timeout=8.0):
+async def wait_variants(c: httpx.AsyncClient, after_version: int | None, incident_id: str | None, timeout=8.0,
+                        exclude: set | None = None):
     """Proposed variants for the current plan version (and the incident, if given); returns (variants, seconds)."""
     t0 = time.time()
     while time.time() - t0 < timeout:
         vs = (await c.get("/api/variants")).json()
-        live = [v for v in vs if v["status"] == "proposed"]
+        live = [v for v in vs if v["status"] == "proposed" and v["id"] not in (exclude or set())]
         if live and (incident_id is None or incident_id in live[0]["incident_ids"]) \
                 and (after_version is None or live[0]["base_plan_version"] >= after_version):
             return live, time.time() - t0
@@ -114,12 +123,29 @@ async def wait_variants(c: httpx.AsyncClient, after_version: int | None, inciden
     return [], time.time() - t0
 
 
+STALE_SEEN: set = set()
+
+
 async def apply(c: httpx.AsyncClient, mon: Monitor, v: dict, label: str, check_promise: bool) -> dict | None:
     plan = (await c.get("/api/plan")).json()
     r = await c.post("/api/plan/apply", json={"variant_id": v["id"], "base_plan_version": plan["version"]})
     if r.status_code == 409:
-        R.check(True, f"{label}: стейл-вариант корректно отклонён (409): {r.json()['detail']}")
-        return None
+        detail = r.json()["detail"]
+        STALE_SEEN.update(x["id"] for x in (await c.get("/api/variants")).json())
+        if not check_promise:
+            R.check(True, f"{label}: устаревший вариант корректно отклонён (409): {detail}")
+            return None
+        # at x60 two real seconds are two minutes on the line: a variant may legitimately go stale.
+        # Then the system must re-plan by itself and the fresh variant must apply.
+        R.check("пересчитываю" in detail, f"{label}: отклонён как устаревший, система пересчитывает: {detail}")
+        vs, dt = await wait_variants(c, plan["version"], None, exclude={v["id"]} | set(STALE_SEEN))
+        if not R.check(bool(vs), f"{label}: свежие варианты пришли за {dt:.1f} с"):
+            return None
+        fresh = max(vs, key=lambda x: x["plan"]["index"]["value"])
+        r = await c.post("/api/plan/apply", json={"variant_id": fresh["id"], "base_plan_version": plan["version"]})
+        if not R.check(r.status_code == 200, f"{label}: свежий вариант применён -> {r.status_code}"):
+            return None
+        v = fresh
     if not R.check(r.status_code == 200, f"{label}: применение -> {r.status_code}"):
         return None
     body = r.json()
@@ -180,7 +206,7 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     await apply(c, mon, best, "скот/лучший", check_promise=True)
     other = next(v for v in vs if v["id"] != best["id"])
     r = await c.post("/api/plan/apply", json={"variant_id": other["id"], "base_plan_version": v0})
-    R.check(r.status_code == 409, f"повторное применение другого варианта старой версии -> {r.status_code} (409)")
+    R.check(r.status_code in (404, 409), f"применение другого варианта старой версии -> {r.status_code} (404/409)")
     r = await c.post("/api/incidents/" + inc["id"] + "/resolve")
     R.check(r.status_code == 200, "сбой снят диспетчером досрочно")
     r = await c.post("/api/incidents/" + inc["id"] + "/resolve")
@@ -244,6 +270,7 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
 
     print("\n# 7. пауза/скорость и ручной пересчёт без сбоев")
     await c.post("/api/sim/clock", json={"paused": True})
+    await asyncio.sleep(1.5)  # let the monitor see the paused state first
     t = mon.now
     await asyncio.sleep(2.5)
     R.check(abs(mon.now - t) < 1, "пауза останавливает время")
@@ -267,8 +294,11 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--speed", type=float, default=60)
+    ap.add_argument("--base", default=BASE, help="server URL, e.g. http://127.0.0.1:8010")
     args = ap.parse_args()
-    async with httpx.AsyncClient(base_url=BASE, timeout=20) as c:
+    set_base(args.base)
+    transport = httpx.AsyncHTTPTransport(retries=2)
+    async with httpx.AsyncClient(base_url=BASE, timeout=20, transport=transport) as c:
         mon = Monitor(c)
         mt = asyncio.create_task(mon.run())
         ws_stats: dict = {}

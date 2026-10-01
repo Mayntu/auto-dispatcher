@@ -168,8 +168,13 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
             for inc, rem in obstacles:
                 if inc.segment_id == leg.segment_id and inc.km is not None:
                     obs_pos = world.pos_of_km(leg.segment_id, inc.km, train.direction)
-                    if st.pos_m < obs_pos - OBSTACLE_STOP_M + 1:
-                        remaining = max(remaining, rem + rest * leg.t_pp)
+                    stop_pos = obs_pos - OBSTACLE_STOP_M
+                    if st.pos_m < stop_pos + 1:
+                        # while the obstacle is being cleared the train runs up to it and stops; afterwards only
+                        # the part beyond the stop point is left (plus restarting from a standstill)
+                        seg_len = world.segment(leg.segment_id).length_m
+                        after = (1 - max(stop_pos, st.pos_m) / seg_len) * leg.t_pp + leg.sup_start
+                        remaining = max(remaining, rem + after)
             remaining += failures.get(train.id, 0)
             current = Current(leg.segment_id, round(remaining), leg.sup_end, rest * leg.e_pp)
         else:

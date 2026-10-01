@@ -189,21 +189,24 @@ class FieldSim:
         dep_plan = dwell.end if dwell else (stop.dep if stop.dep is not None else t)
         tr.delay_s = max(tr.arrived_at - dwell.start, t - dep_plan) if dwell else max(0.0, t - dep_plan)
         min_dwell = (stop.min_dwell_s or cat.min_dwell_s) if stop.stop and k > 0 else (0.0 if k == 0 else t_pass)
-        if t < dep_plan or t < tr.arrived_at + min_dwell:
+        if t < tr.arrived_at + min_dwell:
             return None
+        if k == 0 or (stop.stop and cat.id != "freight"):
+            if stop.dep is not None and t < stop.dep:  # never before the timetable at origin / passenger stops
+                return None
         if self._broken(tid) or self._closed(seg.id) or any(
                 o.loc == "segment" and self._seg(o, o.idx).id == seg.id for o in self.trains.values()):
             return None
         nxt = tr.route[k + 1]
         if self._occupancy(nxt, tid) >= self.world.capacity(nxt) or not self._direction_ok(tr, nxt):
             return None
-        if not (self._segment_turn(tr, seg.id) and self._my_turn_at(tr, nxt)):
-            # waiting for the plan's order is right, unless the whole field has stopped: then the order is
-            # stale (the plan no longer matches reality) and a physically safe move is let through
-            if t - self._last_progress < STALL_OVERRIDE_S or not self._safe_out_of_order(tr, nxt):
+        if t < dep_plan or not (self._segment_turn(tr, seg.id) and self._my_turn_at(tr, nxt)):
+            # waiting for the plan's time and order is right, unless the whole field has stopped: then the
+            # plan no longer matches reality and the DC lets a physically safe move through
+            if self.stalled_s < STALL_OVERRIDE_S or not self._safe_out_of_order(tr, nxt):
                 return None
             self.plan_overrides += 1
-            log.warning("field stalled %.0f s: %s leaves %s out of plan order", t - self._last_progress, tid, st_id)
+            log.warning("field stalled %.0f s: %s leaves %s out of plan", self.stalled_s, tid, st_id)
         self._last_progress = t
         rt = self.rts.get(cat.id, seg.id, tr.train.direction, tr.train.v_max_override_kmh)
         if tr.stopped:
@@ -248,6 +251,13 @@ class FieldSim:
             tr.track_id = self._pick_track(tr, st_id, will_stop)
             return {"kind": "arrived", "station_id": st_id, "track_id": tr.track_id}
         return None
+
+    @property
+    def stalled_s(self) -> float:
+        """How long nothing has moved on the field while some train is out there."""
+        if not any(t.loc in ("station", "segment") for t in self.trains.values()):
+            return 0.0
+        return self.now - self._last_progress
 
     def _direction_ok(self, tr: SimTrain, station_id: str) -> bool:
         """Single-track deadlock avoidance: a station never fills up with trains of one direction while an
@@ -416,6 +426,7 @@ class FieldSim:
             "signals": self.signals(),
             "safety_violations": self.safety_violations,
             "plan_overrides": self.plan_overrides,
+            "stalled_s": round(self.stalled_s),
             "plan_version": self.plan.version if self.plan else None,
         }
 
