@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import lru_cache
 
-from app.common.config import load_settings
+from app.common.config import load_settings, segment_clear_s
 from app.planner.model import objective, solve_cpsat
 from app.planner.strategies import STRATEGIES, durations_for
 from app.railcore.evaluate import Deadlock, evaluate
@@ -46,7 +46,7 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
     elif status != "OPTIMAL" and snap.hint:
         # not proven optimal within the time limit: never propose something worse than keeping the current order
         try:
-            keep = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"], snap.now)
+            keep = evaluate(tasks, snap.hint, segment_clear_s(settings), snap.now)
             if objective(tasks, keep, settings, strat.lambda_stop_mult) < objective(tasks, sol, settings, strat.lambda_stop_mult):
                 sol, status = keep, "KEPT_CURRENT_ORDER"
         except Deadlock:
@@ -63,7 +63,7 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
         robust_dur.update({i.id: durations[i.id] for i in snap.incidents if i.type == IncidentType.TRAIN_FAILURE})
     try:
         rtasks = build_tasks(snap, world, rts, settings, robust_dur, strat.weight_mult)
-        rsol = evaluate(rtasks, plan.entries, settings["planner"]["segment_clear_s"], snap.now)
+        rsol = evaluate(rtasks, plan.entries, segment_clear_s(settings), snap.now)
         rplan = assemble_plan(rtasks, rsol, snap, world, settings, solver="refresh", strategy=strategy_id, solve_ms=0)
         plan.kpi.robust_total_delay_s = rplan.kpi.total_delay_s
     except Deadlock:
@@ -74,7 +74,7 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
 def _fallback(tasks, snap: Snapshot, settings: dict, strat):
     """CP-SAT found nothing in time: keep the current order; if that order no longer fits, the timetable
     order; as a last resort give CP-SAT a longer budget. Never leaves the dispatcher without a plan."""
-    clear = settings["planner"]["segment_clear_s"]
+    clear = segment_clear_s(settings)
     for order in (snap.hint, []):
         try:
             return evaluate(tasks, order, clear, snap.now)
@@ -94,7 +94,7 @@ def retime_with_objective(snap: Snapshot, settings: dict, strategy_id: str = "ba
     strat = STRATEGIES[strategy_id]
     tasks = build_tasks(snap, world, rts, settings, durations, strat.weight_mult)
     try:
-        sol = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"], snap.now)
+        sol = evaluate(tasks, snap.hint, segment_clear_s(settings), snap.now)
     except Deadlock:
         return None
     plan = assemble_plan(tasks, sol, snap, world, settings, solver="refresh", strategy=strategy_id, solve_ms=0)
@@ -107,7 +107,7 @@ def forecast_plan(snap: Snapshot, settings: dict, durations: dict[str, int] | No
     world, rts = get_world(), _rts()
     tasks = build_tasks(snap, world, rts, settings, durations)
     try:
-        sol = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"], snap.now)
+        sol = evaluate(tasks, snap.hint, segment_clear_s(settings), snap.now)
     except Deadlock:
         return None
     return assemble_plan(tasks, sol, snap, world, settings, solver="refresh", strategy=None, solve_ms=0)

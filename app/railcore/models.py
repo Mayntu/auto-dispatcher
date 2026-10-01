@@ -30,6 +30,7 @@ class Station(_Static):
     kind: Literal["station", "siding"]
     km: float
     tracks: list[Track]
+    simultaneous_reception: bool = True  # False: oncoming trains are not received simultaneously (tau_np)
 
 
 class SpeedZone(_Static):
@@ -54,11 +55,23 @@ class Segment(_Static):
     grade_zones: list[GradeZone] = []
 
 
+class BlockSection(_Static):
+    """Part of a segment between two block signals (automatic block, §9.1). Coordinates from the segment
+    start in the odd direction; the blocks of a segment tile it without gaps."""
+    id: str
+    segment_id: str
+    index: int  # 1.. in the odd direction
+    from_m: float
+    to_m: float
+
+
 class Signal(_Static):
     id: str
-    station_id: str
     direction: Direction
-    kind: Literal["entry", "exit"]
+    kind: Literal["entry", "exit", "block", "pre_entry"]
+    station_id: str | None = None  # entry / exit
+    segment_id: str | None = None  # block / pre_entry: on the segment
+    pos_m: float | None = None  # block / pre_entry: from the segment start (odd direction)
 
 
 class Switch(_Static):
@@ -71,6 +84,7 @@ class Switch(_Static):
 class Infra(_Static):
     stations: list[Station]
     segments: list[Segment]
+    blocks: list[BlockSection] = []
     signals: list[Signal]
     switches: list[Switch]
 
@@ -133,6 +147,7 @@ class TrainState(BaseModel):
     delay_s: float  # vs current plan (positive = late)
     next_station_id: str | None
     energy_kwh: float
+    block_id: str | None = None  # block section of the train's head (automatic block)
     # MVP additions: what the planner needs to rebuild the "now" snapshot
     on_field: bool = False
     progress: float = 0.0  # 0..1 along current segment

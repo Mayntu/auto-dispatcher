@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from fastapi.testclient import TestClient
 
-from app.common.config import load_settings
+from app.common.config import load_settings, segment_clear_s
 from app.field.sim import FieldSim
 from app.planner.pool import SolverPool, forecast_plan, solve_job
 from app.planner.snapshot import build_snapshot
@@ -26,7 +26,7 @@ OBSTACLE = {"type": "obstacle", "segment_id": "R1-STP", "km": 24.5, "est_min_min
 
 
 def assert_conflict_free(plan: Plan) -> None:
-    clear = SETTINGS["planner"]["segment_clear_s"]
+    clear = segment_clear_s(SETTINGS)
     by_seg: dict[str, list] = defaultdict(list)
     events: dict[str, list] = defaultdict(list)
     for e in plan.entries:

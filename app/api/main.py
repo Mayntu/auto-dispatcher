@@ -105,6 +105,7 @@ def create_app(bus: EventBus, world: World, settings: dict,
             "sim_epoch": get_env().sim_epoch.isoformat(),
             "thresholds": settings["index"]["thresholds"],
             "station_order": world.station_order,
+            "intervals": settings["intervals"],
             "segment_times": {
                 seg.id: {cat: {d.value: round(rts.get(cat, seg.id, d).t_pp / 60) for d in Direction}
                          for cat in world.categories}

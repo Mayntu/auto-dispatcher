@@ -5,6 +5,7 @@
    "name": "Ст. Северная",
    "kind": "station",
    "km": 0,
+   "simultaneous_reception": true,
    "tracks": [
     {
      "id": "I",
@@ -37,6 +38,7 @@
    "name": "Рзд. 1",
    "kind": "siding",
    "km": 15,
+   "simultaneous_reception": false,
    "tracks": [
     {
      "id": "I",
@@ -57,6 +59,7 @@
    "name": "Ст. Степная",
    "kind": "station",
    "km": 33,
+   "simultaneous_reception": true,
    "tracks": [
     {
      "id": "I",
@@ -83,6 +86,7 @@
    "name": "Рзд. 2",
    "kind": "siding",
    "km": 49,
+   "simultaneous_reception": false,
    "tracks": [
     {
      "id": "I",
@@ -103,6 +107,7 @@
    "name": "Ст. Озёрная",
    "kind": "station",
    "km": 66,
+   "simultaneous_reception": true,
    "tracks": [
     {
      "id": "I",
@@ -123,6 +128,7 @@
    "name": "Ст. Южная",
    "kind": "station",
    "km": 84,
+   "simultaneous_reception": true,
    "tracks": [
     {
      "id": "I",
@@ -209,150 +215,775 @@
    ]
   }
  ],
+ "blocks": [
+  {
+   "id": "SEV-R1-B1",
+   "segment_id": "SEV-R1",
+   "index": 1,
+   "from_m": 0,
+   "to_m": 2500
+  },
+  {
+   "id": "SEV-R1-B2",
+   "segment_id": "SEV-R1",
+   "index": 2,
+   "from_m": 2500,
+   "to_m": 5000
+  },
+  {
+   "id": "SEV-R1-B3",
+   "segment_id": "SEV-R1",
+   "index": 3,
+   "from_m": 5000,
+   "to_m": 7500
+  },
+  {
+   "id": "SEV-R1-B4",
+   "segment_id": "SEV-R1",
+   "index": 4,
+   "from_m": 7500,
+   "to_m": 10000
+  },
+  {
+   "id": "SEV-R1-B5",
+   "segment_id": "SEV-R1",
+   "index": 5,
+   "from_m": 10000,
+   "to_m": 12500
+  },
+  {
+   "id": "SEV-R1-B6",
+   "segment_id": "SEV-R1",
+   "index": 6,
+   "from_m": 12500,
+   "to_m": 15000
+  },
+  {
+   "id": "R1-STP-B1",
+   "segment_id": "R1-STP",
+   "index": 1,
+   "from_m": 0,
+   "to_m": 2571
+  },
+  {
+   "id": "R1-STP-B2",
+   "segment_id": "R1-STP",
+   "index": 2,
+   "from_m": 2571,
+   "to_m": 5143
+  },
+  {
+   "id": "R1-STP-B3",
+   "segment_id": "R1-STP",
+   "index": 3,
+   "from_m": 5143,
+   "to_m": 7714
+  },
+  {
+   "id": "R1-STP-B4",
+   "segment_id": "R1-STP",
+   "index": 4,
+   "from_m": 7714,
+   "to_m": 10286
+  },
+  {
+   "id": "R1-STP-B5",
+   "segment_id": "R1-STP",
+   "index": 5,
+   "from_m": 10286,
+   "to_m": 12857
+  },
+  {
+   "id": "R1-STP-B6",
+   "segment_id": "R1-STP",
+   "index": 6,
+   "from_m": 12857,
+   "to_m": 15429
+  },
+  {
+   "id": "R1-STP-B7",
+   "segment_id": "R1-STP",
+   "index": 7,
+   "from_m": 15429,
+   "to_m": 18000
+  },
+  {
+   "id": "STP-R2-B1",
+   "segment_id": "STP-R2",
+   "index": 1,
+   "from_m": 0,
+   "to_m": 2667
+  },
+  {
+   "id": "STP-R2-B2",
+   "segment_id": "STP-R2",
+   "index": 2,
+   "from_m": 2667,
+   "to_m": 5333
+  },
+  {
+   "id": "STP-R2-B3",
+   "segment_id": "STP-R2",
+   "index": 3,
+   "from_m": 5333,
+   "to_m": 8000
+  },
+  {
+   "id": "STP-R2-B4",
+   "segment_id": "STP-R2",
+   "index": 4,
+   "from_m": 8000,
+   "to_m": 10667
+  },
+  {
+   "id": "STP-R2-B5",
+   "segment_id": "STP-R2",
+   "index": 5,
+   "from_m": 10667,
+   "to_m": 13333
+  },
+  {
+   "id": "STP-R2-B6",
+   "segment_id": "STP-R2",
+   "index": 6,
+   "from_m": 13333,
+   "to_m": 16000
+  },
+  {
+   "id": "R2-OZR-B1",
+   "segment_id": "R2-OZR",
+   "index": 1,
+   "from_m": 0,
+   "to_m": 2429
+  },
+  {
+   "id": "R2-OZR-B2",
+   "segment_id": "R2-OZR",
+   "index": 2,
+   "from_m": 2429,
+   "to_m": 4857
+  },
+  {
+   "id": "R2-OZR-B3",
+   "segment_id": "R2-OZR",
+   "index": 3,
+   "from_m": 4857,
+   "to_m": 7286
+  },
+  {
+   "id": "R2-OZR-B4",
+   "segment_id": "R2-OZR",
+   "index": 4,
+   "from_m": 7286,
+   "to_m": 9714
+  },
+  {
+   "id": "R2-OZR-B5",
+   "segment_id": "R2-OZR",
+   "index": 5,
+   "from_m": 9714,
+   "to_m": 12143
+  },
+  {
+   "id": "R2-OZR-B6",
+   "segment_id": "R2-OZR",
+   "index": 6,
+   "from_m": 12143,
+   "to_m": 14571
+  },
+  {
+   "id": "R2-OZR-B7",
+   "segment_id": "R2-OZR",
+   "index": 7,
+   "from_m": 14571,
+   "to_m": 17000
+  },
+  {
+   "id": "OZR-YUZ-B1",
+   "segment_id": "OZR-YUZ",
+   "index": 1,
+   "from_m": 0,
+   "to_m": 2571
+  },
+  {
+   "id": "OZR-YUZ-B2",
+   "segment_id": "OZR-YUZ",
+   "index": 2,
+   "from_m": 2571,
+   "to_m": 5143
+  },
+  {
+   "id": "OZR-YUZ-B3",
+   "segment_id": "OZR-YUZ",
+   "index": 3,
+   "from_m": 5143,
+   "to_m": 7714
+  },
+  {
+   "id": "OZR-YUZ-B4",
+   "segment_id": "OZR-YUZ",
+   "index": 4,
+   "from_m": 7714,
+   "to_m": 10286
+  },
+  {
+   "id": "OZR-YUZ-B5",
+   "segment_id": "OZR-YUZ",
+   "index": 5,
+   "from_m": 10286,
+   "to_m": 12857
+  },
+  {
+   "id": "OZR-YUZ-B6",
+   "segment_id": "OZR-YUZ",
+   "index": 6,
+   "from_m": 12857,
+   "to_m": 15429
+  },
+  {
+   "id": "OZR-YUZ-B7",
+   "segment_id": "OZR-YUZ",
+   "index": 7,
+   "from_m": 15429,
+   "to_m": 18000
+  }
+ ],
  "signals": [
   {
    "id": "SEV-odd-entry",
-   "station_id": "SEV",
    "direction": "odd",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "SEV"
   },
   {
    "id": "SEV-odd-exit",
-   "station_id": "SEV",
    "direction": "odd",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "SEV"
   },
   {
    "id": "SEV-even-entry",
-   "station_id": "SEV",
    "direction": "even",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "SEV"
   },
   {
    "id": "SEV-even-exit",
-   "station_id": "SEV",
    "direction": "even",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "SEV"
   },
   {
    "id": "R1-odd-entry",
-   "station_id": "R1",
    "direction": "odd",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "R1"
   },
   {
    "id": "R1-odd-exit",
-   "station_id": "R1",
    "direction": "odd",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "R1"
   },
   {
    "id": "R1-even-entry",
-   "station_id": "R1",
    "direction": "even",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "R1"
   },
   {
    "id": "R1-even-exit",
-   "station_id": "R1",
    "direction": "even",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "R1"
   },
   {
    "id": "STP-odd-entry",
-   "station_id": "STP",
    "direction": "odd",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "STP"
   },
   {
    "id": "STP-odd-exit",
-   "station_id": "STP",
    "direction": "odd",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "STP"
   },
   {
    "id": "STP-even-entry",
-   "station_id": "STP",
    "direction": "even",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "STP"
   },
   {
    "id": "STP-even-exit",
-   "station_id": "STP",
    "direction": "even",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "STP"
   },
   {
    "id": "R2-odd-entry",
-   "station_id": "R2",
    "direction": "odd",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "R2"
   },
   {
    "id": "R2-odd-exit",
-   "station_id": "R2",
    "direction": "odd",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "R2"
   },
   {
    "id": "R2-even-entry",
-   "station_id": "R2",
    "direction": "even",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "R2"
   },
   {
    "id": "R2-even-exit",
-   "station_id": "R2",
    "direction": "even",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "R2"
   },
   {
    "id": "OZR-odd-entry",
-   "station_id": "OZR",
    "direction": "odd",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "OZR"
   },
   {
    "id": "OZR-odd-exit",
-   "station_id": "OZR",
    "direction": "odd",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "OZR"
   },
   {
    "id": "OZR-even-entry",
-   "station_id": "OZR",
    "direction": "even",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "OZR"
   },
   {
    "id": "OZR-even-exit",
-   "station_id": "OZR",
    "direction": "even",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "OZR"
   },
   {
    "id": "YUZ-odd-entry",
-   "station_id": "YUZ",
    "direction": "odd",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "YUZ"
   },
   {
    "id": "YUZ-odd-exit",
-   "station_id": "YUZ",
    "direction": "odd",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "YUZ"
   },
   {
    "id": "YUZ-even-entry",
-   "station_id": "YUZ",
    "direction": "even",
-   "kind": "entry"
+   "kind": "entry",
+   "station_id": "YUZ"
   },
   {
    "id": "YUZ-even-exit",
-   "station_id": "YUZ",
    "direction": "even",
-   "kind": "exit"
+   "kind": "exit",
+   "station_id": "YUZ"
+  },
+  {
+   "id": "SEV-R1-P1N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 2500
+  },
+  {
+   "id": "SEV-R1-P1C",
+   "direction": "even",
+   "kind": "pre_entry",
+   "segment_id": "SEV-R1",
+   "pos_m": 2500
+  },
+  {
+   "id": "SEV-R1-P2N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 5000
+  },
+  {
+   "id": "SEV-R1-P2C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 5000
+  },
+  {
+   "id": "SEV-R1-P3N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 7500
+  },
+  {
+   "id": "SEV-R1-P3C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 7500
+  },
+  {
+   "id": "SEV-R1-P4N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 10000
+  },
+  {
+   "id": "SEV-R1-P4C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 10000
+  },
+  {
+   "id": "SEV-R1-P5N",
+   "direction": "odd",
+   "kind": "pre_entry",
+   "segment_id": "SEV-R1",
+   "pos_m": 12500
+  },
+  {
+   "id": "SEV-R1-P5C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "SEV-R1",
+   "pos_m": 12500
+  },
+  {
+   "id": "R1-STP-P1N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 2571
+  },
+  {
+   "id": "R1-STP-P1C",
+   "direction": "even",
+   "kind": "pre_entry",
+   "segment_id": "R1-STP",
+   "pos_m": 2571
+  },
+  {
+   "id": "R1-STP-P2N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 5143
+  },
+  {
+   "id": "R1-STP-P2C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 5143
+  },
+  {
+   "id": "R1-STP-P3N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 7714
+  },
+  {
+   "id": "R1-STP-P3C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 7714
+  },
+  {
+   "id": "R1-STP-P4N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 10286
+  },
+  {
+   "id": "R1-STP-P4C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 10286
+  },
+  {
+   "id": "R1-STP-P5N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 12857
+  },
+  {
+   "id": "R1-STP-P5C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 12857
+  },
+  {
+   "id": "R1-STP-P6N",
+   "direction": "odd",
+   "kind": "pre_entry",
+   "segment_id": "R1-STP",
+   "pos_m": 15429
+  },
+  {
+   "id": "R1-STP-P6C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R1-STP",
+   "pos_m": 15429
+  },
+  {
+   "id": "STP-R2-P1N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 2667
+  },
+  {
+   "id": "STP-R2-P1C",
+   "direction": "even",
+   "kind": "pre_entry",
+   "segment_id": "STP-R2",
+   "pos_m": 2667
+  },
+  {
+   "id": "STP-R2-P2N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 5333
+  },
+  {
+   "id": "STP-R2-P2C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 5333
+  },
+  {
+   "id": "STP-R2-P3N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 8000
+  },
+  {
+   "id": "STP-R2-P3C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 8000
+  },
+  {
+   "id": "STP-R2-P4N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 10667
+  },
+  {
+   "id": "STP-R2-P4C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 10667
+  },
+  {
+   "id": "STP-R2-P5N",
+   "direction": "odd",
+   "kind": "pre_entry",
+   "segment_id": "STP-R2",
+   "pos_m": 13333
+  },
+  {
+   "id": "STP-R2-P5C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "STP-R2",
+   "pos_m": 13333
+  },
+  {
+   "id": "R2-OZR-P1N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 2429
+  },
+  {
+   "id": "R2-OZR-P1C",
+   "direction": "even",
+   "kind": "pre_entry",
+   "segment_id": "R2-OZR",
+   "pos_m": 2429
+  },
+  {
+   "id": "R2-OZR-P2N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 4857
+  },
+  {
+   "id": "R2-OZR-P2C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 4857
+  },
+  {
+   "id": "R2-OZR-P3N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 7286
+  },
+  {
+   "id": "R2-OZR-P3C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 7286
+  },
+  {
+   "id": "R2-OZR-P4N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 9714
+  },
+  {
+   "id": "R2-OZR-P4C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 9714
+  },
+  {
+   "id": "R2-OZR-P5N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 12143
+  },
+  {
+   "id": "R2-OZR-P5C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 12143
+  },
+  {
+   "id": "R2-OZR-P6N",
+   "direction": "odd",
+   "kind": "pre_entry",
+   "segment_id": "R2-OZR",
+   "pos_m": 14571
+  },
+  {
+   "id": "R2-OZR-P6C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "R2-OZR",
+   "pos_m": 14571
+  },
+  {
+   "id": "OZR-YUZ-P1N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 2571
+  },
+  {
+   "id": "OZR-YUZ-P1C",
+   "direction": "even",
+   "kind": "pre_entry",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 2571
+  },
+  {
+   "id": "OZR-YUZ-P2N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 5143
+  },
+  {
+   "id": "OZR-YUZ-P2C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 5143
+  },
+  {
+   "id": "OZR-YUZ-P3N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 7714
+  },
+  {
+   "id": "OZR-YUZ-P3C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 7714
+  },
+  {
+   "id": "OZR-YUZ-P4N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 10286
+  },
+  {
+   "id": "OZR-YUZ-P4C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 10286
+  },
+  {
+   "id": "OZR-YUZ-P5N",
+   "direction": "odd",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 12857
+  },
+  {
+   "id": "OZR-YUZ-P5C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 12857
+  },
+  {
+   "id": "OZR-YUZ-P6N",
+   "direction": "odd",
+   "kind": "pre_entry",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 15429
+  },
+  {
+   "id": "OZR-YUZ-P6C",
+   "direction": "even",
+   "kind": "block",
+   "segment_id": "OZR-YUZ",
+   "pos_m": 15429
   }
  ],
  "switches": [

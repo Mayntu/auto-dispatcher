@@ -19,7 +19,7 @@ import time
 from collections import defaultdict
 from multiprocessing import Pool
 
-from app.common.config import load_settings
+from app.common.config import load_settings, segment_clear_s
 from app.field.incidents import IncidentError
 from app.field.sim import FieldSim
 from app.planner.pool import forecast_plan, solve_job
@@ -34,7 +34,7 @@ TOL = 1.0  # seconds of rounding tolerance
 def check_plan(plan: Plan, snap, world, rts, settings) -> list[str]:
     """Railway rules, re-derived from the raw plan entries."""
     errs: list[str] = []
-    clear = settings["planner"]["segment_clear_s"]
+    clear = segment_clear_s(settings)
     now = snap.now
     trains = {t.id: t for t in snap.trains}
     states = snap.states

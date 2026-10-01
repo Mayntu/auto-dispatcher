@@ -10,6 +10,7 @@ import time
 
 from ortools.sat.python import cp_model
 
+from app.common.config import segment_clear_s
 from app.railcore.infra import get_world
 from app.railcore.models import PlanEntry
 from app.railcore.evaluate import Deadlock, evaluate
@@ -27,7 +28,7 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
     `keep_order`: the approved plan — trains already in it keep their order on every segment, only trains
     new to the horizon are placed freely (extending the plan does not change the dispatcher's decision)."""
     p = settings["planner"]
-    clear = p["segment_clear_s"]
+    clear = segment_clear_s(settings)
     m = cp_model.CpModel()
 
     # warm start: the hint plan's order replayed on the current problem (a full, nearly feasible assignment)
