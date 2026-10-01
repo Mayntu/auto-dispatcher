@@ -21,7 +21,8 @@ from app.railcore.running_time import RunningTimes
 
 CLOSING_TYPES = {IncidentType.OBSTACLE, IncidentType.SEGMENT_CLOSED}
 OBSTACLE_STOP_M = 200.0  # trains stop this far before an obstacle
-MIN_REMAINING_S = 60  # an incident past its estimate but still active blocks for at least this long
+MIN_REMAINING_S = 60
+INVITATION_EXTRA_S = 180  # leaving on the call-on aspect of a failed exit signal (§11.3)  # an incident past its estimate but still active blocks for at least this long
 
 Solution = dict[str, list[tuple[int, int, bool]]]
 
@@ -114,6 +115,8 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
     closed: dict[str, int] = {}
     obstacles: list[tuple[Incident, int]] = []
     failures: dict[str, int] = {}
+    delays: dict[tuple[str, str], int] = {}  # (train, station) -> held there until (relative s)
+    sig_fail: dict[tuple[str, str], int] = {}  # (station, direction) -> exit signal failed until (relative s)
     # warnings: slower running times for trains that enter the segment while the warning is expected to last
     warn = restrictions_by_segment(snap.incidents, world)
     warn_until: dict[str, int] = {}
@@ -130,6 +133,11 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
                 obstacles.append((inc, rem))
         elif inc.type == IncidentType.TRAIN_FAILURE and inc.train_id:
             failures[inc.train_id] = max(failures.get(inc.train_id, 0), rem)
+        elif inc.type == IncidentType.TRAIN_DELAY and inc.train_id and inc.station_id:
+            delays[(inc.train_id, inc.station_id)] = max(delays.get((inc.train_id, inc.station_id), 0), rem)
+        elif inc.type == IncidentType.SIGNAL_FAILURE and inc.station_id:
+            sig_fail[(inc.station_id, inc.params.get("direction"))] = max(
+                sig_fail.get((inc.station_id, inc.params.get("direction")), 0), rem)
 
     tasks: list[Task] = []
     for train in snap.trains:
@@ -187,6 +195,16 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
                 node.dest_dwell = leave
             if k < last and legs_all[k].segment_id in closed:
                 node.dep_min = max(node.dep_min, closed[legs_all[k].segment_id])
+            if k < last and (train.id, s.station_id) in delays:  # train_delay: held at this station
+                node.dep_min = max(node.dep_min, delays[(train.id, s.station_id)])
+                node.stop_fixed = True
+            fail_until = sig_fail.get((s.station_id, train.direction.value))
+            when = node.sched_dep if node.sched_dep is not None else node.sched_arr
+            if k < last and fail_until is not None and (when is None or when <= fail_until):
+                # exit signal failed: stop and leave on the call-on aspect (+180 s) while it lasts
+                # (decided by the timetable time — a train delayed past the repair is treated as affected too)
+                node.stop_fixed = True
+                node.dwell_min = max(node.dwell_min, INVITATION_EXTRA_S)
             return node
 
         current = None

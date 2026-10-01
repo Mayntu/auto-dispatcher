@@ -11,12 +11,16 @@ from dataclasses import dataclass
 
 from app.railcore.models import Incident, IncidentType
 
-MVP_TYPES = {IncidentType.OBSTACLE, IncidentType.TRAIN_FAILURE, IncidentType.SEGMENT_CLOSED, IncidentType.SPEED_RESTRICTION}
+MVP_TYPES = {IncidentType.OBSTACLE, IncidentType.TRAIN_FAILURE, IncidentType.SEGMENT_CLOSED, IncidentType.SPEED_RESTRICTION,
+             IncidentType.TRAIN_DELAY, IncidentType.SIGNAL_FAILURE}
+INVITATION_EXTRA_S = 180  # passing an exit signal on the call-on aspect: stop, check the route, go at 20 km/h
 DEFAULT_DESCRIPTION = {
     IncidentType.OBSTACLE: "Скот на пути, бригада выехала",
     IncidentType.TRAIN_FAILURE: "Неисправность локомотива поезда {train}",
     IncidentType.SEGMENT_CLOSED: "Закрытие перегона для работ",
     IncidentType.SPEED_RESTRICTION: "Предупреждение об ограничении скорости",
+    IncidentType.TRAIN_DELAY: "Задержка поезда {train} (бригада, посадка, техосмотр)",
+    IncidentType.SIGNAL_FAILURE: "Отказ выходного светофора — проследование по пригласительному",
 }
 
 
@@ -51,7 +55,7 @@ def make_incident(req: dict, now: float, segment_id: str | None, km: float | Non
     desc = req.get("description") or DEFAULT_DESCRIPTION[itype].format(train=req.get("train_id"))
     inc = Incident(
         id=uuid.uuid4().hex[:8], type=itype, status="active", segment_id=segment_id,
-        train_id=req.get("train_id"), km=km, started_at=now, est_min_s=lo, est_max_s=hi,
+        station_id=req.get("station_id"), train_id=req.get("train_id"), km=km, started_at=now, est_min_s=lo, est_max_s=hi,
         est_expected_s=round((lo + hi) / 2), params=req.get("params") or {}, description=desc,
     )
     return FieldIncident(inc, actual)

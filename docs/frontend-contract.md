@@ -115,3 +115,20 @@
 | DELETE | `/api/plan/pins/{id}` | снять указание |
 
 Ошибки: `409 {error: "stale_plan", current_version}`, `423 {error: "locked", reason}`, `404 {error: "not_found"}`, `422 {error: "invalid_kind"}`. `Plan.pins` — указания в плане; WS `planner.pin_violated {pin, reason}`.
+
+## Добавлено по замечаниям фронта (docs/backend-issues.md)
+
+| Метод | Путь | Что |
+|---|---|---|
+| POST | `/api/incidents/{id}/estimate` | `{est_min_min, est_max_min, actual_min?, description?}` → `Incident`; WS `incident.updated`; 404 если сбой не активен |
+| POST | `/api/whatif/{request_id}/promote` | → `Variant` (`source: "whatif"`); 404 — результат не найден (хранятся 20); 409 с `detail` — план изменился или порядок what-if хуже действующего плана при фактических параметрах |
+| GET / PUT | `/api/settings` | `{index {weights, thresholds, refs}, priority_weights, planner {time_limit_s, return_gain_s, replan_deviation_s, rescue_eta_s, rescue_haul_s}, intervals, interval_labels}`; PUT — частичный, веса автонормируются; 422 с причиной |
+| POST | `/api/incidents` | новые типы: `train_delay` (`train_id`), `signal_failure` (`station_id`, `direction: odd\|even`); у отказавшего выходного `aspect: "invitation"` |
+| GET | `/api/scenarios` | `[{id, title, steps, duration_min}]` |
+| POST | `/api/scenarios/{id}/run` | `{run_id, scenario_id, steps, log}`; сбои приходят обычными `incident.created` |
+| WS | `planner.conflicts` | `{conflicts: [{kind: head_on\|following\|track, resource_id, time_from, time_to, trains}]}` 1 Гц; также `GET /api/state → conflicts`, `kpi.index.conflicts_forecast` |
+| GET | `/api/history/frames?from&to&step` | кадры: `{sim_time, trains [{train_id, status, segment_id, station_id, track_id, block_id, km, pos_m, speed_kmh, delay_s, next_station_id}], blocks (занятые id), signals {id: aspect}, incidents, index, plan_version, safety_violations}` — последние 20 мин симуляции |
+| GET | `/api/history/events?from&to` | записи журнала |
+| GET | `/api/reports?from&to&format=csv` | CSV-файл; `format=pdf` → 422 (в прототипе только CSV) |
+
+WS теперь пересылает `incident.updated`, `planner.pin_violated`, `planner.conflicts`, `settings.updated`.

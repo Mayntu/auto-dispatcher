@@ -39,7 +39,9 @@ END = 8.5 * 3600  # continuous 48-hour timetable: judge a fixed window
 DUE_SLACK_S = 2 * 3600  # every train scheduled to arrive this long before the end must have arrived
 
 
-def make_incidents(rng: random.Random, world, mass: bool) -> list[tuple[float, dict]]:
+def make_incidents(rng: random.Random, world, mass: bool, extended: bool = False) -> list[tuple[float, dict]]:
+    """`extended` (seeds >= 200) adds warnings, train delays and signal failures; seeds below keep the original
+    mix so their results stay comparable with earlier runs."""
     segs = list(world.segments)
     trains = [t.id for t in world.timetable]
     n = 8 if mass else rng.randint(1, 4)
@@ -47,12 +49,24 @@ def make_incidents(rng: random.Random, world, mass: bool) -> list[tuple[float, d
     out = []
     for k in range(n):
         at = base + (rng.uniform(0, 120) if mass else rng.uniform(0, 5000))
-        kind = rng.choice(["obstacle", "train_failure", "segment_closed"])
+        kinds = ["obstacle", "train_failure", "segment_closed"]
+        if extended:
+            kinds += ["speed_restriction", "train_delay", "signal_failure"]
+        kind = rng.choice(kinds)
         lo = rng.randint(5, 40)
         hi = lo + rng.randint(0, 30)
         req = {"type": kind, "est_min_min": lo, "est_max_min": hi}
-        if kind == "train_failure":
+        if kind in ("train_failure", "train_delay"):
             req["train_id"] = rng.choice(trains)
+        elif kind == "signal_failure":
+            order = world.station_order
+            i = rng.randrange(1, len(order) - 1)
+            req.update(station_id=order[i], direction=rng.choice(["odd", "even"]))
+        elif kind == "speed_restriction":
+            seg = world.segments[rng.choice(segs)]
+            a, b = world.segment_km(seg.id)
+            k = round(rng.uniform(a + 0.5, b - 3.5), 1)
+            req.update(segment_id=seg.id, params={"km_from": k, "km_to": k + 3, "v_kmh": rng.choice([25, 40, 60])})
         else:
             seg = world.segments[rng.choice(segs)]
             req["segment_id"] = seg.id
@@ -73,7 +87,7 @@ def run(seed: int) -> dict:
     sim = FieldSim(world, RunningTimes(world), settings, seed=seed)
     policy = POLICIES[seed % len(POLICIES)]
     mass = seed % 7 == 0
-    incidents = make_incidents(rng, world, mass)
+    incidents = make_incidents(rng, world, mass, extended=seed >= 200)
     res = {"seed": seed, "policy": policy, "mass": mass, "incidents": len(incidents), "errors": [],
            "solves": 0, "max_solve_ms": 0, "promise_gap": 0.0, "stale_applies": 0, "forecast_fail": 0,
            "max_quiet_growth_min": 0.0, "stall": False, "max_fail_streak": 0, "overrides": 0,

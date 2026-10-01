@@ -19,7 +19,9 @@ from app.bus.envelope import Envelope
 from app.field.autoblock import SIGNAL_STOP_M, AutoBlock
 from app.railcore.warnings import restriction_of, restrictions_by_segment
 from app.railcore.warnings import validate as validate_warning
-from app.field.incidents import MVP_TYPES, FieldIncident, IncidentError, make_incident
+from app.field.scenarios import load_scenarios, pick_train
+from app.field.scenarios import start as start_scenario
+from app.field.incidents import INVITATION_EXTRA_S, MVP_TYPES, FieldIncident, IncidentError, make_incident
 from app.railcore.infra import World
 from app.railcore.models import Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus
 from app.railcore.problem import CLOSING_TYPES, OBSTACLE_STOP_M
@@ -114,6 +116,30 @@ class FieldSim:
         if itype not in MVP_TYPES:  # the type first: otherwise a missing segment hides the real reason
             raise IncidentError(f"тип сбоя «{itype}» пока не поддерживается")
         seg_id, km = req.get("segment_id"), req.get("km")
+        if itype == IncidentType.TRAIN_DELAY:
+            # the train is held where it stands (at a station) or at its next station (on the line)
+            tr = self.trains.get(req.get("train_id") or "")
+            if tr is None or tr.loc == "done":
+                raise IncidentError("поезд не найден или уже завершил маршрут")
+            st = self._train_state(tr)
+            where = st.station_id or st.next_station_id or tr.route[0]
+            req = {**req, "station_id": where}
+            fi = make_incident(req, self.now, None, self.world.stations[where].km, self.rng)
+            self.incidents[fi.id] = fi
+            return fi.incident
+        if itype == IncidentType.SIGNAL_FAILURE:
+            st_id, d = req.get("station_id"), (req.get("params") or {}).get("direction") or req.get("direction")
+            if st_id not in self.world.stations or d not in ("odd", "even"):
+                raise IncidentError("отказ светофора: нужны station_id и direction (odd|even)")
+            order = self.world.station_order
+            i = order.index(st_id) + (1 if d == "odd" else -1)
+            if not 0 <= i < len(order):
+                raise IncidentError("в этом направлении со станции нет перегона")
+            req = {**req, "params": {"direction": d, "signal_id": f"{st_id}-{d}-exit"}}
+            fi = make_incident(req, self.now, self.world.segment_between(st_id, order[i]).id,
+                               self.world.stations[st_id].km, self.rng)
+            self.incidents[fi.id] = fi
+            return fi.incident
         if req["type"] == IncidentType.TRAIN_FAILURE:
             tr = self.trains.get(req.get("train_id") or "")
             if tr is None or tr.loc == "done":
@@ -136,6 +162,27 @@ class FieldSim:
         self.incidents[fi.id] = fi
         return fi.incident
 
+    def update_estimate(self, incident_id: str, req: dict) -> Incident:
+        """The crew reports a new estimate («бригада на месте», «дольше на 10 мин»). The true duration is unknown to
+        the planner; here it moves into the new range (or to `actual_min` from a scenario)."""
+        fi = self.incidents.get(incident_id)
+        if fi is None or fi.incident.status != "active":
+            raise IncidentError("сбой не найден или уже снят")
+        elapsed = self.now - fi.incident.started_at
+        lo = round(float(req["est_min_min"]) * 60)
+        hi = round(float(req.get("est_max_min") or req["est_min_min"]) * 60)
+        if hi < lo:
+            raise IncidentError("est_max_min must be >= est_min_min")
+        lo, hi = max(lo, round(elapsed)), max(hi, round(elapsed))  # minutes from the start of the incident
+        if req.get("actual_min") is not None:
+            fi.actual_s = float(req["actual_min"]) * 60
+        else:
+            fi.actual_s = min(max(fi.actual_s, lo), hi)
+        fi.incident = fi.incident.model_copy(update={
+            "est_min_s": lo, "est_max_s": hi, "est_expected_s": round((lo + hi) / 2),
+            "description": req.get("description") or fi.incident.description})
+        return fi.incident
+
     def resolve_incident(self, incident_id: str) -> Incident | None:
         fi = self.incidents.get(incident_id)
         if fi is None or fi.incident.status != "active":
@@ -145,6 +192,14 @@ class FieldSim:
 
     def _closed(self, seg_id: str) -> bool:
         return any(fi.incident.type in CLOSING_TYPES and fi.incident.segment_id == seg_id for fi in self.active())
+
+    def _delayed(self, train_id: str, station_id: str) -> bool:
+        return any(fi.incident.type == IncidentType.TRAIN_DELAY and fi.incident.train_id == train_id
+                   and fi.incident.station_id == station_id for fi in self.active())
+
+    def _signal_failed(self, station_id: str, d: Direction) -> bool:
+        return any(fi.incident.type == IncidentType.SIGNAL_FAILURE and fi.incident.station_id == station_id
+                   and fi.incident.params.get("direction") == d.value for fi in self.active())
 
     def _broken(self, train_id: str) -> bool:
         return any(fi.incident.type == IncidentType.TRAIN_FAILURE and fi.incident.train_id == train_id
@@ -230,6 +285,12 @@ class FieldSim:
         dep_plan = dwell.end if dwell else (stop.dep if stop.dep is not None else t)
         tr.delay_s = max(tr.arrived_at - dwell.start, t - dep_plan) if dwell else max(0.0, t - dep_plan)
         min_dwell = (stop.min_dwell_s or cat.min_dwell_s) if stop.stop and k > 0 else (0.0 if k == 0 else t_pass)
+        if self._delayed(tid, st_id):
+            return None  # train_delay: held here until the delay is over
+        if self._signal_failed(st_id, tr.train.direction):
+            # exit signal failed: stop and leave on the call-on aspect after the route is checked
+            tr.stopped = True
+            min_dwell = max(min_dwell, INVITATION_EXTRA_S)
         if t < tr.arrived_at + min_dwell:
             return None
         if k == 0 or (stop.stop and cat.id != "freight"):
@@ -550,8 +611,9 @@ class FieldSim:
                 if 0 <= nxt < len(order):
                     seg = self.world.segment_between(st, order[nxt]).id
                     ok = self.ab.can_enter(seg, d) and not self._closed(seg)
+                    aspect = "invitation" if self._signal_failed(st, d) else ("green" if ok else "red")
                     out.append({"id": f"{st}-{d.value}-exit", "station_id": st, "direction": d.value, "kind": "exit",
-                                "aspect": "green" if ok else "red", "segment_id": seg})
+                                "aspect": aspect, "segment_id": seg})
         for sig in self.world.infra.signals:
             if sig.segment_id:
                 out.append({"id": sig.id, "segment_id": sig.segment_id, "direction": sig.direction.value,
@@ -672,6 +734,7 @@ class FieldService:
         self.speed = float(settings["sim"]["speed"])
         self.decision_speed = float(settings["sim"].get("decision_speed", 1))
         self.decision_hold = False  # set by the planner while variants await a decision
+        self.scenarios: dict = {}  # running scenarios: run id -> ScenarioRun
         self.paused = False
         self._task: asyncio.Task | None = None
 
@@ -690,6 +753,36 @@ class FieldService:
         if self._task:
             self._task.cancel()
 
+    async def _run_scenarios(self) -> None:
+        """Due scenario steps; a failing step (no suitable train, segment closed already) is logged, not fatal."""
+        for run in list(self.scenarios.values()):
+            while run.done < len(run.steps) and self.sim.now >= run.started_at + run.steps[run.done]["at_min"] * 60:
+                i, step = run.done, run.steps[run.done]
+                run.done += 1
+                try:
+                    if "incident" in step:
+                        req = dict(step["incident"])
+                        if req.get("train_id") in ("auto", "auto_station"):
+                            req["train_id"] = pick_train(self.sim, req["train_id"])
+                            if req["train_id"] is None:
+                                raise IncidentError("нет подходящего поезда")
+                        inc = self.sim.create_incident(req)
+                        run.refs[i] = inc.id
+                        await self.bus.publish("incident.created", inc, source="field", sim_time=self.sim.now)
+                    elif "update" in step:
+                        inc = self.sim.update_estimate(run.refs[step["update"]["ref"]], step["update"])
+                        await self.bus.publish("incident.updated", inc, source="field", sim_time=self.sim.now)
+                    elif "resolve" in step:
+                        inc = self.sim.resolve_incident(run.refs[step["resolve"]["ref"]])
+                        if inc is not None:
+                            await self.bus.publish("incident.resolved", inc, source="field", sim_time=self.sim.now)
+                    run.log.append({"step": i, "ok": True})
+                except (IncidentError, KeyError, ValueError) as e:
+                    run.log.append({"step": i, "ok": False, "reason": str(e)})
+                    log.warning("scenario %s step %d skipped: %s", run.scenario_id, i, e)
+            if run.done >= len(run.steps):
+                self.scenarios.pop(run.id, None)
+
     async def _loop(self) -> None:
         nxt = time.monotonic()
         while True:
@@ -697,6 +790,7 @@ class FieldService:
             if not self.paused:
                 for topic, payload in self.sim.step(self.tick_s * self.effective_speed):
                     await self.bus.publish(topic, payload, source="field", sim_time=self.sim.now)
+                await self._run_scenarios()
             await self._publish_state()
             await asyncio.sleep(max(0.0, nxt - time.monotonic()))
 
@@ -718,6 +812,18 @@ class FieldService:
                 inc = self.sim.create_incident(p)
                 result["incident"] = inc.model_dump(mode="json")
                 await self.bus.publish("incident.created", inc, source="field", sim_time=self.sim.now)
+            elif cmd == "run_scenario":
+                sc = next((x for x in load_scenarios() if x["id"] == p.get("scenario_id")), None)
+                if sc is None:
+                    raise IncidentError("сценарий не найден")
+                run = start_scenario(sc, self.sim.now)
+                self.scenarios[run.id] = run
+                await self._run_scenarios()  # steps at minute 0 right away
+                result.update(run_id=run.id, scenario_id=sc["id"], steps=len(run.steps), log=run.log)
+            elif cmd == "update_incident_estimate":
+                inc = self.sim.update_estimate(p["incident_id"], p)
+                result["incident"] = inc.model_dump(mode="json")
+                await self.bus.publish("incident.updated", inc, source="field", sim_time=self.sim.now)
             elif cmd == "resolve_incident":
                 inc = self.sim.resolve_incident(p["incident_id"])
                 if inc is None:

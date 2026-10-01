@@ -1,0 +1,27 @@
+[
+  {"id": "cow_on_segment", "title": "Препятствие на перегоне Рзд. 1 — Степная (скот)", "steps": [
+    {"at_min": 0, "incident": {"type": "obstacle", "segment_id": "R1-STP", "km": 24.5, "est_min_min": 15, "est_max_min": 30,
+                               "actual_min": 22, "description": "Скот на пути, бригада выехала"}},
+    {"at_min": 10, "update": {"ref": 0, "est_min_min": 15, "est_max_min": 20, "description": "Бригада на месте"}}]},
+  {"id": "train_failure", "title": "Неисправность грузового поезда на перегоне", "steps": [
+    {"at_min": 0, "incident": {"type": "train_failure", "train_id": "auto", "est_min_min": 20, "est_max_min": 45,
+                               "actual_min": 38}}]},
+  {"id": "signal_failure", "title": "Отказ выходного светофора Степной (чётное направление)", "steps": [
+    {"at_min": 0, "incident": {"type": "signal_failure", "station_id": "STP", "direction": "even", "est_min_min": 30,
+                               "est_max_min": 50, "actual_min": 40}}]},
+  {"id": "segment_closed", "title": "Окно на перегоне Рзд. 2 — Озёрная", "steps": [
+    {"at_min": 0, "incident": {"type": "segment_closed", "segment_id": "R2-OZR", "est_min_min": 30, "est_max_min": 30,
+                               "actual_min": 30, "description": "Окно для путевых работ"}}]},
+  {"id": "speed_restriction", "title": "Предупреждение 40 км/ч на перегоне Северная — Рзд. 1", "steps": [
+    {"at_min": 0, "incident": {"type": "speed_restriction", "segment_id": "SEV-R1", "km_from": 3, "km_to": 6, "v_kmh": 40,
+                               "est_min_min": 60, "est_max_min": 60, "actual_min": 60}}]},
+  {"id": "mass_incidents", "title": "Массовые сбои: 8 за 2 минуты", "steps": [
+    {"at_min": 0.0, "incident": {"type": "obstacle", "segment_id": "R1-STP", "km": 24.5, "est_min_min": 15, "est_max_min": 30}},
+    {"at_min": 0.2, "incident": {"type": "speed_restriction", "segment_id": "SEV-R1", "km_from": 3, "km_to": 6, "v_kmh": 40, "est_min_min": 40, "est_max_min": 60}},
+    {"at_min": 0.4, "incident": {"type": "signal_failure", "station_id": "OZR", "direction": "odd", "est_min_min": 20, "est_max_min": 40}},
+    {"at_min": 0.6, "incident": {"type": "train_delay", "train_id": "auto_station", "est_min_min": 10, "est_max_min": 20}},
+    {"at_min": 0.9, "incident": {"type": "segment_closed", "segment_id": "OZR-YUZ", "est_min_min": 20, "est_max_min": 20}},
+    {"at_min": 1.2, "incident": {"type": "train_failure", "train_id": "auto", "est_min_min": 15, "est_max_min": 35}},
+    {"at_min": 1.5, "incident": {"type": "speed_restriction", "segment_id": "STP-R2", "km_from": 37, "km_to": 41, "v_kmh": 50, "est_min_min": 30, "est_max_min": 60}},
+    {"at_min": 1.9, "incident": {"type": "obstacle", "segment_id": "R2-OZR", "km": 57, "est_min_min": 10, "est_max_min": 25}}]}
+]

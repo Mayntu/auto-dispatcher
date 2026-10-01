@@ -290,7 +290,8 @@ class JournalEntry(BaseModel):
     kind: Literal["incident_created", "incident_resolved", "variants_proposed", "variant_applied",
                   "variant_rejected", "variants_stale", "return_offered", "no_decision_needed",
                   "decisions_archived", "plan_broken", "decision_hold", "guard_replan", "signal_stop",
-                  "pin_set", "pin_removed", "pin_violated", "pin_done"]
+                  "pin_set", "pin_removed", "pin_violated", "pin_done", "incident_updated",
+                  "settings_updated", "scenario_started"]
     text: str
     incident_ids: list[str] = []
     variant_id: str | None = None

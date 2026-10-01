@@ -7,11 +7,12 @@ import uuid
 from contextlib import AbstractAsyncContextManager
 from typing import Callable
 
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Response, WebSocket
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app.api.reports import build_report_csv
 from app.api.state_cache import StateCache
 from app.api.ws import WSManager
 from app.bus.base import EventBus
@@ -63,8 +64,11 @@ INTERVAL_LABELS = {
 
 
 class IncidentCreate(BaseModel):
-    type: str = Field(description="obstacle | train_failure | segment_closed (окно) | speed_restriction (предупреждение)")
+    type: str = Field(description="obstacle | train_failure | segment_closed (окно) | speed_restriction (предупреждение) | "
+                                  "train_delay (train_id) | signal_failure (station_id + direction: выходной светофор)")
     segment_id: str | None = None
+    station_id: str | None = None
+    direction: str | None = Field(None, description="signal_failure: odd | even")
     train_id: str | None = None
     km: float | None = None
     km_from: float | None = Field(None, description="Предупреждение: начало, км")
@@ -74,6 +78,69 @@ class IncidentCreate(BaseModel):
     est_max_min: float = Field(description="Оценка длительности, максимум, мин")
     actual_min: float | None = Field(None, description="Фактическая длительность (для сценариев), мин")
     description: str | None = None
+
+
+class EstimateRequest(BaseModel):
+    est_min_min: float = Field(description="Новая оценка длительности сбоя от его начала, минимум, мин")
+    est_max_min: float = Field(description="Максимум, мин")
+    actual_min: float | None = Field(None, description="Фактическая длительность (для сценариев), мин")
+    description: str | None = None
+
+
+class SettingsPatch(BaseModel):
+    """Only these parts are editable at run time; anything else is ignored."""
+
+    index: dict | None = Field(None, description="weights {schedule, capacity, energy, conflicts, accuracy}, thresholds {norm, attention}, refs")
+    priority_weights: dict | None = Field(None, description="{express, passenger, freight}")
+    planner: dict | None = Field(None, description="time_limit_s, return_gain_s, replan_deviation_s, rescue_eta_s")
+    intervals: dict | None = Field(None, description="headway_s, tau_cross_s, tau_np_s, direction_change_s")
+
+
+EDITABLE = {"planner": {"time_limit_s", "return_gain_s", "replan_deviation_s", "rescue_eta_s", "rescue_haul_s"},
+            "intervals": {"headway_s", "tau_cross_s", "tau_np_s", "direction_change_s"}}
+
+
+def apply_settings(settings: dict, patch: SettingsPatch) -> dict:
+    """Validate and merge in place: every service reads the same settings object, so changes apply at once."""
+    new_index = dict(settings["index"])
+    if patch.index:
+        if "weights" in patch.index:
+            w = {k: float(patch.index["weights"].get(k, settings["index"]["weights"][k])) for k in settings["index"]["weights"]}
+            if any(x < 0 for x in w.values()) or sum(w.values()) <= 0:
+                raise ValueError("веса индекса должны быть неотрицательными и не все нулевые")
+            total = sum(w.values())
+            new_index["weights"] = {k: round(x / total, 4) for k, x in w.items()}  # auto-normalised to sum 1
+        if "thresholds" in patch.index:
+            t = {**settings["index"]["thresholds"], **{k: float(v) for k, v in patch.index["thresholds"].items()}}
+            if not 0 <= t["attention"] <= t["norm"] <= 100:
+                raise ValueError("пороги: 0 ≤ «Внимание» ≤ «Норма» ≤ 100")
+            new_index["thresholds"] = t
+        if "refs" in patch.index:
+            r = {**settings["index"]["refs"], **{k: float(v) for k, v in patch.index["refs"].items()}}
+            if any(v <= 0 for v in r.values()):
+                raise ValueError("опорные значения индекса должны быть > 0")
+            new_index["refs"] = r
+    pw = dict(settings["priority_weights"])
+    if patch.priority_weights:
+        pw.update({k: float(v) for k, v in patch.priority_weights.items() if k in pw})
+        if any(v <= 0 for v in pw.values()):
+            raise ValueError("веса приоритета должны быть > 0")
+    sections = {}
+    for name in ("planner", "intervals"):
+        part = getattr(patch, name) or {}
+        bad = set(part) - EDITABLE[name]
+        if bad:
+            raise ValueError(f"{name}: нельзя менять {sorted(bad)}")
+        if any(float(v) < 0 for v in part.values()):
+            raise ValueError(f"{name}: значения должны быть ≥ 0")
+        sections[name] = {k: float(v) for k, v in part.items()}
+    if sections["planner"].get("time_limit_s", 1) <= 0 or sections["planner"].get("time_limit_s", 1) > 4.5:
+        raise ValueError("лимит решателя: от 0 до 4.5 с (бюджет вариантов ≤ 5 с)")
+    settings["index"] = new_index
+    settings["priority_weights"] = pw
+    for name, part in sections.items():
+        settings[name].update({k: (int(v) if name == "intervals" else v) for k, v in part.items()})
+    return settings
 
 
 class ManualDrag(BaseModel):
@@ -107,7 +174,8 @@ class ClockRequest(BaseModel):
 
 
 async def subscribe_api(bus: EventBus, cache: StateCache, ws: WSManager, req: Requester) -> None:
-    for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index", "journal.entry"):
+    for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index", "journal.entry",
+                  "planner.conflicts"):
         await bus.subscribe(topic, cache.on_event)
     await bus.subscribe("#", ws.on_event)
     for topic in REPLY_TOPICS:
@@ -204,6 +272,69 @@ def create_app(bus: EventBus, world: World, settings: dict,
     @app.get("/api/plan/manual/bounds", summary="Указания на ГИД: границы перетаскивания прибытия и отправления")
     async def manual_bounds(train_id: str, station_id: str):
         return await planner_call("manual_bounds", {"train_id": train_id, "station_id": station_id})
+
+    @app.post("/api/incidents/{incident_id}/estimate", response_model=Incident,
+              summary="Уточнить оценку длительности сбоя (пересчитывает варианты)")
+    async def estimate(incident_id: str, body: EstimateRequest) -> dict:
+        res = await req.request("cmd.field.update_incident_estimate", {"incident_id": incident_id, **body.model_dump()})
+        if not res["ok"]:
+            raise HTTPException(404 if "не найден" in (res.get("reason") or "") else 422, res.get("reason"))
+        return res["incident"]
+
+    @app.post("/api/whatif/{request_id}/promote", response_model=Variant,
+              summary="What-if → «Перенести в работу»: вариант на решение диспетчера")
+    async def promote(request_id: str) -> dict:
+        res = await req.request("cmd.planner.promote_whatif", {"request_id": request_id})
+        if not res["ok"]:
+            raise HTTPException(res.get("code", 409), res.get("reason"))
+        return res["body"]
+
+    @app.get("/api/settings", summary="Настройки: веса и пороги индекса, приоритеты, решатель, интервалы")
+    async def get_settings() -> dict:
+        return {"index": settings["index"], "priority_weights": settings["priority_weights"],
+                "planner": {k: settings["planner"][k] for k in EDITABLE["planner"] if k in settings["planner"]},
+                "intervals": settings["intervals"], "interval_labels": INTERVAL_LABELS}
+
+    @app.put("/api/settings", summary="Изменить настройки (применяются сразу, без перезапуска)")
+    async def put_settings(body: SettingsPatch) -> dict:
+        try:
+            apply_settings(settings, body)
+        except (ValueError, KeyError, TypeError) as e:
+            raise HTTPException(422, str(e))
+        await bus.publish("settings.updated", await get_settings(), source="api")
+        return await get_settings()
+
+    @app.get("/api/history/frames", summary="Кадры для перемотки (последние 20 мин симуляции, шаг ≥ 2 с)")
+    async def history_frames(t_from: float | None = Query(None, alias="from"), t_to: float | None = Query(None, alias="to"),
+                             step: float | None = None) -> list:
+        return cache.history(t_from, t_to, step)
+
+    @app.get("/api/history/events", summary="События и решения за период (журнал, часы симуляции)")
+    async def history_events(t_from: float | None = Query(None, alias="from"),
+                             t_to: float | None = Query(None, alias="to")) -> list:
+        return [j for j in cache.journal if (t_from is None or j["time"] >= t_from) and (t_to is None or j["time"] <= t_to)]
+
+    @app.get("/api/reports", summary="Отчёт за период: события, решения, опоздания, индекс по минутам (CSV)")
+    async def report(t_from: float | None = Query(None, alias="from"), t_to: float | None = Query(None, alias="to"),
+                     format: str = "csv"):
+        if format != "csv":
+            raise HTTPException(422, "В прототипе отчёт выгружается в CSV; PDF — в полной версии")
+        return Response(build_report_csv(cache, t_from, t_to), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="report.csv"'})
+
+    @app.get("/api/scenarios", summary="Сценарии сбоев для демонстрации (§9.5)")
+    async def scenarios() -> list:
+        from app.field.scenarios import load_scenarios
+
+        return [{"id": x["id"], "title": x["title"], "steps": len(x["steps"]),
+                 "duration_min": max(st["at_min"] for st in x["steps"])} for x in load_scenarios()]
+
+    @app.post("/api/scenarios/{scenario_id}/run", summary="Запустить сценарий: шаги от текущего времени симуляции")
+    async def run_scenario(scenario_id: str) -> dict:
+        res = await req.request("cmd.field.run_scenario", {"scenario_id": scenario_id})
+        if not res["ok"]:
+            raise HTTPException(404 if "не найден" in (res.get("reason") or "") else 422, res.get("reason"))
+        return {k: res[k] for k in ("run_id", "scenario_id", "steps", "log")}
 
     @app.post("/api/plan/manual/preview", summary="Указания на ГИД: как изменение расходится на другие поезда (≤ 100 мс)")
     async def manual_preview(body: ManualDrag):

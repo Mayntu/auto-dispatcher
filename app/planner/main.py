@@ -19,6 +19,7 @@ from app.planner.pool import SolverPool, _rts, forecast_plan, retime_with_object
 from app.planner.snapshot import build_snapshot
 from app.planner.strategies import STRATEGIES, durations_for, pick_strategies
 from app.planner.variants import generate_variants, score_variants
+from app.planner.conflicts import forecast_conflicts
 from app.planner.manual import ManualError, bounds as manual_bounds, clock, preview as manual_preview
 from app.planner.whatif import run_whatif
 from app.railcore.explain import mins
@@ -59,6 +60,8 @@ class PlannerService:
         self._broken_since: float | None = None
         self.pins: dict[str, Pin] = {}  # the dispatcher's instructions (tasks/02)
         self._pending_pins: dict[str, Pin] = {}  # manual variant id -> the instruction it would set
+        self.conflicts: list[dict] = []  # CDR forecast (§12.7)
+        self._whatifs: dict[str, tuple] = {}  # what-if request id -> (result, plan version it was computed on)
 
     async def start(self) -> None:
         await self.bus.subscribe("field.state", self._on_field)
@@ -66,6 +69,7 @@ class PlannerService:
         await self.bus.subscribe("cmd.planner.*", self._on_cmd)
         await self.bus.subscribe("field.guard", self._on_guard)
         await self.bus.subscribe("field.train_event", self._on_train_event)
+        await self.bus.subscribe("settings.updated", self._on_settings)
         await asyncio.wait_for(self._first_state.wait(), timeout=10)
         t0 = time.perf_counter()
         res = await self.pool.solve(self.snapshot().model_dump(mode="json"), "balanced", self.settings)
@@ -107,7 +111,12 @@ class PlannerService:
 
     async def _on_incident(self, env: Envelope) -> None:
         inc = Incident.model_validate(env.payload)
-        if inc.status == "active":
+        if inc.status == "active" and env.type == "incident.updated":
+            self.incidents[inc.id] = inc
+            await self._journal("incident_updated", f"Уточнена оценка: {inc.description} — "
+                                f"{mins(inc.est_min_s)}–{mins(inc.est_max_s)} мин", incident_ids=[inc.id])
+            self._request("incident")
+        elif inc.status == "active":
             self.incidents[inc.id] = inc
             await self._journal("incident_created", f"Сбой: {inc.description}", incident_ids=[inc.id])
             self._request("incident")
@@ -115,6 +124,12 @@ class PlannerService:
             self.incidents.pop(inc.id, None)
             await self._journal("incident_resolved", f"Сбой снят: {inc.description}", incident_ids=[inc.id])
             self._request("incident" if self.incidents else "resolved")
+
+    async def _on_settings(self, env: Envelope) -> None:
+        """The settings object is shared and already updated: the index and the next solves use it at once."""
+        w = env.payload["index"]["weights"]
+        await self._journal("settings_updated", "Настройки изменены: веса индекса "
+                            + ", ".join(f"{k} {v:.2f}" for k, v in w.items()))
 
     async def _on_train_event(self, env: Envelope) -> None:
         e = env.payload
@@ -299,11 +314,17 @@ class PlannerService:
             await self._live_cards(snap)
         await self._archive_if_done()
         await self._sync_hold()
+        try:
+            self.conflicts = forecast_conflicts(snap, self.world, _rts(), self.settings)
+        except Exception:  # the forecast is advisory: never let it stop the 1 Hz loop
+            log.exception("conflict forecast failed")
+        await self.bus.publish("planner.conflicts", {"conflicts": self.conflicts}, source="planner", sim_time=self.now)
         src = self.forecast or self.plan
         await self.bus.publish("kpi.index", {
             "index": src.index.model_dump(mode="json"), "kpi": src.kpi.model_dump(mode="json"),
             "plan_version": self.version, "last_solve_ms": self.last_solve_ms, "forecast_ok": fc is not None,
             "plan_broken": self._forecast_fails >= 3, "deadlock_guard_triggered_total": self.guard_triggers,
+            "conflicts_forecast": len(self.conflicts),
         }, source="planner", sim_time=self.now)
 
     async def _live_cards(self, snap: Snapshot) -> None:
@@ -365,6 +386,8 @@ class PlannerService:
             await self._reply(env, ok=True, code=202)
         elif cmd == "whatif":
             await self._whatif(env)
+        elif cmd == "promote_whatif":
+            await self._promote_whatif(env)
         elif cmd in ("manual_bounds", "manual_preview", "manual_commit", "pins", "pin_remove"):
             try:
                 await getattr(self, "_" + cmd)(env)
@@ -456,8 +479,46 @@ class PlannerService:
             await self.bus.publish("planner.whatif.result", {"ok": False, "reason": str(e)},
                                    corr_id=env.corr_id, source="planner")
             return
+        self._whatifs[req.id] = (res, self.version)
+        while len(self._whatifs) > 20:
+            self._whatifs.pop(next(iter(self._whatifs)))
         await self.bus.publish("planner.whatif.result", {"ok": True, **res.model_dump(mode="json")},
                                corr_id=env.corr_id, source="planner")
+
+    async def _promote_whatif(self, env: Envelope) -> None:
+        """«Перенести в работу» (§12.8): the what-if plan becomes a proposed variant; applying it keeps its order."""
+        item = self._whatifs.get(env.payload.get("request_id"))
+        if item is None:
+            return await self._reply(env, ok=False, code=404, reason="What-if не найден (результаты хранятся для 20 последних)")
+        res, version = item
+        if version != self.version:
+            return await self._reply(env, ok=False, code=409,
+                                     reason=f"План изменился после расчёта what-if (v{version} → v{self.version}) — пересчитайте")
+        snap = self.snapshot()
+        # the what-if order was made for the changed parameters; in the real situation it must not be worse than
+        # keeping the current plan (the same check as on apply) — otherwise say so instead of a card that goes stale
+        new = retime_with_objective(snap.model_copy(update={"hint": res.plan.entries}), self.settings, "balanced")
+        cur = retime_with_objective(snap, self.settings, "balanced")
+        if new is None or (cur is not None and new[1] > cur[1] + STALE_MARGIN_S):
+            worse = "неисполним" if new is None else f"хуже действующего плана на {mins(new[1] - cur[1])} взвеш. мин"
+            return await self._reply(env, ok=False, code=409, reason=(
+                f"Порядок из what-if рассчитан для изменённых параметров; при фактических параметрах он {worse} — "
+                "переносить в работу нечего"))
+        v = Variant(id=uuid.uuid4().hex[:8], incident_ids=[i.id for i in snap.incidents], base_plan_version=self.version,
+                    strategy="balanced", title="What-if: перенесено в работу", plan=res.plan, delta_index=0.0,
+                    delta_delay_s=0.0, explanation=[], status="proposed", kind="replan", source="whatif",
+                    updated_at=snap.now)
+        for other in self.proposed():
+            other.status = "stale"
+        self.variants = {v.id: v}
+        score_variants(self.world, snap, self.settings, [v], self.forecast)
+        v.explanation = (["Порядок движения из what-if; применяется к текущей обстановке (изменённые параметры "
+                          "what-if — скорость, длительность — в план не переносятся, только решения о порядке)."]
+                         + res.explanation)[:4]
+        await self._journal("variants_proposed", "What-if перенесён в работу — вариант ждёт решения диспетчера")
+        await self._publish_variants()
+        await self._sync_hold()
+        await self._reply(env, ok=True, code=200, body=v.model_dump(mode="json"))
 
     # ---- the dispatcher's instructions from the train graph (tasks/02) ------------------------
     def _check_version(self, env: Envelope) -> None:
