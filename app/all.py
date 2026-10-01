@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -14,6 +13,7 @@ from fastapi import FastAPI
 from app.api.main import create_app, subscribe_api
 from app.bus.memory import MemoryBus
 from app.common.config import get_env, load_settings
+from app.common.logging import setup_logging
 from app.field.sim import FieldService, FieldSim
 from app.planner.main import PlannerService
 from app.planner.pool import SolverPool
@@ -50,7 +50,7 @@ def build_app(settings: dict | None = None) -> FastAPI:
 
 def main() -> None:
     env = get_env()
-    logging.basicConfig(level=env.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    setup_logging("all", env.log_level)
     uvicorn.run(build_app(), host=env.host, port=env.port, log_level=env.log_level.lower())
 
 

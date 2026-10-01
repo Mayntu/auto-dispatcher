@@ -13,6 +13,21 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 
 `data/timetable.json` пересобирается командой `.venv/bin/python -m tools.gen_timetable` (около 30 с).
 
+## Запуск через Docker (полная топология)
+
+```bash
+cp .env.example .env
+docker compose up --build -d      # или: make up
+```
+
+- UI — http://localhost:8080 (nginx)
+- API / Swagger — http://localhost:8000/docs
+- RabbitMQ management — http://localhost:15672 (guest/guest)
+
+Сервисы: `rabbitmq`, `db` (TimescaleDB), `field`, `planner`, `ato`, `recorder`, `api`, `web` —
+все backend-сервисы запускаются из одного образа (`Dockerfile`) с разными командами
+`python -m app.<service>.main`. Остановка — `make down`, логи — `make logs`.
+
 ## Демо (MVP.md §6)
 
 1. Открыть http://localhost:8000: поезда едут, поездограмма рисует факт и план, индекс в «Норме».

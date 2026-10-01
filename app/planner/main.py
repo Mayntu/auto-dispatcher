@@ -8,12 +8,16 @@ import time
 
 from app.bus.base import EventBus
 from app.bus.envelope import Envelope
+from app.bus.factory import build_bus
+from app.common.config import get_env, load_settings
+from app.common.logging import setup_logging
+from app.common.runtime import run_forever
 from app.planner.pool import SolverPool, forecast_plan
 from app.planner.snapshot import build_snapshot
 from app.planner.strategies import STRATEGIES, durations_for
 from app.planner.variants import generate_variants
 from app.planner.whatif import run_whatif
-from app.railcore.infra import World
+from app.railcore.infra import World, get_world
 from app.railcore.models import Incident, Plan, Variant, WhatIfRequest
 from app.railcore.problem import Snapshot
 
@@ -44,7 +48,7 @@ class PlannerService:
         await self.bus.subscribe("field.state", self._on_field)
         await self.bus.subscribe("incident.*", self._on_incident)
         await self.bus.subscribe("cmd.planner.*", self._on_cmd)
-        await asyncio.wait_for(self._first_state.wait(), timeout=10)
+        await self._wait_first_state()
         t0 = time.perf_counter()
         res = await self.pool.solve(self.snapshot().model_dump(mode="json"), "balanced", self.settings)
         plan = Plan.model_validate(res["plan"])
@@ -64,6 +68,14 @@ class PlannerService:
     async def _on_field(self, env: Envelope) -> None:
         self.field = env.payload
         self._first_state.set()
+
+    async def _wait_first_state(self) -> None:
+        """Wait until the first field snapshot arrives (field may start after the planner)."""
+        while not self._first_state.is_set():
+            try:
+                await asyncio.wait_for(self._first_state.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                log.info("planner waiting for field.state ...")
 
     async def _on_incident(self, env: Envelope) -> None:
         inc = Incident.model_validate(env.payload)
@@ -218,3 +230,32 @@ class PlannerService:
             return
         await self.bus.publish("planner.whatif.result", {"ok": True, **res.model_dump(mode="json")},
                                corr_id=env.corr_id, source="planner")
+
+
+async def run() -> None:
+    """Standalone planner service entrypoint (CLAUDE.md §5, §12)."""
+    env = get_env()
+    setup_logging("planner", env.log_level)
+    settings = load_settings()
+    world = get_world()
+    bus = build_bus(env)
+    await bus.start()
+    pool = SolverPool(settings["planner"]["workers"])
+    await pool.warm(settings["planner"]["workers"])
+    service = PlannerService(bus, world, settings, pool)
+    try:
+        await service.start()
+        log.info("planner service started (bus=%s)", env.bus)
+        await run_forever()
+    finally:
+        await service.stop()
+        pool.shutdown()
+        await bus.close()
+
+
+def main() -> None:
+    asyncio.run(run())
+
+
+if __name__ == "__main__":
+    main()

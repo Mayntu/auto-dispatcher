@@ -4,25 +4,30 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Callable
 
-from fastapi import FastAPI, HTTPException, WebSocket
-from fastapi.responses import FileResponse
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app.api.auth import issue_token, verify_credentials, verify_token
 from app.api.state_cache import StateCache
 from app.api.ws import WSManager
 from app.bus.base import EventBus
 from app.bus.envelope import Envelope
-from app.common.config import get_env
+from app.bus.factory import build_bus
+from app.common.config import get_env, load_settings
+from app.common.logging import setup_logging
 from app.railcore.eco import train_profile
-from app.railcore.infra import World
+from app.railcore.infra import World, get_world
 from app.railcore.models import Direction, Incident, Modification, Plan, SpeedProfile, TrainState, Variant, WhatIfResult
 from app.railcore.running_time import RunningTimes
 
 REPLY_TOPICS = ("dc.command_result", "planner.command_result", "planner.whatif.result")
+AUTH_SKIP = {"/", "/health", "/metrics", "/docs", "/redoc", "/openapi.json", "/api/auth/login"}
 
 
 class Requester:
@@ -74,6 +79,11 @@ class ClockRequest(BaseModel):
     speed: float | None = None
 
 
+class LoginBody(BaseModel):
+    login: str
+    password: str
+
+
 async def subscribe_api(bus: EventBus, cache: StateCache, ws: WSManager, req: Requester) -> None:
     for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index"):
         await bus.subscribe(topic, cache.on_event)
@@ -91,6 +101,28 @@ def create_app(bus: EventBus, world: World, settings: dict,
     req = Requester(bus)
     rts = RunningTimes(world)
     app.state.cache, app.state.ws, app.state.requester = cache, wsm, req
+    env = get_env()
+
+    @app.middleware("http")
+    async def auth_middleware(request: Request, call_next):
+        if not env.auth_enabled:
+            return await call_next(request)
+        path = request.url.path
+        if path in AUTH_SKIP or path.startswith("/static"):
+            return await call_next(request)
+        header = request.headers.get("authorization", "")
+        token = header[7:] if header.lower().startswith("bearer ") else None
+        if token is None or verify_token(token) is None:
+            return JSONResponse({"detail": "Требуется аутентификация"}, status_code=401)
+        return await call_next(request)
+
+    @app.post("/api/auth/login", summary="Вход: JWT для ролей dispatcher/admin")
+    async def login(body: LoginBody) -> dict:
+        role = verify_credentials(body.login, body.password)
+        if role is None:
+            raise HTTPException(401, "Неверный логин или пароль")
+        token, exp = issue_token(body.login, role)
+        return {"token": token, "role": role, "expires_at": exp}
 
     @app.get("/health", summary="Проверка живости")
     async def health() -> dict:
@@ -189,6 +221,11 @@ def create_app(bus: EventBus, world: World, settings: dict,
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
+        if env.auth_enabled:
+            token = ws.query_params.get("token")
+            if not token or verify_token(token) is None:
+                await ws.close(code=4401)
+                return
         await wsm.handle(ws)
 
     web = get_env().web_dir
@@ -199,3 +236,32 @@ def create_app(bus: EventBus, world: World, settings: dict,
 
     app.mount("/static", StaticFiles(directory=web), name="static")
     return app
+
+
+def build_default_app() -> FastAPI:
+    """Standalone API gateway: own bus, subscribes to everything the UI needs (CLAUDE.md §16)."""
+    env = get_env()
+    settings = load_settings()
+    world = get_world()
+    bus = build_bus(env)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        await bus.start()
+        await subscribe_api(bus, app.state.cache, app.state.ws, app.state.requester)
+        try:
+            yield
+        finally:
+            await bus.close()
+
+    return create_app(bus, world, settings, lifespan)
+
+
+def main() -> None:
+    env = get_env()
+    setup_logging("api", env.log_level)
+    uvicorn.run(build_default_app(), host=env.host, port=env.port, log_level=env.log_level.lower())
+
+
+if __name__ == "__main__":
+    main()

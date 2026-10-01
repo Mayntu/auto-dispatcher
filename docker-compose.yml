@@ -1,0 +1,94 @@
+# Autodispatcher — full multi-service topology (CLAUDE.md §5, §23).
+# All backend services run from ONE image, differing only by command.
+#   docker compose up --build   ->  UI http://localhost:8080  |  API http://localhost:8000/docs
+x-app-env: &app-env
+  BUS: rabbit
+  RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+  DATABASE_URL: postgresql://rail:rail@db:5432/rail
+  SIM_EPOCH: "${SIM_EPOCH:-2026-10-02T07:55:00+05:00}"
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  JWT_SECRET: ${JWT_SECRET:-change-me}
+  AUTH_ENABLED: ${AUTH_ENABLED:-false}
+  HOST: 0.0.0.0
+  PORT: "8000"
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  environment: *app-env
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  db:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rail
+      POSTGRES_PASSWORD: rail
+      POSTGRES_DB: rail
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rail -d rail"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  field:
+    <<: *app
+    command: python -m app.field.main
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  planner:
+    <<: *app
+    command: python -m app.planner.main
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  ato:
+    <<: *app
+    command: python -m app.ato.main
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  recorder:
+    <<: *app
+    command: python -m app.recorder.main
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      db: { condition: service_healthy }
+
+  api:
+    <<: *app
+    command: python -m app.api.main
+    ports:
+      - "8000:8000"
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      db: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
