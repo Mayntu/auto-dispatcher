@@ -25,6 +25,7 @@ async def generate_variants(pool: SolverPool, world: World, snap: Snapshot, sett
             strategy=sid, title=RETURN_TITLE if kind == "return" else STRATEGIES[sid].title,
             plan=Plan.model_validate(r["plan"]), delta_index=0.0, delta_delay_s=0.0, explanation=[],
             status="proposed", kind=kind, updated_at=snap.now,
+            source="return_to_schedule" if kind == "return" else "incident",
         )
         for sid, r in zip(strategies, results)
     ]

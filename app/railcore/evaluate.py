@@ -96,7 +96,8 @@ def evaluate(tasks: list[Task], order: list[PlanEntry], clear_s: int, now: float
                 # a stop the plan decided stays a stop (the order around it — tau_np, crossings — was built on it);
                 # only trains the plan lets pass choose between easing off and stopping
                 s = n.stop_fixed or plan_stop.get((t.train_id, n.station_id), False)
-                if not s and n.kind == "mid" and wait > 1 and i > 0:
+                pinned = n.pin_arr is not None or n.pin_dep is not None
+                if not s and n.kind == "mid" and wait > 1 and i > 0 and not pinned:
                     # like the CP-SAT model: run slower (up to 1.3x) to pass without stopping when possible —
                     # but never slower than that cap; otherwise the train stops at the station
                     latest = times[(t.train_id, i - 1, "d")] + _run_cap(t, i)
@@ -125,7 +126,7 @@ def _run_cap(t: Task, i: int) -> float:
     plus what a stop would cost anyway (braking + restart). A train a few seconds late eases off, it does
     not stop — otherwise a 10 s lag turns into a 2 min stop that ripples through every crossing."""
     leg = t.legs[i - 1]
-    return round(1.3 * (leg.t_pp + leg.sup_start + leg.sup_end)) + leg.sup_start + leg.sup_end
+    return round(leg.max_factor * (leg.t_pp + leg.sup_start + leg.sup_end)) + leg.sup_start + leg.sup_end
 
 
 def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, plan_track: dict, stops: dict,
@@ -141,8 +142,16 @@ def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, plan_tra
         for i, n in enumerate(t.nodes):
             a, d = (tid, i, "a"), (tid, i, "d")
             pa, pd = plan_time.get((tid, n.station_id), (0.0, 0.0))
+            if n.free_arr:
+                pa = 0.0
+            if n.free_dep:
+                pd = 0.0
             lb[a] = float(n.arr_fixed) if n.arr_fixed is not None else max(0.0, pa, arr_lb.get(a, 0.0))
             lb[d] = max(float(n.dep_min), pd)
+            if n.pin_arr is not None:  # the dispatcher's instruction: not earlier than that
+                lb[a] = max(lb[a], float(n.pin_arr))
+            if n.pin_dep is not None:
+                lb[d] = max(lb[d], float(n.pin_dep))
             dwell = n.dest_dwell if n.kind == "dest" else n.dwell_min
             edges[a].append((d, dwell))
         if t.current:
@@ -151,6 +160,8 @@ def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, plan_tra
             users[t.current.segment_id].append((-1e12 - t.current.progress, None, (tid, 0, "a"), float("-inf")))
         for i, leg in enumerate(t.legs):
             run = leg.t_pp + leg.sup_start * stops[(tid, i)] + leg.sup_end * stops[(tid, i + 1)]
+            if leg.fixed_run is not None:
+                run = max(run, leg.fixed_run)
             edges[(tid, i, "d")].append(((tid, i + 1, "a"), run))
             key = plan_start.get((tid, leg.segment_id))
             sched = t.nodes[i].sched_dep if t.nodes[i].sched_dep is not None else float("inf")

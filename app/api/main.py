@@ -8,7 +8,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Callable
 
 from fastapi import FastAPI, HTTPException, WebSocket
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -74,6 +74,17 @@ class IncidentCreate(BaseModel):
     est_max_min: float = Field(description="Оценка длительности, максимум, мин")
     actual_min: float | None = Field(None, description="Фактическая длительность (для сценариев), мин")
     description: str | None = None
+
+
+class ManualDrag(BaseModel):
+    base_plan_version: int
+    train_id: str
+    station_id: str
+    kind: str = Field(description="arr | dep")
+    time: float = Field(description="Новое время, секунды симуляции (округляется до минуты)")
+
+    model_config = {"json_schema_extra": {"examples": [
+        {"base_plan_version": 3, "train_id": "2003", "station_id": "STP", "kind": "dep", "time": 9900}]}}
 
 
 class DirectionRequest(BaseModel):
@@ -183,6 +194,33 @@ def create_app(bus: EventBus, world: World, settings: dict,
         if not res["ok"]:
             raise HTTPException(res.get("code", 409), res.get("reason"))
         return res
+
+    async def planner_call(cmd: str, payload: dict):
+        res = await req.request(f"cmd.planner.{cmd}", payload)
+        if not res["ok"]:
+            return JSONResponse(status_code=res.get("code", 409), content=res.get("body") or {"error": res.get("reason")})
+        return res["body"]
+
+    @app.get("/api/plan/manual/bounds", summary="Указания на ГИД: границы перетаскивания прибытия и отправления")
+    async def manual_bounds(train_id: str, station_id: str):
+        return await planner_call("manual_bounds", {"train_id": train_id, "station_id": station_id})
+
+    @app.post("/api/plan/manual/preview", summary="Указания на ГИД: как изменение расходится на другие поезда (≤ 100 мс)")
+    async def manual_preview(body: ManualDrag):
+        return await planner_call("manual_preview", body.model_dump())
+
+    @app.post("/api/plan/manual/commit",
+              summary="Указания на ГИД: варианты «Сохранить порядок» и «Переразвести» (≤ 5 с); применение — /api/plan/apply")
+    async def manual_commit(body: ManualDrag):
+        return await planner_call("manual_commit", body.model_dump())
+
+    @app.get("/api/plan/pins", summary="Действующие указания диспетчера")
+    async def pins():
+        return await planner_call("pins", {})
+
+    @app.delete("/api/plan/pins/{pin_id}", summary="Снять указание диспетчера")
+    async def pin_remove(pin_id: str):
+        return await planner_call("pin_remove", {"pin_id": pin_id})
 
     @app.post("/api/plan/variants/{variant_id}/reject", summary="Отклонить вариант")
     async def reject(variant_id: str) -> dict:

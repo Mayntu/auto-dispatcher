@@ -22,6 +22,7 @@ from app.railcore.problem import Solution, Task
 SCALE = 100  # objective coefficients are floats * SCALE
 EPS_FINAL = 0.01
 WAIT_FREE_S = 1200  # a train may wait this long at a station before the long-wait penalty starts
+PIN_PENALTY = 10_000  # per second a dispatcher's instruction is missed: hard in practice, never infeasible
 LAMBDA_WAIT = 0.5  # per second of waiting beyond that: no train (a freight in particular) starves for hours
 WINDOW_SLACK_S = 3 * 3600  # pairs further apart than this keep their natural order without a decision variable
 
@@ -119,6 +120,15 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
                 late = m.NewIntVar(0, ub, f"late_{tid}_{i}")
                 m.Add(late >= a - n.sched_arr)
                 objective.append(round(t.weight * SCALE) * late)
+            # the dispatcher's instruction (tasks/02 §3.4): exact time, as a penalty so that an instruction a new
+            # incident made impossible still gives a plan (the deviation then marks it violated)
+            for pin_t, var in ((n.pin_arr, a), (n.pin_dep, d)):
+                if pin_t is not None:
+                    dev = m.NewIntVar(0, ub + n.dest_dwell, f"pd_{tid}_{i}_{len(objective)}")
+                    m.Add(dev >= var - pin_t)
+                    m.Add(dev >= pin_t - var)
+                    objective.append(PIN_PENALTY * SCALE * dev)
+                    m.AddHint(var, max(0, pin_t))
             if fix and tid in fix:
                 fa, fd, fs = fix[tid][i]
                 m.Add(a == fa)
@@ -147,7 +157,7 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
         for i, leg in enumerate(t.legs):
             run = arr[i + 1] - dep[i]
             m.Add(run >= leg.t_pp + leg.sup_start * stop[i] + leg.sup_end * stop[i + 1])
-            m.Add(run <= round(1.3 * (leg.t_pp + leg.sup_start + leg.sup_end)))
+            m.Add(run <= round(leg.max_factor * (leg.t_pp + leg.sup_start + leg.sup_end)))
             if tid in warm:
                 est = (warm[tid][i][1], warm[tid][i + 1][0])
             else:
@@ -252,6 +262,10 @@ def objective(tasks: list[Task], sol: Solution, settings: dict, lambda_stop_mult
                 total += t.weight * max(0, arr - n.sched_arr)
             if n.kind == "mid" and not n.stop_fixed and stop:
                 total += lam
+            if n.pin_arr is not None:
+                total += PIN_PENALTY * abs(arr - n.pin_arr)
+            if n.pin_dep is not None:
+                total += PIN_PENALTY * abs(dep - n.pin_dep)
             if n.kind == "mid":
                 total += LAMBDA_WAIT * max(0, dep - arr - n.dwell_min - WAIT_FREE_S)
             elif n.kind == "origin" and n.sched_dep is not None:

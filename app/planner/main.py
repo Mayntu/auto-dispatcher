@@ -15,14 +15,15 @@ import uuid
 
 from app.bus.base import EventBus
 from app.bus.envelope import Envelope
-from app.planner.pool import SolverPool, forecast_plan, retime_with_objective
+from app.planner.pool import SolverPool, _rts, forecast_plan, retime_with_objective
 from app.planner.snapshot import build_snapshot
 from app.planner.strategies import STRATEGIES, durations_for, pick_strategies
 from app.planner.variants import generate_variants, score_variants
+from app.planner.manual import ManualError, bounds as manual_bounds, clock, preview as manual_preview
 from app.planner.whatif import run_whatif
 from app.railcore.explain import mins
 from app.railcore.infra import World
-from app.railcore.models import Incident, JournalEntry, Plan, Variant, WhatIfRequest
+from app.railcore.models import Incident, JournalEntry, Pin, Plan, Variant, WhatIfRequest
 from app.railcore.problem import Snapshot
 
 log = logging.getLogger("planner")
@@ -56,6 +57,8 @@ class PlannerService:
         self.guard_triggers = 0  # deadlock_guard_triggered_total: guards must not hide planning bugs
         self._guard_pending: str | None = None
         self._broken_since: float | None = None
+        self.pins: dict[str, Pin] = {}  # the dispatcher's instructions (tasks/02)
+        self._pending_pins: dict[str, Pin] = {}  # manual variant id -> the instruction it would set
 
     async def start(self) -> None:
         await self.bus.subscribe("field.state", self._on_field)
@@ -76,8 +79,12 @@ class PlannerService:
         for t in self._tasks + ([self._gen_task] if self._gen_task else []):
             t.cancel()
 
-    def snapshot(self) -> Snapshot:
-        return build_snapshot(self.field, self.world.timetable, list(self.incidents.values()), self.plan)
+    def snapshot(self, extra_pin: Pin | None = None) -> Snapshot:
+        snap = build_snapshot(self.field, self.world.timetable, list(self.incidents.values()), self.plan)
+        pins = [p for p in self.pins.values() if p.status in ("active", "violated")]
+        if extra_pin is not None:
+            pins = [p for p in pins if (p.train_id, p.station_id) != (extra_pin.train_id, extra_pin.station_id)] + [extra_pin]
+        return snap.model_copy(update={"pins": pins})
 
     @property
     def now(self) -> float:
@@ -163,7 +170,7 @@ class PlannerService:
             variants = await generate_variants(self.pool, self.world, snap, self.settings, self.version, forecast,
                                                pick_strategies(snap.incidents, self.settings), kind)
         else:
-            variants = await self._after_resolution(snap, forecast)
+            variants = await self._after_resolution(snap, forecast, "pin_removed" in reasons)
         self.last_solve_ms = round((time.perf_counter() - t0) * 1000)
         for v in self.variants.values():
             if v.status == "proposed":
@@ -185,7 +192,7 @@ class PlannerService:
         await self._sync_hold()
         log.info("%d variants in %d ms (%s)", len(variants), self.last_solve_ms, ",".join(sorted(reasons)))
 
-    async def _after_resolution(self, snap: Snapshot, forecast: Plan | None) -> list[Variant]:
+    async def _after_resolution(self, snap: Snapshot, forecast: Plan | None, pin_removed: bool = False) -> list[Variant]:
         """All incidents cleared: re-time quietly; offer "return to schedule" only if re-ordering really pays."""
         if forecast is not None:
             await self._refresh(forecast, "incidents cleared")
@@ -196,7 +203,8 @@ class PlannerService:
         self._last_gain = (cur[1] - new[1]) if cur and new else 0.0
         if self._last_gain >= self.settings["planner"]["return_gain_s"]:
             return cand
-        await self._journal("no_decision_needed", "Сбои сняты, план уточнён по времени — решений не требуется"
+        await self._journal("no_decision_needed", ("Указание снято" if pin_removed else "Сбои сняты")
+                            + ", план уточнён по времени — решений не требуется"
                             f" (перестановка дала бы {mins(max(0.0, self._last_gain))} мин)")
         return []
 
@@ -229,6 +237,8 @@ class PlannerService:
         self.version += 1
         plan.version, plan.base_version = self.version, base_version
         self.plan = plan
+        plan.pins = [p for p in self.pins.values() if p.status in ("active", "violated")]
+        await self._check_pins(plan)
         await self.bus.publish("plan.approved", plan, source="planner", sim_time=plan.created_at)
 
     async def _refresh(self, fc: Plan, why: str) -> None:
@@ -236,6 +246,8 @@ class PlannerService:
         plan = fc.model_copy(update={"version": self.version, "base_version": self.plan.base_version,
                                      "strategy": self.plan.strategy, "solver": "refresh"})
         self.plan = plan
+        plan.pins = [p for p in self.pins.values() if p.status in ("active", "violated")]
+        await self._check_pins(plan)
         await self.bus.publish("plan.refreshed", plan, source="planner", sim_time=plan.created_at)
         log.info("plan v%d re-timed: %s", self.version, why)
 
@@ -251,6 +263,7 @@ class PlannerService:
                 log.exception("planner tick failed")
 
     async def _tick(self) -> None:
+        await self._pins_done()
         snap = self.snapshot()
         fc = forecast_plan(snap, self.settings)
         if fc is not None:
@@ -341,6 +354,11 @@ class PlannerService:
             await self._reply(env, ok=True, code=202)
         elif cmd == "whatif":
             await self._whatif(env)
+        elif cmd in ("manual_bounds", "manual_preview", "manual_commit", "pins", "pin_remove"):
+            try:
+                await getattr(self, "_" + cmd)(env)
+            except ManualError as e:
+                await self._reply(env, ok=False, code=e.code, body=e.body(), reason=e.error)
         else:
             await self._reply(env, ok=False, code=400, reason=f"unknown command {cmd}")
 
@@ -373,7 +391,8 @@ class PlannerService:
                                      reason=f"Вариант устарел: текущая версия плана {self.version}")
         # keep the variant's order (the decision) and re-time it from now; compare like for like with keeping
         # the current plan, both scored with the objective the solver optimised for this strategy
-        snap = self.snapshot()
+        new_pin = self._pending_pins.get(vid)
+        snap = self.snapshot(new_pin)
         durations = durations_for(STRATEGIES[v.strategy], snap.incidents, self.settings)
         new = retime_with_objective(snap.model_copy(update={"hint": v.plan.entries}), self.settings, v.strategy, durations)
         cur = retime_with_objective(snap, self.settings, v.strategy, durations)
@@ -391,6 +410,14 @@ class PlannerService:
             await self._publish_variants()
             self._request("incident" if self.incidents else "broken")
             return await self._reply(env, ok=False, code=409, reason=reason)
+        if new_pin is not None:  # the instruction becomes active with the plan that keeps it
+            for p in list(self.pins.values()):
+                if (p.train_id, p.station_id) == (new_pin.train_id, new_pin.station_id) and p.status in ("active", "violated"):
+                    p.status = "removed"
+            new_pin.status = "active"
+            self.pins[new_pin.id] = new_pin
+            self._pending_pins.clear()
+            await self._journal("pin_set", f"Указание диспетчера: {new_pin.description}")
         plan = new[0]
         plan.strategy, plan.solver, plan.solve_ms = v.strategy, v.plan.solver, v.plan.solve_ms
         plan.kpi.robust_total_delay_s = v.plan.kpi.robust_total_delay_s
@@ -420,3 +447,138 @@ class PlannerService:
             return
         await self.bus.publish("planner.whatif.result", {"ok": True, **res.model_dump(mode="json")},
                                corr_id=env.corr_id, source="planner")
+
+    # ---- the dispatcher's instructions from the train graph (tasks/02) ------------------------
+    def _check_version(self, env: Envelope) -> None:
+        if env.payload.get("base_plan_version") not in (None, self.version):
+            raise ManualError(409, "stale_plan", current_version=self.version)
+        if self.plan is None:
+            raise ManualError(409, "stale_plan", current_version=self.version)
+
+    async def _manual_bounds(self, env: Envelope) -> None:
+        if self.plan is None:
+            raise ManualError(409, "stale_plan", current_version=self.version)
+        p = env.payload
+        b = manual_bounds(self.snapshot(), self.world, _rts(), self.settings, self.plan, p["train_id"], p["station_id"])
+        await self._reply(env, ok=True, code=200, body=b)
+
+    async def _manual_preview(self, env: Envelope) -> None:
+        self._check_version(env)
+        p = env.payload
+        r = manual_preview(self.snapshot(), self.world, _rts(), self.settings, self.plan, self.forecast,
+                           p["train_id"], p["station_id"], p["kind"], float(p["time"]))
+        r.pop("plan"), r.pop("pin")
+        await self._reply(env, ok=True, code=200, body=r)
+
+    async def _manual_commit(self, env: Envelope) -> None:
+        """Two variants: keep the order (the preview) and re-plan with the instruction (CP-SAT)."""
+        self._check_version(env)
+        p = env.payload
+        t0 = time.perf_counter()
+        snap0 = self.snapshot()
+        r = manual_preview(snap0, self.world, _rts(), self.settings, self.plan, self.forecast,
+                           p["train_id"], p["station_id"], p["kind"], float(p["time"]))
+        pin, keep = r["pin"], r["plan"]
+        snap = self.snapshot(pin)
+        b = manual_bounds(snap0, self.world, _rts(), self.settings, self.plan, pin.train_id, pin.station_id)
+        manual = {"train_id": pin.train_id, "station_id": pin.station_id, "kind": pin.kind,
+                  "from_time": b[pin.kind]["current"], "to_time": pin.time}
+        res = await self.pool.solve(snap.model_dump(mode="json"), "reoptimize", self.settings)
+        reopt = Plan.model_validate(res["plan"])
+        variants = []
+        for strategy, plan in (("keep_order", keep), ("reoptimize", reopt)):
+            if plan is None:
+                continue
+            variants.append(Variant(id=uuid.uuid4().hex[:8], incident_ids=[i.id for i in snap.incidents],
+                                    base_plan_version=self.version, strategy=strategy, title=STRATEGIES[strategy].title,
+                                    plan=plan, delta_index=0.0, delta_delay_s=0.0, explanation=[], status="proposed",
+                                    kind="manual", source="manual", manual=manual, updated_at=snap.now))
+        note = None
+        if len(variants) == 2:
+            a = retime_with_objective(snap.model_copy(update={"hint": variants[0].plan.entries}), self.settings, "balanced")
+            c = retime_with_objective(snap.model_copy(update={"hint": variants[1].plan.entries}), self.settings, "balanced")
+            gain = (a[1] - c[1]) if a and c else 0.0
+            if c is None or gain < self.settings["manual"]["reoptimize_min_gain_s"]:
+                variants = variants[:1]
+                note = "Перестановка скрещений не даёт выигрыша — предложен только вариант с текущим порядком."
+        elif not variants:
+            raise ManualError(409, "stale_plan", current_version=self.version)
+        score_variants(self.world, snap, self.settings, variants, self.forecast)
+        if note:
+            variants[0].explanation.insert(0, note)
+        variants[0].explanation.insert(0, f"Указание диспетчера: {pin.description}.")
+        for v in self.variants.values():
+            if v.status == "proposed":
+                v.status = "stale"
+        self.variants = {v.id: v for v in variants}
+        self._pending_pins = {v.id: pin.model_copy() for v in variants}
+        self.last_solve_ms = round((time.perf_counter() - t0) * 1000)
+        await self._journal("variants_proposed", f"Указание диспетчера на ГИД ({pin.description}): "
+                            f"предложено вариантов {len(variants)} за {self.last_solve_ms / 1000:.1f} с")
+        await self._publish_variants()
+        await self._sync_hold()
+        await self._reply(env, ok=True, code=200, body={"variants": [v.model_dump(mode="json") for v in variants]})
+
+    async def _pins(self, env: Envelope) -> None:
+        await self._reply(env, ok=True, code=200,
+                          body=[p.model_dump(mode="json") for p in self.pins.values() if p.status in ("active", "violated")])
+
+    async def _pin_remove(self, env: Envelope) -> None:
+        pin = self.pins.get(env.payload.get("pin_id"))
+        if pin is None or pin.status not in ("active", "violated"):
+            raise ManualError(404, "not_found")
+        pin.status = "removed"
+        await self._journal("pin_removed", f"Указание снято: {pin.description}")
+        if self.plan is not None:
+            self.plan.pins = [p for p in self.pins.values() if p.status in ("active", "violated")]
+        # nothing conflicts after a constraint is lifted: the plan stays; a "return to schedule" is offered only
+        # if re-planning without the instruction really pays (§12.1)
+        if not self.incidents:
+            self._request("pin_removed")
+        await self._reply(env, ok=True, code=200, body={"ok": True})
+
+    async def _check_pins(self, plan: Plan) -> None:
+        """An instruction the new plan cannot keep (e.g. a new incident made it impossible) is marked violated."""
+        times = {(e.train_id, e.station_id): (e.start, e.end) for e in plan.entries if e.kind == "dwell"}
+        for pin in self.pins.values():
+            if pin.status != "active" or pin.time < plan.created_at:
+                continue
+            t = times.get((pin.train_id, pin.station_id))
+            if t is None:
+                continue
+            got = t[0] if pin.kind == "arr" else t[1]
+            if abs(got - pin.time) > 60:
+                pin.status = "violated"
+                pin.reason = (f"План не может выполнить указание: {'прибытие' if pin.kind == 'arr' else 'отправление'} "
+                              f"в {clock(got)} вместо {clock(pin.time)}")
+                await self.bus.publish("planner.pin_violated", {"pin": pin.model_dump(mode="json"), "reason": pin.reason},
+                                       source="planner", sim_time=self.now)
+                await self._journal("pin_violated", f"Указание нарушено: {pin.description}. {pin.reason}")
+
+    async def _pins_done(self) -> None:
+        """An instruction whose event has happened is done and leaves the plan."""
+        if not self.field:
+            return
+        states = {t["train_id"]: t for t in self.field["trains"]}
+        changed = False
+        for pin in self.pins.values():
+            if pin.status not in ("active", "violated") or pin.time > self.now:
+                continue
+            st = states.get(pin.train_id)
+            route = [s.station_id for s in self.world.trains[pin.train_id].stops]
+            k = route.index(pin.station_id)
+            if st is None or st["status"] == "finished":
+                done = True
+            elif st["station_id"]:
+                at = route.index(st["station_id"])
+                done = at > k or (pin.kind == "arr" and at == k)
+            elif st["segment_id"] and st["next_station_id"]:
+                done = route.index(st["next_station_id"]) > k
+            else:
+                done = False
+            if done or pin.time < self.now - 3600:
+                pin.status = "done"
+                changed = True
+                await self._journal("pin_done", f"Указание выполнено: {pin.description}")
+        if changed and self.plan is not None:
+            self.plan.pins = [p for p in self.pins.values() if p.status in ("active", "violated")]

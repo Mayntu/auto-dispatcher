@@ -233,6 +233,21 @@ class IndexValue(BaseModel):
     components: list[IndexComponent]
 
 
+class Pin(BaseModel):
+    """A dispatcher's instruction from the train graph (tasks/02): this train arrives at / departs from this
+    station at this time. A hard requirement for every later re-planning until the dispatcher removes it."""
+
+    id: str
+    train_id: str
+    station_id: str
+    kind: Literal["arr", "dep"]
+    time: float  # sim seconds
+    created_at: float  # sim seconds
+    status: Literal["active", "violated", "done", "removed"]
+    reason: str | None = None  # why it is violated
+    description: str  # «Задержать 2003 отправлением со Степной до 10:42»
+
+
 class Plan(BaseModel):
     version: int
     base_version: int | None
@@ -245,6 +260,7 @@ class Plan(BaseModel):
     strategy: str | None = None
     solver: Literal["cpsat", "fallback", "refresh"]
     solve_ms: int
+    pins: list[Pin] = []  # the dispatcher's instructions this plan keeps (active and violated)
 
 
 class Variant(BaseModel):
@@ -263,7 +279,9 @@ class Variant(BaseModel):
     score: float | None = None
     recommended: bool = False
     updated_at: float | None = None  # sim time of the last live re-timing
-    kind: Literal["incident", "return", "replan", "broken"] = "incident"
+    kind: Literal["incident", "return", "replan", "broken", "manual"] = "incident"
+    source: Literal["incident", "manual", "return_to_schedule", "whatif"] = "incident"
+    manual: dict | None = None  # {train_id, station_id, kind, from_time, to_time} for source="manual"
 
 
 class JournalEntry(BaseModel):
@@ -271,7 +289,8 @@ class JournalEntry(BaseModel):
     time: float  # sim seconds
     kind: Literal["incident_created", "incident_resolved", "variants_proposed", "variant_applied",
                   "variant_rejected", "variants_stale", "return_offered", "no_decision_needed",
-                  "decisions_archived", "plan_broken", "decision_hold", "guard_replan", "signal_stop"]
+                  "decisions_archived", "plan_broken", "decision_hold", "guard_replan", "signal_stop",
+                  "pin_set", "pin_removed", "pin_violated", "pin_done"]
     text: str
     incident_ids: list[str] = []
     variant_id: str | None = None
