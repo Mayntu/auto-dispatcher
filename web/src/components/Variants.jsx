@@ -14,7 +14,9 @@ export function Variants({ s, selectedId, onSelect }) {
   const p = s.pending;
   const [criterion, setCriterion] = useState('optimal');
   const variants = p?.variants ?? [];
-  const best = variants.length ? bestFor(variants, criterion) : null;
+  // С сервером «рекомендуем» ставит планировщик (поле recommended), по умолчанию выбрана эта карточка.
+  const serverBest = variants.find((v) => v.recommended);
+  const best = variants.length ? (serverBest && criterion === 'optimal' ? serverBest : bestFor(variants, criterion)) : null;
 
   useEffect(() => {
     if (best) onSelect(best.id);
@@ -49,7 +51,7 @@ export function Variants({ s, selectedId, onSelect }) {
   const sel = variants.find((v) => v.id === selectedId) ?? best;
   const ranged = s.disruptions.filter((d) => d.resolvedAt === undefined && s.now < d.start + d.durMax && d.durMax > d.durMin);
   const longest = ranged.sort((a, b) => b.durMax - a.durMax)[0];
-  const recommended = variants.length > 1 ? bestFor(variants, 'optimal')?.id : null;
+  const recommended = s.liveMode ? serverBest?.id : variants.length > 1 ? bestFor(variants, 'optimal')?.id : null;
   const events = s.disruptions.filter((d) => p.disruptionIds.includes(d.id));
   const deadline = p.firstConflictAt !== undefined ? p.firstConflictAt - s.settings.autoApplyLeadSec : null;
   const forecast = shownIndex(s);
@@ -172,6 +174,11 @@ export function Variants({ s, selectedId, onSelect }) {
                     ) : (
                       <button className="apply" onClick={() => apply(v.id)}>
                         <Check size={18} /> {t('Применить план')}
+                      </button>
+                    )}
+                    {s.liveMode && (
+                      <button className="ghost reject" onClick={() => engine.rejectVariant(v.id)}>
+                        <X size={16} /> {t('Отклонить')}
                       </button>
                     )}
                   </div>

@@ -855,10 +855,13 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
         const from = SECTION.stations[g.from].km;
         const to = SECTION.stations[g.to].km;
         // Занятость: с сервера — по данным поля, в демо — по положению поездов и перекрытиям.
-        const liveSeg = s.live?.segments?.[g.specId];
         const occ = new Set();
-        if (liveSeg) for (const id of liveSeg.occupied_blocks ?? []) occ.add(`${id}:s`);
-        else {
+        if (s.live?.blocks) {
+          for (const b of blocks) {
+            const lb = s.live.blocks[b.id];
+            if (lb?.occupied_by || lb?.obstacle) occ.add(`${b.id}:s`);
+          }
+        } else {
           for (const p of positions) {
             if (p.station !== undefined || p.km <= from || p.km >= to) continue;
             const fr = (p.km - from) / (to - from || 1);
@@ -874,7 +877,7 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
             for (const b of blocks) if (Math.max(a, c) > b.f0 && Math.min(a, c) < b.f1) for (const tr of trs) occ.add(`${b.id}:${tr}`);
           }
         }
-        const dirLive = liveSeg?.direction ?? null;
+        const dirLive = s.live?.directions?.[g.specId]?.direction ?? null;
         const { u, n } = flat.segs[i];
         const at = (fr, track, off) => {
           const c = flat.onTrack(i, track, fr);

@@ -1,27 +1,24 @@
 /**
- * Клиент бэкенда (§16 ТЗ): REST для команд и начальных данных, WebSocket для потока событий шины.
+ * Клиент бэкенда (docs/frontend-contract.md): REST для команд и начальных данных, WebSocket для потока событий.
  * Режим включается в .env: VITE_DATA_SOURCE=live. Без него интерфейс работает на встроенном движке (демо).
+ * Авторизации в бэкенде MVP нет — вход на фронте локальный.
  */
 export const LIVE = import.meta.env.VITE_DATA_SOURCE === 'live';
 const API = import.meta.env.VITE_API_BASE ?? '/api';
 const WS_PATH = import.meta.env.VITE_WS_PATH ?? '/ws';
-const TOKEN_KEY = 'autodispatcher.token';
 
-const token = () => {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-};
-
+/** Ответ REST: статус, данные и текст ошибки сервера (FastAPI кладёт его в detail). */
 async function call(method, path, body) {
-  const t = token();
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    return { status: 0, ok: false, data: null, detail: String(err) };
+  }
   const text = await res.text();
   let data = null;
   try {
@@ -29,85 +26,65 @@ async function call(method, path, body) {
   } catch {
     data = null;
   }
-  return { status: res.status, ok: res.status < 300, data };
+  const d = data?.detail;
+  const detail = typeof d === 'string' ? d : Array.isArray(d) ? d.map((x) => x.msg).join('; ') : null;
+  return { status: res.status, ok: res.status < 300, data, detail };
 }
 
-const list = (d, key) => (Array.isArray(d) ? d : (d?.[key] ?? []));
+const get = async (path) => {
+  const r = await call('GET', path);
+  return r.ok ? r.data : null;
+};
 
 export const api = {
-  async infra() {
-    return (await call('GET', '/infra')).data;
-  },
-  async trains() {
-    return list((await call('GET', '/trains')).data, 'trains');
-  },
-  async plan() {
-    return (await call('GET', '/plan/current')).data;
-  },
-  async variants() {
-    return (await call('GET', '/plan/variants')).data;
-  },
-  async incidents() {
-    return list((await call('GET', '/incidents')).data, 'incidents');
-  },
-  async scenarios() {
-    return list((await call('GET', '/scenarios')).data, 'scenarios');
-  },
-  /** Вход на сервер (JWT, §16.1). Если авторизации на сервере ещё нет — работаем без токена. */
-  async login(login, password) {
-    const r = await call('POST', '/auth/login', { login, password });
-    const tk = r.data?.access_token ?? r.data?.token;
-    if (r.ok && tk) {
-      try {
-        localStorage.setItem(TOKEN_KEY, tk);
-      } catch {
-        /* токен не сохранится между перезагрузками */
-      }
-    }
-    return { ok: r.ok || r.status === 404, role: r.data?.role };
-  },
+  /** {infra, categories, timetable, sim_epoch, thresholds, station_order, intervals, segment_times} */
+  infra: () => get('/infra'),
+  /** {field, plan, variants, index, fact, journal} — то же, что WS snapshot. */
+  state: () => get('/state'),
   apply: (variantId, baseVersion) => call('POST', '/plan/apply', { variant_id: variantId, base_plan_version: baseVersion }),
   reject: (variantId) => call('POST', `/plan/variants/${encodeURIComponent(variantId)}/reject`),
   replan: () => call('POST', '/plan/replan'),
-  async whatif(modifications) {
-    return (await call('POST', '/whatif', { modifications })).data?.request_id ?? null;
-  },
-  promoteWhatIf: (id) => call('POST', `/whatif/${encodeURIComponent(id)}/promote`),
+  /** What-if считается синхронно (≤ 3 с), ответ — WhatIfResult. */
+  whatif: (modifications) => call('POST', '/whatif', { modifications }),
+  /** SpeedProfile на текущий/ближайший перегон → список (карточка поезда умеет рисовать несколько). */
   async ato(trainId) {
-    return list((await call('GET', `/ato/${encodeURIComponent(trainId)}`)).data, 'profiles');
+    const r = await call('GET', `/ato/${encodeURIComponent(trainId)}`);
+    return r.ok && r.data ? (Array.isArray(r.data) ? r.data : [r.data]) : [];
   },
-  clock: (paused, speed) => call('POST', '/sim/clock', { paused, speed }),
-  createIncident: (incident) => call('POST', '/incidents', incident),
+  clock: (body) => call('POST', '/sim/clock', body),
+  /** {type: obstacle|train_failure|segment_closed, segment_id?, train_id?, km?, est_min_min, est_max_min, description?} */
+  createIncident: (body) => call('POST', '/incidents', body),
   resolveIncident: (id) => call('POST', `/incidents/${encodeURIComponent(id)}/resolve`),
-  estimate: (id, minS, maxS) => call('POST', `/incidents/${encodeURIComponent(id)}/estimate`, { est_min_s: minS, est_max_s: maxS }),
-  runScenario: (id) => call('POST', `/scenarios/${encodeURIComponent(id)}/run`),
 };
 
 /**
- * Поток событий: при подключении сервер шлёт снимок, дальше — конверты шины (§15.2).
- * Обрыв — переподключение с паузой; снимок при переподключении восстанавливает всё состояние.
+ * Поток событий: при подключении сервер шлёт {type: 'snapshot', payload}, дальше — конверты шины (§15.2).
+ * Обрыв — переподключение с паузой; снимок при переподключении восстанавливает весь экран.
  */
-export function connectStream(onEnvelope, onStatus) {
+export function connectStream(onMessage, onStatus) {
   let ws = null;
   let stopped = false;
   let retry = 0;
   const open = () => {
     onStatus('connecting');
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const t = token();
-    ws = new WebSocket(`${proto}://${location.host}${WS_PATH}${t ? `?token=${encodeURIComponent(t)}` : ''}`);
+    ws = new WebSocket(`${proto}://${location.host}${WS_PATH}`);
     ws.onopen = () => {
       retry = 0;
       onStatus('online');
-      ws.send(JSON.stringify({ op: 'subscribe', channels: ['#'] }));
     };
     ws.onmessage = (m) => {
+      let msg;
       try {
-        const msg = JSON.parse(m.data);
-        // Снимок может прийти и конвертом, и просто объектом (§16.3).
-        onEnvelope(typeof msg.type === 'string' && 'payload' in msg ? msg : { type: 'snapshot', ts_wall: Date.now() / 1000, payload: msg });
+        msg = JSON.parse(m.data);
       } catch (err) {
         console.error('Некорректное сообщение сервера', err);
+        return;
+      }
+      try {
+        onMessage(msg);
+      } catch (err) {
+        console.error(`Ошибка обработки «${msg?.type}»`, err);
       }
     };
     ws.onclose = () => {
@@ -121,7 +98,7 @@ export function connectStream(onEnvelope, onStatus) {
       stopped = true;
       ws?.close();
     },
-    /** Фронт сообщает серверу p95 задержки отрисовки (§16.3). */
+    /** Фронт сообщает серверу p95 задержки доставки (§16.3). */
     reportLatency(p95) {
       if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'latency', p95_ms: Math.round(p95) }));
     },

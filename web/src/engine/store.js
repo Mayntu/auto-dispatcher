@@ -28,7 +28,9 @@ export function useSmoothNow() {
     let lastNow = engine.getState().now;
     const loop = () => {
       const st = engine.getState();
-      const ahead = st.running ? Math.min(1, (performance.now() - engine.lastReal) / 1000) * st.speed : 0;
+      // С сервером время идёт с эффективной скоростью (×1, пока ждём решения диспетчера).
+      const speed = st.live?.effectiveSpeed ?? st.speed;
+      const ahead = st.running ? Math.min(1, (performance.now() - engine.lastReal) / 1000) * speed : 0;
       let v = st.now + ahead;
       // Время не идёт назад, кроме явного сброса или перемотки (скачок больше минуты).
       if (v < last && Math.abs(st.now - lastNow) < 60) v = last;

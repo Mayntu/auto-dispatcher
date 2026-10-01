@@ -197,6 +197,12 @@ export function variantsFromSpec(payload, ctx) {
     const robustExtra = k.robust_total_delay_s != null ? Math.max(0, k.robust_total_delay_s - k.total_delay_s) / 60 : 0;
     return {
       id: v.id,
+      // Рекомендацию ставит сервер по единому мерилу score (§27.5) — ровно одна карточка.
+      recommended: !!v.recommended,
+      score: v.score,
+      kind: v.kind ?? 'incident',
+      status: v.status,
+      updatedAt: toUi(v.updated_at),
       specStrategy: v.strategy,
       strategy: STRATEGY[v.strategy] ?? v.strategy,
       title: v.title,
@@ -261,7 +267,36 @@ export function fieldFromSpec(f) {
     t: toUi(f.sim_time),
     trains,
     signals: Object.fromEntries((f.signals ?? []).map((s) => [s.id, s.aspect])),
-    segments: Object.fromEntries((f.segments ?? []).map((s) => [s.segment_id, s])),
+    /** Блок-участки: id → {occupied_by, obstacle}. */
+    blocks: Object.fromEntries((f.blocks ?? []).map((b) => [b.id, b])),
+    /** Установленное направление перегона: segment_id → {direction: odd|even|null, changing}. */
+    directions: f.directions ?? {},
+    counters: f.counters ?? null,
+    closedSegments: f.closed_segments ?? [],
+    speed: f.speed,
+    effectiveSpeed: f.effective_speed ?? f.speed,
+    paused: !!f.paused,
+    decisionHold: !!f.decision_hold,
+    planVersion: f.plan_version,
     safetyViolations: f.safety_violations ?? 0,
   };
 }
+
+/** Фактические нитки ГИД из снимка сервера: {train_id: [[t, km], …]} → время интерфейса. */
+export const factFromSpec = (fact) =>
+  Object.fromEntries(Object.entries(fact ?? {}).map(([id, pts]) => [id, pts.map(([t, km]) => [toUi(t), km])]));
+
+/** Запись журнала решений сервера (JournalEntry) → строка журнала интерфейса. */
+const JOURNAL_LEVEL = {
+  incident_created: 'crit',
+  plan_broken: 'crit',
+  signal_stop: 'warn',
+  variants_proposed: 'warn',
+  variants_stale: 'warn',
+  decision_hold: 'warn',
+  guard_replan: 'warn',
+  variant_applied: 'ok',
+  incident_resolved: 'ok',
+  no_decision_needed: 'ok',
+};
+export const journalFromSpec = (e) => ({ id: e.id, t: toUi(e.time), level: JOURNAL_LEVEL[e.kind] ?? 'info', text: e.text, source: 'Сервер', kind: e.kind });

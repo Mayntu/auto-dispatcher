@@ -34,7 +34,7 @@ export const shownIndex = (s) => s.forecastIndex ?? s.index;
 /** Сколько реальных секунд у диспетчера на выбор, когда срок решения подошёл (время модели в это время идёт ×1). */
 export const DECISION_GRACE_SEC = 60;
 /** Срок решения подошёл: модель замедлена до ×1 и идёт обратный отсчёт. */
-export const decisionHold = (s) => s.pending?.holdSince !== undefined;
+export const decisionHold = (s) => (s.liveMode ? !!s.live?.decisionHold : s.pending?.holdSince !== undefined);
 export const isActive = (d, t) => d.start <= t && t < d.start + durationOf(d, 'expected');
 export class Engine {
   bus = new EventBus();

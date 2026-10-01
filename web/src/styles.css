@@ -662,3 +662,7 @@ button.danger { color: var(--crit); border-color: #f3b9b7; }
 .vf-chip { padding: 2px 8px; border-radius: 99px; background: #fff; color: var(--crit); font-size: 12.5px; white-space: nowrap; }
 .vf-chip small { color: var(--muted); font-weight: 500; }
 .v-robust { margin-top: 0; padding-top: 8px; }
+
+/* live-режим: строка статуса в плашке и ожидание сервера при загрузке */
+.status-pill .st-counters { margin-left: 10px; font-size: 12px; white-space: nowrap; }
+.boot-wait { padding: 40px; font: 15px system-ui, sans-serif; color: #555; }

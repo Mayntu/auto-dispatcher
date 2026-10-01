@@ -69,13 +69,23 @@ const STATIONS = built.stations;
 export const SECTION = { name: m('Участок {a} — {b}', { a: m(STATIONS[0].short), b: m(STATIONS.at(-1).short) }), ...built };
 export let SECTION_KM = STATIONS[STATIONS.length - 1].km;
 
+/** Категория поезда сервера (§9.2) → категория интерфейса. */
+export const CATEGORY_FROM_SERVER = { express: 'express', passenger: 'pass', freight: 'freight' };
+
 /**
- * Участок с сервера (§9.1 ТЗ: stations / segments). Пересобирает SECTION на месте — все модули держат ссылку
- * на те же массивы. Вызывается до первого рендера, когда интерфейс работает с бэкендом.
+ * Участок с сервера (GET /api/infra: {infra: {stations, segments, blocks, signals}, categories, timetable, …}).
+ * Пересобирает SECTION на месте — все модули держат ссылку на те же массивы. Вызывается до первого рендера.
  * Координат в инфраструктуре сервера нет — схема раскладывается по километражу «змейкой», как на карте.
  */
-export function applyInfra(infra) {
-  const order = [...infra.stations].sort((a, b) => a.km - b.km);
+export function applyInfra(res) {
+  const infra = res.infra ?? res;
+  // Цвета, скорости и названия категорий — с сервера (§9.2, §18.3).
+  for (const c of res.categories ?? []) {
+    const ui = CATEGORIES[CATEGORY_FROM_SERVER[c.id]];
+    if (ui) Object.assign(ui, { name: c.name, color: c.color, vmax: c.v_max_kmh, massT: c.mass_t });
+  }
+  const byId = new Map(infra.stations.map((s) => [s.id, s]));
+  const order = res.station_order?.length ? res.station_order.map((id) => byId.get(id)).filter(Boolean) : [...infra.stations].sort((a, b) => a.km - b.km);
   const stations = order.map((st, i) => {
     const terminal = i === 0 || i === order.length - 1;
     // Короткое имя для подписей: у станции без «Ст.»; разъезд без префикса («1») не читается — оставляем «Рзд. 1».
@@ -121,6 +131,7 @@ export function applyInfra(infra) {
   STATIONS.splice(0, STATIONS.length, ...stations);
   SECTION.segments.splice(0, SECTION.segments.length, ...segments);
   SECTION.signals = infra.signals ?? [];
+  SECTION.server = { epoch: res.sim_epoch, timetable: res.timetable ?? [], thresholds: res.thresholds, intervals: res.intervals };
   SECTION.name = m('Участок {a} — {b}', { a: m(STATIONS[0].short), b: m(STATIONS.at(-1).short) });
   SECTION.fromServer = true;
   SECTION_KM = STATIONS[STATIONS.length - 1].km;
