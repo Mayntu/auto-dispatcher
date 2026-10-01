@@ -17,10 +17,38 @@ class Deadlock(Exception):
     def __init__(self, trains: list[str]):
         super().__init__(f"deadlock between trains {', '.join(trains)}")
         self.trains = trains
+        self.cycle: list[tuple] = []  # one cycle of events (train, node index, a|d) — for diagnostics
 
 
-def evaluate(tasks: list[Task], order: list[PlanEntry], clear_s: int, now: float = 0.0) -> Solution:
-    """`order` entries are in absolute sim time; task times are relative to `now`."""
+def _find_cycle(edges: dict, left: set) -> list[tuple]:
+    """A cycle among the events left after the topological pass: each of them still has a predecessor
+    there, so walking predecessors must close a loop."""
+    pred: dict[tuple, tuple] = {}
+    for u, outs in edges.items():
+        if u in left:
+            for w, _ in outs:
+                if w in left:
+                    pred.setdefault(w, u)
+    v = next(iter(left), None)
+    path, pos = [], {}
+    while v is not None and v not in pos:
+        pos[v] = len(path)
+        path.append(v)
+        v = pred.get(v)
+    return list(reversed(path[pos[v]:])) if v is not None else []
+
+
+DEFAULT_INTERVALS = {"headway_s": 480, "tau_np_s": 180}
+
+
+def evaluate(tasks: list[Task], order: list[PlanEntry], clear_s: int, now: float = 0.0,
+             intervals: dict | None = None) -> Solution:
+    """`order` entries are in absolute sim time; task times are relative to `now`.
+    Automatic block (§12.5): oncoming trains in plan order need the segment cleared (arr + clear -> dep);
+    following trains keep the headway at both ends; at stations without simultaneous reception oncoming
+    arrivals are tau_np apart; station tracks follow the plan's track assignment where known."""
+    iv = {**DEFAULT_INTERVALS, **(intervals or {})}
+    plan_track = {(e.train_id, e.station_id): e.track_id for e in order if e.kind == "dwell" and e.track_id}
     plan_start = {(e.train_id, e.segment_id): e.start - now for e in order if e.kind == "run"}
     plan_stop = {(e.train_id, e.station_id): e.stop for e in order if e.kind == "dwell"}
     # the field never runs ahead of the plan: planned times are lower bounds, deviations only push later
@@ -32,19 +60,42 @@ def evaluate(tasks: list[Task], order: list[PlanEntry], clear_s: int, now: float
     # "run slower instead of stopping" moves the arrival later; that later arrival must also hold the segment
     # for the next train, so it becomes a lower bound and everything is recomputed until it settles
     arr_lb: dict[tuple, float] = {}
+    # tau_np: at a siding oncoming trains arrive tau_np apart, in the order they actually come — applied as lower
+    # bounds after each pass (an edge in plan order could contradict the segment order and fake a deadlock)
+    np_lb: dict[tuple, float] = {}
+    sidings = [(t, i) for t in tasks for i, n in enumerate(t.nodes)
+               if not n.simultaneous_reception and n.kind != "origin"]
     times: dict = {}
-    for _ in range(10):
-        try:
-            times = _longest_path(tasks, plan_start, plan_time, stops, clear_s, arr_lb, strict_tracks=True)
-        except Deadlock:  # the plan's track use no longer fits reality: keep only time-consistent track edges
-            times = _longest_path(tasks, plan_start, plan_time, stops, clear_s, arr_lb, strict_tracks=False)
+    for _ in range(12):
+        lbs = {k: max(arr_lb.get(k, 0.0), np_lb.get(k, 0.0)) for k in arr_lb.keys() | np_lb.keys()}
+        times = None
+        # the plan's track use may no longer fit reality: retry keeping only time-consistent track edges, then
+        # with the segment order alone (station capacity is then held by the field, not by the forecast)
+        for mode in ("strict", "consistent", "segments"):
+            try:
+                times = _longest_path(tasks, plan_start, plan_time, plan_track, stops, clear_s, iv, lbs, mode)
+                break
+            except Deadlock:
+                if mode == "segments":
+                    raise
         changed = False
+        by_station: dict[str, list] = defaultdict(list)
+        for t, i in sidings:
+            by_station[t.nodes[i].station_id].append((times[(t.train_id, i, "a")], t, i))
+        for arrs in by_station.values():
+            arrs.sort(key=lambda x: x[0])
+            for (ta, a, _), (tb, b, ib) in zip(arrs, arrs[1:]):
+                if a.direction != b.direction and tb < ta + iv["tau_np_s"] - 0.5 and b.nodes[ib].arr_fixed is None:
+                    np_lb[(b.train_id, ib, "a")] = ta + iv["tau_np_s"]
+                    changed = True
         for t in tasks:
             for i, n in enumerate(t.nodes):
                 key = (t.train_id, i, "a")
                 arr, dep = times[key], times[(t.train_id, i, "d")]
                 wait = dep - arr - n.pass_threshold
-                s = n.stop_fixed
+                # a stop the plan decided stays a stop (the order around it — tau_np, crossings — was built on it);
+                # only trains the plan lets pass choose between easing off and stopping
+                s = n.stop_fixed or plan_stop.get((t.train_id, n.station_id), False)
                 if not s and n.kind == "mid" and wait > 1 and i > 0:
                     # like the CP-SAT model: run slower (up to 1.3x) to pass without stopping when possible —
                     # but never slower than that cap; otherwise the train stops at the station
@@ -77,8 +128,10 @@ def _run_cap(t: Task, i: int) -> float:
     return round(1.3 * (leg.t_pp + leg.sup_start + leg.sup_end)) + leg.sup_start + leg.sup_end
 
 
-def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, stops: dict, clear_s: int,
-                  arr_lb: dict, strict_tracks: bool = True) -> dict:
+def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, plan_track: dict, stops: dict,
+                  clear_s: int, iv: dict, arr_lb: dict, mode: str = "strict") -> dict:
+    headway, tau_np = iv["headway_s"], iv["tau_np_s"]
+    direction = {t.train_id: t.direction.value for t in tasks}
     lb: dict[tuple, float] = {}
     edges: dict[tuple, list[tuple[tuple, float]]] = defaultdict(list)
     users: dict[str, list[tuple[float, tuple, tuple]]] = defaultdict(list)  # segment -> (key, start node, end node)
@@ -117,11 +170,35 @@ def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, stops: d
             ordered.append((max(u[3], floor), 1, u))
         ordered.sort(key=lambda x: (x[0], x[1]))
         seg_users[:] = [u for _, _, u in ordered]
-        for (_, _, end_a, _), (_, start_b, end_b, _) in zip(seg_users, seg_users[1:]):
-            if start_b is not None:
-                edges[end_a].append((start_b, clear_s))
-            else:  # both on the segment now: the follower arrives after the leader
+        for (_, start_a, end_a, _), (_, start_b, end_b, _) in zip(seg_users, seg_users[1:]):
+            if direction[end_a[0]] != direction[end_b[0]]:  # oncoming: the segment must be cleared first
+                if start_b is not None:
+                    edges[end_a].append((start_b, clear_s))
+            elif start_b is None:  # both on the segment now: the follower arrives after the leader
                 edges[end_a].append((end_b, 0.0))
+            else:  # following in a packet: the headway at both ends, no overtaking on the line
+                if start_a is not None:
+                    edges[start_a].append((start_b, headway))
+                edges[end_a].append((end_b, headway))
+
+    # station tracks assigned by the plan: on each track the next train comes only after the previous left
+    # (only where the plan's own times agree: a train standing on another track than the plan said — the plan
+    # being re-timed is older than reality — must not create a false deadlock; station capacity still holds)
+    by_track: dict[tuple[str, str], list[tuple[float, float, str, int]]] = defaultdict(list)
+    for t in tasks:
+        for i, n in enumerate(t.nodes):
+            tr = n.track_fixed or plan_track.get((t.train_id, n.station_id))
+            pt = plan_time.get((t.train_id, n.station_id))
+            if tr is None or pt is None or mode == "segments":
+                continue
+            here = (n.arr_fixed is not None and n.arr_fixed <= 0) or (i == 0 and t.current)
+            by_track[(n.station_id, tr)].append((float("-inf") if here else pt[0], pt[1], t.train_id, i))
+    for seq in by_track.values():
+        seq.sort(key=lambda x: x[0])
+        for (_, end_a, ta, ia), (kb, _, tb, ib) in zip(seq, seq[1:]):
+            if ta != tb and end_a <= kb + 1:
+                target = (tb, ib - 1, "d") if ib > 0 else (tb, ib, "a")
+                edges[(ta, ia, "d")].append((target, 0.0))
 
     # station tracks (§12.5): spread visits over the tracks in plan order; on each track the next
     # train arrives only after the previous one has left
@@ -152,7 +229,9 @@ def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, stops: d
             prev_end, prev = free[k]
             # only edges that agree with the plan's own times: a greedy track that is still busy at this
             # arrival would add a backwards edge (a false deadlock cycle)
-            if prev is not None and prev[0] != tid and (strict_tracks or prev_end <= start + 1):
+            if mode == "segments":
+                break
+            if prev is not None and prev[0] != tid and (mode == "strict" or prev_end <= start + 1):
                 # the track is taken when the train leaves the previous station (DC sets the arrival route then)
                 target = (tid, i - 1, "d") if i > 0 else (tid, i, "a")
                 edges[(prev[0], prev[1], "d")].append((target, 0.0))
@@ -174,5 +253,7 @@ def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, stops: d
             if indeg[v] == 0:
                 queue.append(v)
     if seen < len(lb):
-        raise Deadlock(sorted({v[0] for v, k in indeg.items() if k > 0}))
+        err = Deadlock(sorted({v[0] for v, k in indeg.items() if k > 0}))
+        err.cycle = _find_cycle(edges, {v for v, k in indeg.items() if k > 0})
+        raise err
     return val

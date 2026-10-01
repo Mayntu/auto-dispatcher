@@ -25,25 +25,33 @@ OBSTACLE = {"type": "obstacle", "segment_id": "R1-STP", "km": 24.5, "est_min_min
             "actual_min": 22}
 
 
-def assert_conflict_free(plan: Plan) -> None:
+def assert_conflict_free(plan: Plan, snap=None) -> None:
+    """The independent rule checker (tools/audit.py): automatic block on the segments, station tracks,
+    useful length, platforms, tau_np."""
+    from app.railcore.running_time import RunningTimes
+    from tools.audit import check_plan
+
+    errs = check_plan(plan, snap, WORLD, RunningTimes(WORLD), SETTINGS) if snap is not None else _segments_only(plan)
+    assert not errs, errs[:5]
+
+
+def _segments_only(plan: Plan) -> list[str]:
     clear = segment_clear_s(SETTINGS)
-    by_seg: dict[str, list] = defaultdict(list)
-    events: dict[str, list] = defaultdict(list)
+    direction = {t.id: t.direction for t in WORLD.timetable}
+    runs = defaultdict(list)
     for e in plan.entries:
         if e.kind == "run":
-            by_seg[e.segment_id].append((e.start, e.end + clear, e.train_id))
-        else:
-            events[e.station_id] += [(e.start, 1), (e.end, -1)]
-    for seg, runs in by_seg.items():
-        runs.sort()
-        for (s1, e1, a), (s2, _, b) in zip(runs, runs[1:]):
-            assert s2 >= e1 - 1, f"{a} and {b} overlap on {seg}"
-    for st, ev in events.items():
-        level = peak = 0
-        for _, d in sorted(ev, key=lambda x: (x[0], x[1])):
-            level += d
-            peak = max(peak, level)
-        assert peak <= WORLD.capacity(st), f"station {st} over capacity"
+            runs[e.segment_id].append(e)
+    errs = []
+    for seg, rs in runs.items():
+        rs.sort(key=lambda e: e.start)
+        for x, a in enumerate(rs):
+            for b in rs[x + 1:]:
+                if direction[a.train_id] != direction[b.train_id] and b.start < a.end + clear - 1:
+                    errs.append(f"{a.train_id} and {b.train_id} oncoming on {seg}")
+                if direction[a.train_id] == direction[b.train_id] and b.end < a.end - 1:
+                    errs.append(f"{b.train_id} overtakes {a.train_id} on {seg}")
+    return errs
 
 
 def due_trains_finished(sim: FieldSim, slack_s: float = 2 * 3600) -> list[str]:
@@ -84,9 +92,10 @@ def initial_plan(sim: FieldSim) -> Plan:
 
 
 def test_plan_v1_is_conflict_free_and_on_time():
-    plan = initial_plan(new_sim())
+    sim = new_sim()
+    plan = initial_plan(sim)
     assert plan.solver == "cpsat"
-    assert_conflict_free(plan)
+    assert_conflict_free(plan, snapshot(sim, None))
     assert plan.index.category == "norm"
 
 
@@ -114,7 +123,7 @@ def test_obstacle_gives_three_conflict_free_variants_within_5s():
     assert [v.strategy for v in variants] == ["balanced", "robust", "passenger_first"]
     closure_end = inc.started_at + inc.est_expected_s
     for v in variants:
-        assert_conflict_free(v.plan)
+        assert_conflict_free(v.plan, snap)
         assert v.explanation
         on_segment = {t.train_id for t in snap.states.values() if t.segment_id == "R1-STP"}
         for e in v.plan.entries:

@@ -48,6 +48,10 @@ class Node:
     stop_fixed: bool = False
     dest_dwell: int = 0
     capacity: int = 1  # tracks at the station
+    tracks: list[str] = field(default_factory=list)  # tracks this train may use here (useful length, platform)
+    side_tracks: list[str] = field(default_factory=list)  # of those, the side (non-main) ones
+    track_fixed: str | None = None  # the track the train stands on now
+    simultaneous_reception: bool = True
 
 
 @dataclass
@@ -138,8 +142,15 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
             seg_id = legs_all[min(k, last - 1)].segment_id
             t_pass = round(rts.t_pass(cat.id, seg_id, train.direction, clear_m, ov))
             kind = "origin" if k == 0 else "dest" if k == last else "mid"
+            station = world.stations[s.station_id]
+            # useful length: the train must fit; a passenger stop needs a platform track
+            fit = [tr for tr in station.tracks if tr.length_m >= cat.length_m] or list(station.tracks)
+            if s.stop and cat.id != "freight" and kind != "origin":
+                fit = [tr for tr in fit if tr.platform] or fit
             node = Node(station_id=s.station_id, kind=kind, sched_arr=rel(s.arr), sched_dep=rel(s.dep),
-                        sched_stop=s.stop, dwell_min=0, pass_threshold=t_pass, capacity=world.capacity(s.station_id))
+                        sched_stop=s.stop, dwell_min=0, pass_threshold=t_pass, capacity=world.capacity(s.station_id),
+                        tracks=[tr.id for tr in fit], side_tracks=[tr.id for tr in fit if not tr.main],
+                        simultaneous_reception=station.simultaneous_reception)
             if kind == "mid":
                 node.dwell_min = max(s.min_dwell_s, cat.min_dwell_s) if s.stop else t_pass
                 node.stop_fixed = s.stop
@@ -186,6 +197,9 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
             nodes = [make_node(k) for k in range(first, len(route))]
             n0 = nodes[0]
             n0.arr_fixed = 0
+            n0.track_fixed = st.track_id
+            if st.track_id and st.track_id not in n0.tracks:
+                n0.tracks.append(st.track_id)
             elapsed = max(0.0, now - (st.arrived_at if st.arrived_at is not None else now))
             if n0.kind == "dest":
                 # already arrived: keep the real arrival time (in the past), not "now" — otherwise the
@@ -216,6 +230,9 @@ def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World
     now = snap.now
     horizon = settings["planner"]["horizon_s"]
     window = settings["index"]["refs"]["accuracy_window_s"]
+    # station tracks: assigned by CP-SAT, or carried over from the plan being re-timed
+    tracks = getattr(sol, "tracks", None) or {(e.train_id, e.station_id): e.track_id
+                                               for e in snap.hint if e.kind == "dwell" and e.track_id}
     entries: list[PlanEntry] = []
     total = weighted = 0.0
     delayed: list[tuple[str, float]] = []
@@ -233,7 +250,7 @@ def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World
             is_unplanned = stop and node.kind == "mid" and not node.sched_stop
             unplanned += is_unplanned
             entries.append(PlanEntry(train_id=task.train_id, kind="dwell", segment_id=None, station_id=node.station_id,
-                                     track_id=None, start=now + arr, end=now + dep, stop=stop, unplanned=is_unplanned))
+                                     track_id=tracks.get((task.train_id, node.station_id)) or node.track_fixed, start=now + arr, end=now + dep, stop=stop, unplanned=is_unplanned))
             if i < len(task.legs):
                 leg = task.legs[i]
                 entries.append(PlanEntry(train_id=task.train_id, kind="run", segment_id=leg.segment_id,
