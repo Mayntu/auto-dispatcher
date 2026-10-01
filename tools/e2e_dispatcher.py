@@ -105,7 +105,12 @@ async def ws_probe(stats: dict) -> None:
 
 
 async def wait_sim(mon: Monitor, t: float) -> None:
+    """Wait for a sim time; pending decisions that pop up meanwhile are declined (keep the current plan),
+    otherwise the line would stay at ×1."""
     while mon.now < t:
+        for v in (await mon.c.get("/api/variants")).json():
+            if v["status"] == "proposed":
+                await mon.c.post(f"/api/plan/variants/{v['id']}/reject")
         await asyncio.sleep(0.5)
 
 
@@ -202,6 +207,10 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     vs, dt = await wait_variants(c, v0, inc["id"])
     R.check(len(vs) == 3 and dt <= 5, f"3 варианта за {dt:.1f} с (≤ 5)")
     R.check(all(v["explanation"] for v in vs), "у каждого варианта есть объяснение")
+    R.check(sum(v["recommended"] for v in vs) == 1, "ровно один рекомендуемый вариант")
+    await asyncio.sleep(1.2)
+    f = mon.state["field"]
+    R.check(f["decision_hold"] and f["effective_speed"] == 1, f"пока ждём решения, время идёт ×1 (сейчас ×{f['effective_speed']})")
     best = max(vs, key=lambda v: v["plan"]["index"]["value"])
     await apply(c, mon, best, "скот/лучший", check_promise=True)
     other = next(v for v in vs if v["id"] != best["id"])
@@ -211,9 +220,17 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     R.check(r.status_code == 200, "сбой снят диспетчером досрочно")
     r = await c.post("/api/incidents/" + inc["id"] + "/resolve")
     R.check(r.status_code == 404, f"повторное снятие -> {r.status_code} (404)")
-    vs, dt = await wait_variants(c, None, None)
+    await asyncio.sleep(4)
+    vs = [v for v in (await c.get("/api/variants")).json() if v["status"] == "proposed"]
     if vs:
-        await apply(c, mon, max(vs, key=lambda v: v["plan"]["index"]["value"]), "после снятия/лучший", check_promise=True)
+        R.check(all(v["title"] == "Возврат к графику" for v in vs), "после снятия предложен «Возврат к графику»")
+        await apply(c, mon, vs[0], "возврат к графику", check_promise=True)
+    else:
+        R.check(True, "после снятия: решений не требуется (план уточнён по времени)")
+    await asyncio.sleep(2)
+    R.check((await c.get("/api/variants")).json() == [], "панель решений пуста: «Активных решений нет»")
+    kinds = [e["kind"] for e in (await c.get("/api/journal")).json()]
+    R.check("variant_applied" in kinds and "incident_resolved" in kinds, "решение и снятие сбоя записаны в журнал")
 
     print("\n# 4. поломка 2003 в пути — вспомогательный локомотив")
     await wait_sim(mon, 4500)
@@ -236,7 +253,7 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
     inc = r.json()
     vs, dt = await wait_variants(c, v0, inc["id"])
     R.check(len(vs) == 3 and dt <= 5, f"3 варианта за {dt:.1f} с")
-    await wait_sim(mon, mon.now + 600)
+    await asyncio.sleep(15)  # a slow dispatcher; the line runs at ×1 meanwhile
     worst = min(vs, key=lambda v: v["plan"]["index"]["value"]) if vs else None
     if worst:
         await apply(c, mon, worst, "закрытие/худший/поздно", check_promise=False)
@@ -288,6 +305,9 @@ async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
 
     print("\n# 8. доводим день до конца")
     while any(t["status"] != "finished" for t in mon.state["field"]["trains"]) and mon.now < 40000 and not mon.stall:
+        for v in (await c.get("/api/variants")).json():
+            if v["status"] == "proposed":  # nobody at the desk: decline, so the line goes back to ×60
+                await c.post(f"/api/plan/variants/{v['id']}/reject")
         await asyncio.sleep(2)
 
 

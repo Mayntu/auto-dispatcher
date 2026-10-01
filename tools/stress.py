@@ -95,16 +95,19 @@ def run(seed: int) -> dict:
         quiet_since, quiet_delay = None, None
         last_move, last_km = 0.0, None
         fail_streak = 0
+        resolved_only = False
 
         while sim.now < END and not all(t.loc == "done" for t in sim.trains.values()):
             for topic, _ in sim.step(STEP):
                 if topic == "incident.resolved":
                     need_regen = True
+                    resolved_only = True
             while incidents and incidents[0][0] <= sim.now:
                 _, req = incidents.pop(0)
                 try:
                     sim.create_incident(req)
                     need_regen = True
+                    resolved_only = False
                 except IncidentError:
                     pass
             if policy == "replan" and sim.now - last_replan > 1800:
@@ -113,8 +116,23 @@ def run(seed: int) -> dict:
             if need_regen:
                 need_regen = False
                 sn = snap(plan)
-                pending_variants = [(s, solve(sn, s)) for s in pick_strategies(sn.incidents, settings)]
-                apply_at = sim.now + (rng.uniform(120, 900) if policy == "late" else 0)
+                if resolved_only and not sn.incidents:
+                    # as the service: incidents cleared -> quiet refresh; "return to schedule" only if it pays
+                    resolved_only = False
+                    fresh = forecast_plan(sn, settings)
+                    if fresh is not None:
+                        plan = fresh
+                        sim.set_plan(plan)
+                        sn = snap(plan)
+                    cand = solve(sn, "balanced")
+                    cv = retime_with_objective(sn, settings, "balanced")
+                    nv = retime_with_objective(sn.model_copy(update={"hint": cand.entries}), settings, "balanced")
+                    gain = cv[1] - nv[1] if cv and nv else 0
+                    pending_variants = [("balanced", cand)] if gain >= settings["planner"]["return_gain_s"] else None
+                else:
+                    pending_variants = [(s, solve(sn, s)) for s in pick_strategies(sn.incidents, settings)]
+                # while a decision is pending the service runs the line at ×1: a "late" dispatcher costs seconds
+                apply_at = sim.now + (rng.uniform(10, 120) if policy == "late" else 0)
 
             if pending_variants is not None and apply_at is not None and sim.now >= apply_at and policy != "ignore":
                 ranked = sorted(pending_variants, key=lambda v: v[1].index.value, reverse=True)

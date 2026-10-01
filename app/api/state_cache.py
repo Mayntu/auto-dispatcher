@@ -6,6 +6,7 @@ from app.bus.envelope import Envelope
 
 FACT_WINDOW_S = 3 * 3600
 FACT_MIN_STEP_S = 15
+JOURNAL_MAX = 500
 
 
 class StateCache:
@@ -15,6 +16,7 @@ class StateCache:
         self.variants: dict | None = None
         self.index: dict | None = None
         self.fact: dict[str, list[list[float]]] = {}
+        self.journal: list[dict] = []
 
     async def on_event(self, env: Envelope) -> None:
         t = env.type
@@ -27,6 +29,9 @@ class StateCache:
             self.variants = env.payload
         elif t == "kpi.index":
             self.index = env.payload
+        elif t == "journal.entry":
+            self.journal.append(env.payload)
+            del self.journal[:-JOURNAL_MAX]
 
     def _track(self, state: dict) -> None:
         now = state["sim_time"]
@@ -41,4 +46,4 @@ class StateCache:
 
     def snapshot(self) -> dict:
         return {"field": self.field, "plan": self.plan, "variants": self.variants, "index": self.index,
-                "fact": self.fact}
+                "fact": self.fact, "journal": self.journal[-100:]}

@@ -12,6 +12,7 @@ from app.common.config import load_settings
 from app.field.sim import FieldSim
 from app.planner.pool import SolverPool, forecast_plan, solve_job
 from app.planner.snapshot import build_snapshot
+from app.planner.strategies import pick_strategies
 from app.planner.variants import generate_variants
 from app.railcore.eco import eco_profile
 from app.railcore.infra import get_world
@@ -79,7 +80,8 @@ def test_obstacle_gives_three_conflict_free_variants_within_5s():
         try:
             await pool.warm(SETTINGS["planner"]["workers"])
             t0 = time.perf_counter()
-            vs = await generate_variants(pool, WORLD, snap, SETTINGS, plan.version, None)
+            vs = await generate_variants(pool, WORLD, snap, SETTINGS, plan.version, None,
+                                         pick_strategies(snap.incidents, SETTINGS))
             return vs, time.perf_counter() - t0
         finally:
             pool.shutdown()

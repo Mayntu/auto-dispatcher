@@ -19,7 +19,7 @@ from app.bus.envelope import Envelope
 from app.common.config import get_env
 from app.railcore.eco import train_profile
 from app.railcore.infra import World
-from app.railcore.models import Direction, Incident, Modification, Plan, SpeedProfile, TrainState, Variant, WhatIfResult
+from app.railcore.models import Direction, Incident, JournalEntry, Modification, Plan, SpeedProfile, TrainState, Variant, WhatIfResult
 from app.railcore.running_time import RunningTimes
 
 REPLY_TOPICS = ("dc.command_result", "planner.command_result", "planner.whatif.result")
@@ -75,7 +75,7 @@ class ClockRequest(BaseModel):
 
 
 async def subscribe_api(bus: EventBus, cache: StateCache, ws: WSManager, req: Requester) -> None:
-    for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index"):
+    for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index", "journal.entry"):
         await bus.subscribe(topic, cache.on_event)
     await bus.subscribe("#", ws.on_event)
     for topic in REPLY_TOPICS:
@@ -150,6 +150,17 @@ def create_app(bus: EventBus, world: World, settings: dict,
         if not res["ok"]:
             raise HTTPException(res.get("code", 409), res.get("reason"))
         return res
+
+    @app.post("/api/plan/variants/{variant_id}/reject", summary="Отклонить вариант")
+    async def reject(variant_id: str) -> dict:
+        res = await req.request("cmd.planner.reject", {"variant_id": variant_id})
+        if not res["ok"]:
+            raise HTTPException(res.get("code", 409), res.get("reason"))
+        return res
+
+    @app.get("/api/journal", response_model=list[JournalEntry], summary="Журнал решений и событий (часы симуляции)")
+    async def journal(limit: int = 200) -> list:
+        return cache.journal[-limit:]
 
     @app.post("/api/plan/replan", summary="Пересчитать план вручную: варианты придут в planner.variants")
     async def replan() -> dict:

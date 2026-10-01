@@ -243,6 +243,24 @@ class Variant(BaseModel):
     delta_delay_s: float
     explanation: list[str]
     status: Literal["proposed", "applied", "stale", "rejected"]
+    # step 1: one yardstick for all variants (balanced objective, weighted minutes, lower is better),
+    # the recommendation follows it; live cards are re-timed from "now" every second
+    score: float | None = None
+    recommended: bool = False
+    updated_at: float | None = None  # sim time of the last live re-timing
+    kind: Literal["incident", "return", "replan", "broken"] = "incident"
+
+
+class JournalEntry(BaseModel):
+    id: str
+    time: float  # sim seconds
+    kind: Literal["incident_created", "incident_resolved", "variants_proposed", "variant_applied",
+                  "variant_rejected", "variants_stale", "return_offered", "no_decision_needed",
+                  "decisions_archived", "plan_broken", "decision_hold"]
+    text: str
+    incident_ids: list[str] = []
+    variant_id: str | None = None
+    strategy: str | None = None
 
 
 class Modification(BaseModel):

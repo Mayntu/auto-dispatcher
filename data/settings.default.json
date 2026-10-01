@@ -33,13 +33,15 @@
     "replan_deviation_s": 120,
     "rescue_eta_s": 1800,
     "rescue_haul_s": 600,
-    "whatif_time_limit_s": 2.5
+    "whatif_time_limit_s": 2.5,
+    "return_gain_s": 300
   },
   "sim": {
     "speed": 20,
     "tick_s": 0.5,
     "auto_routes": true,
-    "ato_compliance": 1.0
+    "ato_compliance": 1.0,
+    "decision_speed": 1
   },
   "station": {
     "side_track_kmh": 40,

@@ -252,6 +252,18 @@ class FieldSim:
             return {"kind": "arrived", "station_id": st_id, "track_id": tr.track_id}
         return None
 
+    def counters(self) -> dict:
+        """Status line (§27.5): on the line / at stations / waiting to depart / arrived this shift."""
+        c = {"in_transit": 0, "at_stations": 0, "waiting": 0, "arrived": 0}
+        for t in self.trains.values():
+            if t.loc == "segment":
+                c["in_transit"] += 1
+            elif t.loc == "station":
+                c["waiting" if t.idx == 0 else "at_stations"] += 1
+            elif t.loc == "done":
+                c["arrived"] += 1
+        return c
+
     @property
     def stalled_s(self) -> float:
         """How long nothing has moved on the field while some train is out there."""
@@ -426,6 +438,7 @@ class FieldSim:
             "signals": self.signals(),
             "safety_violations": self.safety_violations,
             "plan_overrides": self.plan_overrides,
+            "counters": self.counters(),
             "stalled_s": round(self.stalled_s),
             "plan_version": self.plan.version if self.plan else None,
         }
@@ -439,8 +452,14 @@ class FieldService:
         self.sim = sim
         self.tick_s = settings["sim"]["tick_s"]
         self.speed = float(settings["sim"]["speed"])
+        self.decision_speed = float(settings["sim"].get("decision_speed", 1))
+        self.decision_hold = False  # set by the planner while variants await a decision
         self.paused = False
         self._task: asyncio.Task | None = None
+
+    @property
+    def effective_speed(self) -> float:
+        return min(self.speed, self.decision_speed) if self.decision_hold else self.speed
 
     async def start(self) -> None:
         await self.bus.subscribe("plan.approved", self._on_plan)
@@ -458,14 +477,15 @@ class FieldService:
         while True:
             nxt += self.tick_s
             if not self.paused:
-                for topic, payload in self.sim.step(self.tick_s * self.speed):
+                for topic, payload in self.sim.step(self.tick_s * self.effective_speed):
                     await self.bus.publish(topic, payload, source="field", sim_time=self.sim.now)
             await self._publish_state()
             await asyncio.sleep(max(0.0, nxt - time.monotonic()))
 
     async def _publish_state(self) -> None:
         state = self.sim.snapshot()
-        state.update(speed=self.speed, paused=self.paused)
+        state.update(speed=self.speed, paused=self.paused, decision_hold=self.decision_hold,
+                     effective_speed=0.0 if self.paused else self.effective_speed)
         await self.bus.publish("field.state", state, source="field", sim_time=self.sim.now)
 
     async def _on_plan(self, env: Envelope) -> None:
@@ -492,7 +512,9 @@ class FieldService:
                     self.paused = bool(p["paused"])
                 if p.get("speed"):
                     self.speed = float(p["speed"])
-                result.update(paused=self.paused, speed=self.speed)
+                if p.get("decision_hold") is not None:
+                    self.decision_hold = bool(p["decision_hold"])
+                result.update(paused=self.paused, speed=self.speed, decision_hold=self.decision_hold)
             else:
                 result.update(ok=False, reason=f"unknown command {cmd}")
         except (IncidentError, KeyError, ValueError) as e:

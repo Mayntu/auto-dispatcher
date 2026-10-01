@@ -185,6 +185,7 @@
         <button data-tab="decide" class="on">Решения<span class="badge" id="decBadge" style="display:none">3</span></button>
         <button data-tab="whatif">Что если…</button>
         <button data-tab="ato">Автоведение</button>
+        <button data-tab="journal">Журнал</button>
       </div>
       <div class="pane on" id="pane-decide"><div id="variants"></div></div>
       <div class="pane" id="pane-whatif">
@@ -198,6 +199,7 @@
         <div id="wiResult"></div>
         <p class="muted" style="font-size:12px">Действующий план не меняется — это песочница. Сравнение идёт с таким же пересчётом без изменений.</p>
       </div>
+      <div class="pane" id="pane-journal"><div id="journal"></div></div>
       <div class="pane" id="pane-ato">
         <div class="sentence">Рекомендация машинисту поезда <select id="atoTrain"></select></div>
         <div class="atoText" id="atoText"></div>
@@ -222,7 +224,7 @@ const INC_ICON = {obstacle: '🐄', train_failure: '⚙️', segment_closed: '�
 
 const S = {infra: null, stations: {}, segments: {}, trains: {}, segTimes: {}, epochSec: 0,
   field: null, plan: null, variants: null, index: null, fact: {}, ghost: null, whatif: null,
-  computing: false, lat: [], drawer: null, tab: 'decide', layout: null};
+  computing: false, lat: [], drawer: null, tab: 'decide', layout: null, journal: []};
 
 // ---------- utils ----------
 const pad = n => String(n).padStart(2, '0');
@@ -409,6 +411,7 @@ function renderSituation() {
   } else if (lateSched.length) {
     cls = 'warn'; icon = '🕒'; main = `<b>Движение по плану, небольшие опоздания к расписанию:</b> ${lateText} мин.`;
   } else main = '<b>Штатное движение.</b> Все поезда следуют по плану, конфликтов нет.';
+  if (f.decision_hold) sub = (sub ? sub + ' ' : '') + '⏱ Пока ждём решения, время идёт ×1.';
   $('situation').className = 'situation ' + cls; $('sitIcon').textContent = icon; $('sitMain').innerHTML = main; $('sitSub').textContent = sub;
   $('sitBtn').style.display = proposed.length ? '' : 'none';
   $('replanBtn').style.display = replan ? '' : 'none';
@@ -492,9 +495,9 @@ function renderVariants() {
   const box = $('variants');
   if (S.computing) { box.innerHTML = `<div class="muted" style="margin-bottom:10px">Считаем варианты… <span id="timer">0.0</span> с</div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`; return; }
   const vs = S.variants ? S.variants.variants : [];
-  if (!vs.length) { box.innerHTML = `<div class="empty">Сейчас решений не требуется.<br><br>Когда случится сбой, здесь появятся 3 варианта плана: что будет с задержками в каждом случае и почему.</div>`; return; }
+  if (!vs.length) { box.innerHTML = `<div class="empty"><b>Активных решений нет.</b><br><br>Когда случится сбой, здесь появятся варианты плана: что будет с опозданиями в каждом случае и почему. Принятые решения — во вкладке «Журнал».</div>`; return; }
   const live = vs.filter(v => v.status === 'proposed');
-  const best = live.length ? live.reduce((a, b) => b.plan.index.value > a.plan.index.value ? b : a) : null;
+  const best = live.find(v => v.recommended) || null;
   box.innerHTML = (live.length ? `<div class="muted" style="margin-bottom:10px;font-size:13px">Если ничего не менять, качество движения — <b>${S.index ? Math.round(S.index.index.value) : '—'}</b>. Наведите на вариант, чтобы увидеть его на графике движения.</div>` : '')
     + vs.map(v => {
       const k = v.plan.kpi, late = k.delayed_trains.slice(0, 3);
@@ -503,14 +506,21 @@ function renderVariants() {
       return `<div class="var ${best && v.id === best.id ? 'best' : ''} ${v.status === 'stale' ? 'dim' : ''}" data-v="${v.id}">
         <div class="top"><b>${v.title}</b>${tag}</div>
         <div class="grid3">
-          <div><span>Качество движения</span><b style="color:${QCOL[v.plan.index.category]}">${Math.round(v.plan.index.value)}</b> <span style="display:inline" class="${v.delta_index >= 0 ? 'ok' : 'bad'}">${sgn(v.delta_index, '')}</span></div>
+          <div><span>Прогноз индекса при варианте</span><b style="color:${QCOL[v.plan.index.category]}">${Math.round(v.plan.index.value)}</b> <span style="display:inline" class="${v.delta_index >= 0 ? 'ok' : 'bad'}">${sgn(v.delta_index, '')}</span></div>
           <div><span>Задержка всех поездов</span><b>${mins(k.total_delay_s)}</b> мин</div>
           <div><span>Если сбой затянется</span><b>${rob == null ? '—' : sgn(rob / 60)}</b></div>
         </div>
         <div style="font-size:13px">${late.length ? 'Опоздают: ' + late.map(([t, s]) => `<b>${t}</b> +${mins(s)} мин`).join(', ') : 'Никто не опоздает к конечной.'}</div>
         <details><summary>Почему так</summary><ul>${v.explanation.map(x => `<li>${x}</li>`).join('')}</ul></details>
-        <div class="act">посчитано в ${clock(v.plan.created_at, false)} за ${(v.plan.solve_ms / 1000).toFixed(1)} с ${v.status === 'proposed' ? `<button class="primary" data-apply="${v.id}">Применить</button>` : ''}</div></div>`;
+        <div class="act">посчитано в ${clock(v.plan.created_at, false)} за ${(v.plan.solve_ms / 1000).toFixed(1)} с${v.updated_at ? ` · цифры на ${clock(v.updated_at, false)}` : ''} ${v.status === 'proposed' ? `<button data-reject="${v.id}">Отклонить</button>` : ''} ${v.status === 'proposed' ? `<button class="primary" data-apply="${v.id}">Применить</button>` : ''}</div></div>`;
     }).join('');
+}
+
+// ---------- journal ----------
+function renderJournal() {
+  const items = [...(S.journal || [])].reverse().slice(0, 150);
+  $('journal').innerHTML = items.length ? `<table>${items.map(e => `<tr><td class="muted" style="white-space:nowrap">${clock(e.time, false)}</td><td>${e.text}</td></tr>`).join('')}</table>`
+    : '<div class="empty">Журнал пуст.</div>';
 }
 
 // ---------- what-if ----------
@@ -663,7 +673,7 @@ function connect() {
   ws.onclose = () => { $('wsdot').classList.remove('ok'); $('wstext').textContent = 'нет связи'; setTimeout(connect, 1500); };
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
-    if (m.type === 'snapshot') { const p = m.payload; Object.assign(S, {field: p.field, plan: p.plan, variants: p.variants, index: p.index, fact: p.fact || {}}); renderVariants(); syncWhatIf(); schedule(); return; }
+    if (m.type === 'snapshot') { const p = m.payload; Object.assign(S, {field: p.field, plan: p.plan, variants: p.variants, index: p.index, fact: p.fact || {}, journal: p.journal || []}); renderVariants(); renderJournal(); syncWhatIf(); schedule(); return; }
     switch (m.type) {
       case 'field.state': {
         const prev = S.field ? S.field.incidents.map(i => i.id).join() : '';
@@ -674,6 +684,7 @@ function connect() {
         schedule(); break;
       }
       case 'kpi.index': S.index = m.payload; schedule(); break;
+      case 'journal.entry': S.journal.push(m.payload); renderJournal(); break;
       case 'plan.approved': S.plan = m.payload; S.ghost = S.whatif ? S.whatif.plan : null; schedule(); loadAto(); break;
       case 'plan.refreshed': S.plan = m.payload; schedule(); break;
       case 'planner.variants': S.variants = m.payload; S.computing = false; S.lastSolveMs = m.payload.solve_ms; renderVariants(); schedule(); break;
@@ -701,6 +712,7 @@ document.addEventListener('click', async e => {
     if (b.dataset.tab) setTab(b.dataset.tab);
     else if (b.dataset.inc) await api('POST', '/api/incidents', JSON.parse(b.dataset.inc));
     else if (b.dataset.resolve) await api('POST', `/api/incidents/${b.dataset.resolve}/resolve`);
+    else if (b.dataset.reject) await api('POST', `/api/plan/variants/${b.dataset.reject}/reject`);
     else if (b.dataset.apply) { b.disabled = true; const r = await api('POST', '/api/plan/apply', {variant_id: b.dataset.apply, base_plan_version: S.plan.version}); toast(`План перестроен по времени «сейчас»: качество движения ${Math.round(r.index)}, задержка всех поездов ${mins(r.total_delay_s)} мин`, true); }
     else if (b.dataset.p) await api('POST', '/api/sim/clock', {paused: !S.field.paused});
     else if (b.dataset.s) await api('POST', '/api/sim/clock', {paused: false, speed: +b.dataset.s});

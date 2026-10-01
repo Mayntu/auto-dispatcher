@@ -55,6 +55,9 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
 
     # robustness: keep this plan's order, incidents at their max duration
     # (a rescue locomotive caps a failure at its ETA, so that stays as planned)
+    if not any(i.est_max_s > i.est_min_s for i in snap.incidents):
+        # no active incident with a duration range: "if it lasts longer" is meaningless, don't show it (§27.5)
+        return {"plan": plan.model_dump(mode="json"), "status": status}
     robust_dur = {i.id: i.est_max_s for i in snap.incidents}
     if strat.duration == "rescue":
         robust_dur.update({i.id: durations[i.id] for i in snap.incidents if i.type == IncidentType.TRAIN_FAILURE})
