@@ -8,7 +8,16 @@ import { t } from '../i18n';
 
 export function StatusPill({ s }) {
   const idx = shownIndex(s);
-  const status = s.pending
+  const c = s.live?.counters;
+  const status = s.liveMode
+    ? s.pending
+      ? { cls: 'alert', text: t('Требуется решение') }
+      : s.planBroken
+        ? { cls: 'alert', text: t('План перестал выполняться') }
+        : s.disruptions.length
+          ? { cls: 'warn', text: t('Сбой на участке') }
+          : { cls: 'ok', text: t('Штатно') }
+    : s.pending
     ? { cls: 'alert', text: t('Сбой на участке — нужно решение') }
     : s.conflicts.length
       ? { cls: 'warn', text: t('Конфликтов в плане: {n}', { n: s.conflicts.length }) }
@@ -21,6 +30,11 @@ export function StatusPill({ s }) {
         <span className="sep" />
         <span className="muted-l">{t('качество')}</span>
         <b className={CAT_CLASS[idx.category]}>{idx.value.toFixed(0)}</b>
+        {c && (
+          <span className="st-counters muted-l" title={t('Строка статуса')}>
+            {t('в пути {a} · на станциях {b} · ожидают {c} · прибыли {d}', { a: c.in_transit, b: c.at_stations, c: c.waiting, d: c.arrived })}
+          </span>
+        )}
       </summary>
       <div className="quality-pop">
         <div className="pop-head">{t('Качество движения: {v} из 100', { v: idx.value.toFixed(0) })}</div>
@@ -42,6 +56,7 @@ export function StatusPill({ s }) {
 
 const SPEEDS = [
   { v: 1, label: '×1' },
+  { v: 10, label: '×10' },
   { v: 20, label: '×20' },
   { v: 60, label: '×60' },
 ];
@@ -51,7 +66,7 @@ export function ClockPill({ s, controls = false }) {
     return (
       <div className="clock-pill">
         <span className="mono time">{fmtHM(s.now)}</span>
-        <span className="clock-speed">{s.running ? `×${decisionHold(s) ? 1 : s.speed}` : t('пауза')}</span>
+        <span className="clock-speed">{s.running ? `×${s.live?.effectiveSpeed ?? (decisionHold(s) ? 1 : s.speed)}` : t('пауза')}</span>
         {decisionHold(s) && <span className="clock-hold">{t('ждём решения')}</span>}
       </div>
     );

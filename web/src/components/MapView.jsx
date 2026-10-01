@@ -11,9 +11,11 @@ import { blockSets, durationOf, isBlocking, ownTrack } from '../core/scheduler';
 import { CATEGORIES, edgeFraction, SECTION, stationName } from '../core/section';
 import { fmtHM } from '../core/time';
 import { isActive, runningPlan } from '../engine/engine';
-import { useSmoothNow } from '../engine/store';
+import { engine, useSmoothNow } from '../engine/store';
+import { can } from '../engine/roles';
 import { acceptsDrag, currentDragKind, EVENT_BY_KIND, readDragKind } from './EventPalette';
 import { useSize } from './ui';
+import { makeTrees, TreesLayer } from './MapScenery';
 import { t as tr, useLang } from '../i18n';
 
 const MIN_ZOOM = 0.8;
@@ -190,7 +192,47 @@ function trainPlace(p, geo, disruptions, t) {
   const own = ownTrack(p.dir);
   const track = SECTION.segments[seg].tracks >= 2 ? trackAt(closuresAt(disruptions, seg, t), own, f) : undefined;
   const pt = geo.onTrack(seg, track, f);
-  return { ...pt, s: pt.s ?? 1, angle: geo.segs[seg].angle, atStation: false, track, f, wrong: track !== undefined && track !== own };
+  return { ...pt, s: pt.s ?? 1, angle: geo.segs[seg].angle, atStation: false, seg, track, f, wrong: track !== undefined && track !== own };
+}
+
+const CAR_W = 11;
+const CAR_GAP = 2;
+
+/**
+ * Где стоит каждый вагон: путь от локомотива назад по рельсам — до станции, через неё и по предыдущему перегону.
+ * Возвращает смещение центра вагона от локомотива и его поворот, чтобы состав плавно повторял изгиб пути.
+ */
+function tailPoses(pl, dir, geo, scale, wagons) {
+  const own = ownTrack(dir);
+  const pts = [{ x: pl.x, y: pl.y }];
+  pts.push(geo.onTrack(pl.seg, pl.track, dir === 1 ? 0 : 1));
+  pts.push(geo.S[dir === 1 ? pl.seg : pl.seg + 1]);
+  const prev = dir === 1 ? pl.seg - 1 : pl.seg + 1;
+  if (prev >= 0 && prev < geo.segs.length) {
+    const tr = SECTION.segments[prev].tracks >= 2 ? own : undefined;
+    pts.push(geo.onTrack(prev, tr, dir === 1 ? 1 : 0));
+    pts.push(geo.onTrack(prev, tr, dir === 1 ? 0 : 1));
+  }
+  // Точка на расстоянии d назад от головы и направление движения в ней.
+  const at = (d) => {
+    let left = d;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1e-6) continue;
+      if (left <= len || i + 2 === pts.length) {
+        const k = Math.min(1, left / len);
+        return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, deg: (Math.atan2(a.y - b.y, a.x - b.x) * 180) / Math.PI };
+      }
+      left -= len;
+    }
+    return { x: pl.x, y: pl.y, deg: 0 };
+  };
+  return Array.from({ length: wagons }, (_, i) => {
+    const q = at((17.5 + i * (CAR_W + CAR_GAP)) * scale);
+    return { dx: q.x - pl.x, dy: q.y - pl.y, deg: q.deg };
+  });
 }
 
 export function MapView({ s, snapshot, selected, onSelect, armed, onPlace, allowEvents = false }) {
@@ -211,6 +253,7 @@ export function MapView({ s, snapshot, selected, onSelect, armed, onPlace, allow
   const flat = useMemo(() => geometry(L, view), [L, view]);
   const pr = useMemo(() => projector(w, h, tilt), [w, h, tilt]);
   const geo = useMemo(() => projectGeo(flat, pr), [flat, pr]);
+  const trees = useMemo(() => makeTrees(L, w, h), [L, w, h]);
 
   // Плавный переход 2D ↔ 3D.
   useEffect(() => {
@@ -412,7 +455,7 @@ export function MapView({ s, snapshot, selected, onSelect, armed, onPlace, allow
       <div
         className="map-ground"
         style={{
-          backgroundSize: `${46 * view.k}px ${46 * view.k}px`,
+          backgroundSize: `${260 * view.k}px ${260 * view.k}px`,
           backgroundPosition: `${view.x + w}px ${view.y + h}px`,
           transformOrigin: `${pr.cx + w}px ${pr.cy + h}px`,
           transform: `perspective(${CAMERA}px) rotateX(${tilt}rad)`,
@@ -420,6 +463,9 @@ export function MapView({ s, snapshot, selected, onSelect, armed, onPlace, allow
       />
       {tilt > 0.01 && <div className="map-fog" style={{ opacity: tilt / TILT_3D }} />}
       <svg width={w} height={h} className="map-svg" role="img" aria-label={tr('Карта участка')}>
+
+        {/* степь и рощи: в 3D деревья встают */}
+        <TreesLayer trees={trees} view={view} project={pr.fwd} lift={tilt / TILT_3D} w={w} h={h} />
 
         {/* перегоны: два пути, съезды между ними */}
         {SECTION.segments.map((g, i) => {
@@ -701,7 +747,7 @@ function TrainsLayer({ part, s, plan, snapshot, geo, selected, ahead, armed, tar
           </g>
         </g>
       )}
-      {placed.map(({ p, x, y, angle, atStation, wrong, s: k }) => {
+      {placed.map(({ p, x, y, angle, atStation, wrong, s: k, seg, track }) => {
         const train = trainById.get(p.trainId);
         if (atStation) {
           if (part !== 'top') return null;
@@ -747,7 +793,14 @@ function TrainsLayer({ part, s, plan, snapshot, geo, selected, ahead, armed, tar
           >
             <title>{`${train.number} · ${tr(CATEGORIES[train.category].name)}${wrong ? ` · ${tr('идёт по соседнему пути')}` : ''}`}</title>
             {part === 'body' ? (
-              <Consist deg={deg} color={color} wagons={WAGONS[train.category] ?? 4} scale={1.2 * k} />
+              <Consist
+                deg={deg}
+                color={color}
+                wagons={WAGONS[train.category] ?? 4}
+                scale={1.2 * k * (1 + 0.55 * (geo.pr.tilt / TILT_3D))}
+                lift={geo.pr.tilt / TILT_3D}
+                cars={seg !== undefined ? tailPoses({ x, y, seg, track }, p.dir, geo, 1.2 * k * (1 + 0.55 * (geo.pr.tilt / TILT_3D)), WAGONS[train.category] ?? 4) : null}
+              />
             ) : (
               <g transform={`translate(0 ${labelDy})`}>
                 <rect x={-23} y={-10} width={46} height={20} rx={10} className="train-label" />
@@ -764,16 +817,41 @@ function TrainsLayer({ part, s, plan, snapshot, geo, selected, ahead, armed, tar
 }
 
 /** Состав: локомотив с обтекаемой кабиной впереди и вагоны за ним, развёрнутый по направлению движения. */
-function Consist({ deg, color, wagons, scale }) {
-  const carW = 11;
-  const gap = 2;
+function Consist({ deg, color, wagons, scale, lift = 0, cars = null }) {
+  const carW = CAR_W;
+  const gap = CAR_GAP;
+  // Вагоны: по рельсам (cars — смещение и поворот каждого) или прямой линией за локомотивом.
+  const shapes = (roof) => (
+    <g>
+      {cars
+        ? cars.map((c, i) => (
+            <g key={i} transform={`translate(${c.dx} ${c.dy}) rotate(${c.deg}) scale(${scale})`}>
+              <rect x={-carW / 2} y={-4} width={carW} height={8} rx={2} fill={color} className={roof ? 'car' : 'car-side'} />
+            </g>
+          ))
+        : Array.from({ length: wagons }, (_, i) => (
+            <g key={i} transform={`rotate(${deg}) scale(${scale})`}>
+              <rect x={-10 - (i + 1) * (carW + gap)} y={-4} width={carW} height={8} rx={2} fill={color} className={roof ? 'car' : 'car-side'} />
+            </g>
+          ))}
+      <g transform={`rotate(${deg}) scale(${scale})`}>
+        <path d="M-10 -5 H6 Q12 -5 12 0 Q12 5 6 5 H-10 Z" fill={color} className={roof ? 'loco' : 'car-side'} />
+        {roof && <rect x={4} y={-3} width={3.5} height={6} rx={1.5} className="cab" />}
+      </g>
+    </g>
+  );
+  if (lift < 0.05) return <g className="consist">{shapes(true)}</g>;
+  // 3D: стенки вагонов — несколько затемнённых слоёв, крыша поднята над рельсами.
+  const H = 7 * scale * lift;
   return (
-    <g transform={`rotate(${deg}) scale(${scale})`} className="consist">
-      {Array.from({ length: wagons }, (_, i) => (
-        <rect key={i} x={-10 - (i + 1) * (carW + gap)} y={-4} width={carW} height={8} rx={2} fill={color} className="car" />
+    <g className="consist c3d">
+      <g className="car-base">{shapes(false)}</g>
+      {[1, 2, 3].map((i) => (
+        <g key={i} transform={`translate(0 ${(-H * i) / 4})`} style={{ filter: `brightness(${0.6 + i * 0.07})` }}>
+          {shapes(false)}
+        </g>
       ))}
-      <path d="M-10 -5 H6 Q12 -5 12 0 Q12 5 6 5 H-10 Z" fill={color} className="loco" />
-      <rect x={4} y={-3} width={3.5} height={6} rx={1.5} className="cab" />
+      <g transform={`translate(0 ${-H})`}>{shapes(true)}</g>
     </g>
   );
 }
@@ -855,10 +933,13 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
         const from = SECTION.stations[g.from].km;
         const to = SECTION.stations[g.to].km;
         // Занятость: с сервера — по данным поля, в демо — по положению поездов и перекрытиям.
-        const liveSeg = s.live?.segments?.[g.specId];
         const occ = new Set();
-        if (liveSeg) for (const id of liveSeg.occupied_blocks ?? []) occ.add(`${id}:s`);
-        else {
+        if (s.live?.blocks) {
+          for (const b of blocks) {
+            const lb = s.live.blocks[b.id];
+            if (lb?.occupied_by || lb?.obstacle) occ.add(`${b.id}:s`);
+          }
+        } else {
           for (const p of positions) {
             if (p.station !== undefined || p.km <= from || p.km >= to) continue;
             const fr = (p.km - from) / (to - from || 1);
@@ -874,7 +955,10 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
             for (const b of blocks) if (Math.max(a, c) > b.f0 && Math.min(a, c) < b.f1) for (const tr of trs) occ.add(`${b.id}:${tr}`);
           }
         }
-        const dirLive = liveSeg?.direction ?? null;
+        const dirInfo = s.live?.directions?.[g.specId];
+        const dirLive = dirInfo?.direction ?? null;
+        // С сервером диспетчер меняет направление кликом по стрелке (POST /api/dc/direction, только свободный перегон).
+        const canTurn = s.liveMode && can(s.user, 'section') && !dirInfo?.changing;
         const { u, n } = flat.segs[i];
         const at = (fr, track, off) => {
           const c = flat.onTrack(i, track, fr);
@@ -935,8 +1019,17 @@ function AutoBlockLayer({ s, plan, t, geo, flat }) {
               const w1 = { x: tip.x - u.x * 5 * z * sgn + n.x * 3.5 * z, y: tip.y - u.y * 5 * z * sgn + n.y * 3.5 * z };
               const w2 = { x: tip.x - u.x * 5 * z * sgn - n.x * 3.5 * z, y: tip.y - u.y * 5 * z * sgn - n.y * 3.5 * z };
               return (
-                <g className="ab-dir">
-                  <title>{tr('Установленное направление автоблокировки')}</title>
+                <g
+                  className={`ab-dir ${canTurn ? 'turnable' : ''} ${dirInfo?.changing ? 'changing' : ''} ${dirInfo?.manual ? 'manual' : ''}`}
+                  onPointerDown={canTurn ? (e) => e.stopPropagation() : undefined}
+                  onClick={canTurn ? (e) => { e.stopPropagation(); engine.setDirection(i, dirLive === 'odd' ? 'even' : 'odd'); } : undefined}
+                >
+                  <title>
+                    {tr('Установленное направление автоблокировки')}
+                    {dirInfo?.changing ? ` · ${tr('меняется')}` : dirInfo?.manual ? ` · ${tr('задано диспетчером')}` : ''}
+                    {canTurn ? ` · ${tr('клик — сменить направление')}` : ''}
+                  </title>
+                  <circle cx={c.x} cy={c.y} r={L + 4} className="ab-dir-hit" />
                   <line x1={tail.x} y1={tail.y} x2={tip.x} y2={tip.y} />
                   <path d={`M${tip.x} ${tip.y} L${w1.x} ${w1.y} L${w2.x} ${w2.y} Z`} />
                 </g>

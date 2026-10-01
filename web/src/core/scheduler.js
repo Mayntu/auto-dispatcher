@@ -115,7 +115,33 @@ function speedLimitAt(ctx, seg, t) {
   }
   return v;
 }
+/**
+ * Указания диспетчера (ctx.pins): закреплённое время на раздельном пункте.
+ * dep — поезд отправляется не раньше этого времени; arr — время хода по перегону до пункта подбирается так,
+ * чтобы прибыть в это время (в пределах от минимального хода до 1,3 обычного), holdDep — отправление остаётся на месте.
+ */
+const pinsOf = (ctx, trainId, station) => (ctx.pins ?? []).filter((p) => p.trainId === trainId && p.station === station);
+/** Пункт, к которому поезд идёт по перегону seg. */
+const arrivalStation = (train, seg) => (train.dir === 1 ? seg + 1 : seg);
+/** Минимальное время хода: на максимальной скорости, без запаса на разгон и замедление. */
+export function minRunTime(ctx, train, seg, enter) {
+  const s = ctx.section.segments[seg];
+  const v = Math.min(effectiveVmax(train), s.vmax, speedLimitAt(ctx, seg, enter));
+  return Math.round((s.lengthKm / v) * 3600);
+}
+/** Обычное время хода и границы, в которых диспетчер может его менять. */
+export function runLimits(ctx, train, seg, enter) {
+  const normal = baseRunTime(ctx, train, seg, enter);
+  return { min: Math.min(normal, minRunTime(ctx, train, seg, enter)), normal, max: Math.round(normal * 1.3) };
+}
 export function runTime(ctx, train, seg, enter) {
+  const base = baseRunTime(ctx, train, seg, enter);
+  const pin = pinsOf(ctx, train.id, arrivalStation(train, seg)).find((p) => p.kind === 'arr');
+  if (!pin) return base;
+  const min = Math.min(base, minRunTime(ctx, train, seg, enter));
+  return Math.round(Math.min(Math.round(base * 1.3), Math.max(min, pin.time - enter)));
+}
+function baseRunTime(ctx, train, seg, enter) {
   const s = ctx.section.segments[seg];
   const v = Math.min(effectiveVmax(train), s.vmax, speedLimitAt(ctx, seg, enter));
   let t = (s.lengthKm / v) * 3600 + RUN_MARGIN;
@@ -142,7 +168,13 @@ function anchorValue(ctx, trainId, kind, k) {
   return v;
 }
 function depLowerBound(ctx, train, k) {
-  return Math.max(anchorValue(ctx, train.id, 'stop', k), k === 0 ? anchorValue(ctx, train.id, 'origin', 0) : -Infinity);
+  let v = Math.max(anchorValue(ctx, train.id, 'stop', k), k === 0 ? anchorValue(ctx, train.id, 'origin', 0) : -Infinity);
+  const station = routeOf(ctx.section, train)[k];
+  for (const p of pinsOf(ctx, train.id, station)) {
+    if (p.kind === 'dep') v = Math.max(v, p.time);
+    if (p.kind === 'arr' && p.holdDep !== undefined) v = Math.max(v, p.holdDep);
+  }
+  return v;
 }
 const isPlannedStop = (train, station) => train.stops.includes(station);
 function baselineDep(ctx, trainId, k) {

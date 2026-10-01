@@ -4,7 +4,7 @@
  *
  * Время: на сервере sim_time — секунды от SIM_EPOCH, в интерфейсе — секунды от полуночи.
  */
-import { impactsOf, prosCons } from '../core/planner';
+import { impactsOf, prosCons, stepsOf } from '../core/planner';
 import { destDelayMin } from '../core/qualityIndex';
 import { SECTION } from '../core/section';
 
@@ -111,6 +111,97 @@ export function planFromSpec(plan, trains) {
   };
 }
 
+// ───────────── указания диспетчера и ручное изменение ─────────────
+/** Pin сервера → указание интерфейса. */
+export function pinFromSpec(p) {
+  return {
+    id: p.id,
+    trainId: p.train_id,
+    station: stIdx().get(p.station_id),
+    kind: p.kind,
+    time: toUi(p.time),
+    createdAt: toUi(p.created_at),
+    status: p.status,
+    reason: p.reason ?? null,
+    description: p.description,
+  };
+}
+const boundFromSpec = (b) =>
+  b && {
+    current: toUi(b.current),
+    min: toUi(b.min),
+    max: toUi(b.max),
+    minReason: b.min_reason,
+    maxReason: b.max_reason,
+    locked: b.locked,
+    lockedReason: b.locked_reason,
+  };
+/** BoundsResponse → границы точки для перетаскивания. */
+export function boundsFromSpec(r) {
+  const i = r.info ?? {};
+  return {
+    basePlanVersion: r.base_plan_version,
+    pointType: r.point_type,
+    arr: boundFromSpec(r.arr),
+    dep: boundFromSpec(r.dep),
+    info: {
+      minDwell: i.min_dwell_s ?? 0,
+      prevDep: toUi(i.prev_dep ?? null),
+      prevStation: i.prev_station_id ? stIdx().get(i.prev_station_id) : null,
+      run: i.min_run_s != null ? { min: i.min_run_s, max: i.max_run_s, lengthKm: (i.segment_length_m ?? 0) / 1000, vmax: i.v_max_kmh } : null,
+      schedArr: toUi(i.sched_arr ?? null),
+      schedDep: toUi(i.sched_dep ?? null),
+      pin: i.pin ? pinFromSpec(i.pin) : null,
+    },
+  };
+}
+/** PreviewResponse → прогноз: нитки затронутых поездов накладываются на действующий план. */
+export function previewFromSpec(r, plan, trains, at = null) {
+  const idx = stIdx();
+  const out = { ...plan.trains };
+  for (const th of r.threads ?? []) {
+    const cur = plan.trains[th.train_id]?.stops ?? [];
+    const byStation = new Map(th.points.map((pt) => [idx.get(pt.station_id), pt]));
+    out[th.train_id] = {
+      ...(plan.trains[th.train_id] ?? { trainId: th.train_id }),
+      stops: cur.map((st) => {
+        const pt = byStation.get(st.station);
+        if (!pt) return st;
+        const arr = toUi(pt.arr ?? pt.dep);
+        const dep = toUi(pt.dep ?? pt.arr);
+        return { ...st, arr, dep };
+      }),
+    };
+  }
+  const num = new Map(trains.map((t) => [t.id, t.number]));
+  const kmOf = (res) => {
+    const g = SECTION.segments.find((x) => x.specId === res);
+    if (g) return (SECTION.stations[g.from].km + SECTION.stations[g.to].km) / 2;
+    const st = SECTION.stations.find((x) => x.specId === res || res?.startsWith?.(`${x.specId}:`));
+    return st?.km ?? 0;
+  };
+  const d = r.dragged ?? {};
+  return {
+    time: toUi(r.time),
+    clamped: r.clamped,
+    dragged: { arr: toUi(d.arr ?? null), dep: toUi(d.dep ?? null), dwell: d.dwell_s ?? 0, prevRun: d.prev_run_s ?? null },
+    plan: { ...plan, trains: out },
+    changed: (r.affected ?? []).map((a) => ({ trainId: a.train_id, number: num.get(a.train_id) ?? a.train_id, deltaFinal: a.delta_final_s, deltaMax: a.delta_max_s })),
+    // Конфликт сервера — {kind, trains, text} без места и времени: маркер ставим в перетаскиваемую точку.
+    conflicts: (r.conflicts ?? []).map((c) => ({
+      time: c.time_from != null ? toUi(c.time_from) : toUi(r.time),
+      km: c.resource_id ? kmOf(c.resource_id) : (at?.km ?? 0),
+      trains: c.trains,
+      kind: c.kind,
+      text: c.text,
+    })),
+    index: { value: r.index_forecast },
+    deltaIndex: r.delta_index ?? 0,
+    totalDelayDelta: (r.total_delay_delta_s ?? 0) / 60,
+    ms: r.compute_ms,
+  };
+}
+
 // ───────────── индекс ─────────────
 const CAT = { norm: 'norm', attention: 'warn', critical: 'crit' };
 const fmtRaw = (v) => (Math.abs(v) >= 100 ? Math.round(v).toLocaleString('ru-RU') : (Math.round(v * 10) / 10).toString());
@@ -154,8 +245,9 @@ export function disruptionFromSpec(d, now) {
   if (g) {
     const from = SECTION.stations[g.from].km;
     const at = d.km != null ? (d.km - from) * 1000 : g.length / 2;
-    const p0 = d.type === 'speed_restriction' ? Number(d.params?.from_m ?? at - 500) : at - 500;
-    const p1 = d.type === 'speed_restriction' ? Number(d.params?.to_m ?? at + 500) : at + 500;
+    const warn = d.type === 'speed_restriction' && d.params?.km_from != null;
+    const p0 = warn ? (Math.min(d.params.km_from, d.params.km_to) - from) * 1000 : at - 500;
+    const p1 = warn ? (Math.max(d.params.km_from, d.params.km_to) - from) * 1000 : at + 500;
     // Позиции на ребре считаются от его start_node.
     posStart = Math.max(0, Math.round(g.reversed ? g.length - p1 : p0));
     posEnd = Math.min(g.length, Math.round(g.reversed ? g.length - p0 : p1));
@@ -175,7 +267,7 @@ export function disruptionFromSpec(d, now) {
     durMin: d.est_min_s,
     durMax: d.est_max_s,
     durExpected: d.est_expected_s ?? Math.round((d.est_min_s + d.est_max_s) / 2),
-    speedLimit: kind === 'signal' ? Number(d.params?.speed_kmh ?? 20) : undefined,
+    speedLimit: kind === 'signal' ? Number(d.params?.v_kmh ?? d.params?.speed_kmh ?? 20) : undefined,
     anchors: [],
     resolvedAt,
     note: d.description,
@@ -197,6 +289,12 @@ export function variantsFromSpec(payload, ctx) {
     const robustExtra = k.robust_total_delay_s != null ? Math.max(0, k.robust_total_delay_s - k.total_delay_s) / 60 : 0;
     return {
       id: v.id,
+      // Рекомендацию ставит сервер по единому мерилу score (§27.5) — ровно одна карточка.
+      recommended: !!v.recommended,
+      score: v.score,
+      kind: v.kind ?? 'incident',
+      status: v.status,
+      updatedAt: toUi(v.updated_at),
       specStrategy: v.strategy,
       strategy: STRATEGY[v.strategy] ?? v.strategy,
       title: v.title,
@@ -205,7 +303,9 @@ export function variantsFromSpec(payload, ctx) {
       // Индекс при максимальной длительности сбоя сервер не присылает — оцениваем по приросту опоздания.
       worstIndex: Math.max(0, index.value - robustExtra * 0.5),
       robustExtraMin: k.robust_total_delay_s != null ? robustExtra : null,
-      conflicts: k.conflicts ?? 0,
+      // kpi.conflicts у сервера в MVP — вынужденные остановки (CLAUDE.md, «Индекс: conflicts»), а не конфликты:
+      // план решателя без пересечений по построению. Остановки идут отдельным полем unplannedStops.
+      conflicts: 0,
       weightedDelayMin: (k.weighted_delay_s ?? 0) / 60,
       passengerDelayMin: trains.filter((t) => t.category !== 'freight' && t.category !== 'freightFast').reduce((s, t) => s + destDelayMin(plan, baseline, t.id), 0),
       impacts: prev ? impactsOf(prev, plan, baseline, trains) : [],
@@ -218,6 +318,7 @@ export function variantsFromSpec(payload, ctx) {
       basePlanVersion: v.base_plan_version,
       solveMs: v.plan.solve_ms,
       explanation: ['', ...(v.explanation ?? [])],
+      steps: prev ? stepsOf(prev, plan, trains) : [],
       wins: [],
     };
   });
@@ -235,7 +336,7 @@ export function whatIfFromSpec(r, ctx) {
     trains: ctx.trains,
     index: indexFromSpec(r.plan.index),
     deltaIndex: r.delta_index,
-    conflicts: r.plan.kpi?.conflicts ?? 0,
+    conflicts: 0, // kpi.conflicts — вынужденные остановки, см. variantsFromSpec
     affected: r.per_train.map((x) => ({ trainId: x.train_id, number: x.train_id, deltaMin: x.arr_delta_s / 60, delayMin: x.final_delay_s / 60 })),
     changedMeetings: (r.changed_meetings ?? []).map((m) => ({ ...m, time: toUi(m.time) })),
     explanation: r.explanation ?? [],
@@ -261,7 +362,36 @@ export function fieldFromSpec(f) {
     t: toUi(f.sim_time),
     trains,
     signals: Object.fromEntries((f.signals ?? []).map((s) => [s.id, s.aspect])),
-    segments: Object.fromEntries((f.segments ?? []).map((s) => [s.segment_id, s])),
+    /** Блок-участки: id → {occupied_by, obstacle}. */
+    blocks: Object.fromEntries((f.blocks ?? []).map((b) => [b.id, b])),
+    /** Установленное направление перегона: segment_id → {direction: odd|even|null, changing}. */
+    directions: f.directions ?? {},
+    counters: f.counters ?? null,
+    closedSegments: f.closed_segments ?? [],
+    speed: f.speed,
+    effectiveSpeed: f.effective_speed ?? f.speed,
+    paused: !!f.paused,
+    decisionHold: !!f.decision_hold,
+    planVersion: f.plan_version,
     safetyViolations: f.safety_violations ?? 0,
   };
 }
+
+/** Фактические нитки ГИД из снимка сервера: {train_id: [[t, km], …]} → время интерфейса. */
+export const factFromSpec = (fact) =>
+  Object.fromEntries(Object.entries(fact ?? {}).map(([id, pts]) => [id, pts.map(([t, km]) => [toUi(t), km])]));
+
+/** Запись журнала решений сервера (JournalEntry) → строка журнала интерфейса. */
+const JOURNAL_LEVEL = {
+  incident_created: 'crit',
+  plan_broken: 'crit',
+  signal_stop: 'warn',
+  variants_proposed: 'warn',
+  variants_stale: 'warn',
+  decision_hold: 'warn',
+  guard_replan: 'warn',
+  variant_applied: 'ok',
+  incident_resolved: 'ok',
+  no_decision_needed: 'ok',
+};
+export const journalFromSpec = (e) => ({ id: e.id, t: toUi(e.time), level: JOURNAL_LEVEL[e.kind] ?? 'info', text: e.text, source: 'Сервер', kind: e.kind });

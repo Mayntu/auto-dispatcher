@@ -97,7 +97,8 @@ function Calm({ s }) {
 }
 
 export function ActiveEvents({ s, editable }) {
-  const list = s.disruptions.filter((d) => d.resolvedAt === undefined && s.now < d.start + d.durMax).reverse();
+  // С сервером в списке ровно активные сбои поля (field.state.incidents), даже если затянулись дольше оценки.
+  const list = s.disruptions.filter((d) => d.resolvedAt === undefined && (s.liveMode || s.now < d.start + d.durMax)).reverse();
   if (!list.length) return null;
   return (
     <section className="events">

@@ -1,83 +1,144 @@
 /**
- * Работа с бэкендом команды. Движок перестаёт считать сам и становится «зеркалом» сервера — как второй экран
- * зеркалит ведущий: состояние приходит потоком событий, действия интерфейса уходят командами в REST.
- * Компоненты при этом не меняются: они читают то же состояние движка.
+ * Работа с бэкендом команды (docs/frontend-contract.md). Движок перестаёт считать сам и становится «зеркалом»
+ * сервера: состояние приходит потоком WS (snapshot + конверты), действия интерфейса уходят командами в REST.
+ * Компоненты читают то же состояние движка, что и в демо.
  */
 import {
   baselineFromTimetable,
   disruptionFromSpec,
+  factFromSpec,
   fieldFromSpec,
   indexFromSpec,
+  journalFromSpec,
   planFromSpec,
-  setEpoch,
   SPEC_TYPE,
-  toServer,
-  toUi,
   trainFromSpec,
   variantsFromSpec,
   whatIfFromSpec,
+  boundsFromSpec,
+  pinFromSpec,
+  previewFromSpec,
+  toServer,
 } from '../api/adapter';
+import { fmtHM } from '../core/time';
 import { api, connectStream } from '../api/backend';
 import { m } from '../i18n/msg';
 import { SECTION } from '../core/section';
 import { shownIndex } from './engine';
 
-const LEVEL = { true: 'info', false: 'warn' };
 let uidSeq = 0;
 const uid = (p) => `${p}${Date.now().toString(36)}${(++uidSeq).toString(36)}`;
+const LATENCY_REPORT_MS = 5000;
+const FACT_STEP_S = 15;
+const FACT_WINDOW_S = 3 * 3600;
 
 export function startLive(engine) {
   engine.stop();
-  let trains = [];
-  let baseline = null;
-  let whatIfTimer = null;
-  let whatIfRequest = null;
+  const trains = (SECTION.server?.timetable ?? []).map(trainFromSpec);
+  const baseline = baselineFromTimetable(trains);
   const latency = [];
-  const fact = {};
+  let fact = {};
+  let incidentsKey = '';
+  const journalSeen = new Set();
+  let manualBase = null;
 
   const st = () => engine.getState();
   const ctx = () => ({ trains, baseline, prev: st().plan, disruptions: st().disruptions });
 
+  engine.set({ trains, baseline, connection: 'connecting', liveMode: true });
+
   // ───────────── входящий поток ─────────────
-  const setTrains = (specTrains) => {
-    trains = specTrains.map(trainFromSpec);
-    baseline = baselineFromTimetable(trains);
-    engine.set({ trains, baseline });
-  };
   const setPlan = (plan) => {
     const p = planFromSpec(plan, trains);
-    if (p) engine.set({ plan: p, conflicts: [], metrics: { ...st().metrics, lastReplanMs: plan.solve_ms ?? 0 } });
-    return p;
+    if (p) engine.set({ plan: p, conflicts: [] });
+    // Указания диспетчера приходят вместе с планом (§6.4).
+    if (plan?.pins) engine.set({ pins: plan.pins.map(pinFromSpec) });
   };
+  const setIndex = (k) => {
+    if (!k) return;
+    engine.set({
+      index: indexFromSpec(k.index),
+      kpi: k.kpi,
+      planBroken: !!k.plan_broken,
+      forecastOk: k.forecast_ok !== false,
+      metrics: { ...st().metrics, lastReplanMs: k.last_solve_ms ?? st().metrics.lastReplanMs },
+    });
+  };
+  /** planner.variants заменяет пачку целиком; пустая пачка — «Активных решений нет». */
   const setVariants = (payload) => {
-    if (!payload) return;
+    if (!payload) return engine.set({ pending: undefined });
     const variants = variantsFromSpec(payload, ctx());
-    if (!variants.length) {
-      engine.set({ pending: undefined });
-      return;
-    }
     const prev = st().pending;
+    if (!variants.length) {
+      // Все карточки устарели без решения — сервер сам пересчитывает (§27.5), показываем «считаем».
+      // Если хоть одна применена или отклонена, остальные тоже помечаются stale: решение принято, карточки уходят в журнал.
+      const list = payload.variants ?? [];
+      const stale = list.length > 0 && list.every((v) => v.status === 'stale');
+      return engine.set({ pending: stale ? { ...(prev ?? {}), id: prev?.id ?? uid('R'), status: 'computing', variants: [], disruptionIds: payload.incident_ids ?? [] } : undefined });
+    }
+    const sameBatch = prev?.status === 'ready' && variants.every((v) => prev.variants.some((x) => x.id === v.id));
     engine.set({
       pending: {
-        id: prev?.status === 'ready' && prev.variants.every((v) => variants.some((x) => x.id === v.id)) ? prev.id : uid('R'),
-        createdAt: prev?.createdAt ?? st().now,
+        id: sameBatch ? prev.id : uid('R'),
+        createdAt: sameBatch ? prev.createdAt : st().now,
         status: 'ready',
         variants,
         disruptionIds: payload.incident_ids ?? [],
         basePlanVersion: payload.base_plan_version,
         solveMs: payload.solve_ms,
+        notice: sameBatch ? prev.notice : undefined,
       },
       metrics: { ...st().metrics, lastVariantsMs: payload.solve_ms ?? st().metrics.lastVariantsMs },
     });
   };
-  const upsertIncident = (d) => {
-    const x = disruptionFromSpec(d, st().now);
-    if (!x) return null;
-    engine.set({ disruptions: [...st().disruptions.filter((y) => y.id !== x.id), x] });
-    return x;
+  /** Активные сбои — из field.state (источник правды); пересобираем, только если список изменился. */
+  const setIncidents = (list) => {
+    const key = JSON.stringify(list ?? []);
+    if (key === incidentsKey) return;
+    incidentsKey = key;
+    engine.set({ disruptions: (list ?? []).map((d) => disruptionFromSpec(d, st().now)).filter(Boolean) });
+  };
+  const addJournal = (entries) => {
+    const fresh = entries.filter((e) => e && !journalSeen.has(e.id));
+    if (!fresh.length) return;
+    for (const e of fresh) journalSeen.add(e.id);
+    const rows = fresh.map(journalFromSpec).sort((a, b) => b.t - a.t);
+    const applied = fresh
+      .filter((e) => e.kind === 'variant_applied')
+      .map((e) => ({ id: e.id, t: rows.find((r) => r.id === e.id).t, title: e.text, strategy: e.strategy, indexBefore: shownIndex(st()).value, indexAfter: shownIndex(st()).value, weightedDelayMin: 0, by: 'Сервер', auto: false }));
+    engine.set({ log: [...rows, ...st().log].slice(0, 800), decisions: [...applied, ...st().decisions] });
+  };
+  /** Нитка «факт» ГИД: снимок сервера + точки из field.state (тот же шаг, что у сервера). */
+  const trackFact = (f) => {
+    let changed = false;
+    for (const tr of f.trains) {
+      const arr = fact[tr.trainId] ?? (fact[tr.trainId] = []);
+      const last = arr[arr.length - 1];
+      if (!last || f.t - last[0] >= FACT_STEP_S || (tr.km !== last[1] && f.t > last[0])) {
+        arr.push([f.t, tr.km]);
+        while (arr.length && arr[0][0] < f.t - FACT_WINDOW_S) arr.shift();
+        changed = true;
+      }
+    }
+    if (changed) engine.set({ factTrack: { ...fact } });
+  };
+  const onField = (p) => {
+    const f = fieldFromSpec(p);
+    engine.lastReal = performance.now();
+    setIncidents(p.incidents);
+    engine.set({
+      now: f.t,
+      running: !f.paused,
+      speed: f.speed ?? st().speed,
+      live: f,
+      connection: 'online',
+      safetyViolations: f.safetyViolations,
+    });
+    trackFact(f);
+    engine.bus.emit('tick', f.t);
   };
 
-  const onEnvelope = (env) => {
+  const onMessage = (env) => {
     const p = env.payload;
     if (env.ts_wall) {
       const ms = Date.now() - env.ts_wall * 1000;
@@ -88,86 +149,45 @@ export function startLive(engine) {
     }
     switch (env.type) {
       case 'snapshot':
-        if (p.sim_epoch) setEpoch(p.sim_epoch);
-        if (p.trains) setTrains(p.trains);
+        fact = factFromSpec(p.fact);
+        engine.set({ factTrack: { ...fact } });
         if (p.plan) setPlan(p.plan);
-        if (p.index) engine.set({ index: indexFromSpec(p.index) });
-        if (p.incidents) for (const d of p.incidents) upsertIncident(d);
-        if (p.variants !== undefined) setVariants(p.variants);
-        if (p.scenarios) engine.set({ scenarios: p.scenarios });
-        if (p.field) onEnvelope({ type: 'field.state', payload: p.field });
+        setIndex(p.index);
+        setVariants(p.variants);
+        addJournal(p.journal ?? []);
+        if (p.field) onField(p.field);
         return;
-      case 'field.state': {
-        const f = fieldFromSpec(p);
-        engine.lastReal = performance.now();
-        // Нитка «факт» на ГИД: точка при заметном сдвиге или раз в 20 с модельного времени, за последние 4 ч.
-        let changed = false;
-        for (const tr of f.trains) {
-          const arr = fact[tr.trainId] ?? (fact[tr.trainId] = []);
-          const last = arr[arr.length - 1];
-          if (!last || f.t - last[0] >= 20 || Math.abs(tr.km - last[1]) > 0.3) {
-            arr.push([f.t, tr.km]);
-            while (arr.length && arr[0][0] < f.t - 4 * 3600) arr.shift();
-            changed = true;
-          }
-        }
-        engine.set({
-          now: f.t,
-          running: !p.paused,
-          speed: p.speed ?? st().speed,
-          live: f,
-          connection: 'online',
-          safetyViolations: Math.max(st().safetyViolations ?? 0, f.safetyViolations),
-          ...(changed ? { factTrack: { ...fact } } : {}),
-        });
+      case 'field.state':
+        onField(p);
         return;
-      }
       case 'kpi.index':
-        engine.set({ index: indexFromSpec(p) });
+        setIndex(p);
         return;
       case 'plan.approved':
-      case 'plan.refreshed': {
-        const plan = setPlan(p);
-        if (env.type === 'plan.approved' && plan)
-          engine.log('ok', m('План v{v} утверждён, пересчитан за {ms} мс', { v: p.version, ms: p.solve_ms ?? 0 }), 'Планировщик');
+      case 'plan.refreshed':
+        setPlan(p);
         return;
-      }
       case 'planner.variants':
         setVariants(p);
-        if (p.variants?.some((v) => v.status === 'proposed'))
-          engine.log('warn', m('Готово вариантов: {n} за {ms} мс', { n: p.variants.filter((v) => v.status === 'proposed').length, ms: Math.round(p.solve_ms ?? 0) }), 'Планировщик');
+        return;
+      case 'journal.entry':
+        addJournal([p]);
+        return;
+      case 'incident.created':
+        // Пока сервер считает варианты — диспетчер видит «Подбираю варианты…».
+        if (!st().pending) engine.set({ pending: { id: uid('R'), createdAt: st().now, status: 'computing', variants: [], disruptionIds: [p.id] } });
         return;
       case 'planner.metrics':
         if (p.solve_ms !== undefined) engine.set({ metrics: { ...st().metrics, lastVariantsMs: p.solve_ms } });
         return;
-      case 'planner.whatif.result':
-        if (st().whatIf && (!whatIfRequest || env.corr_id === whatIfRequest || p.request_id === whatIfRequest))
-          engine.set({ whatIf: { ...st().whatIf, result: whatIfFromSpec(p, ctx()) } });
-        return;
-      case 'incident.created': {
-        const d = upsertIncident(p);
-        if (d) {
-          engine.log('crit', d.description, 'ДЦ');
-          // Пока сервер считает варианты — диспетчер видит «Подбираю варианты…».
-          if (!st().pending) engine.set({ pending: { id: uid('R'), createdAt: st().now, status: 'computing', variants: [], disruptionIds: [d.id] } });
-        }
+      case 'planner.pin_violated': {
+        const pin = pinFromSpec(p.pin ?? p);
+        engine.set({ pins: (st().pins ?? []).map((x) => (x.id === pin.id ? { ...pin, status: 'violated', reason: p.reason } : x)) });
+        engine.toast(m('Указание по {n} невыполнимо: {r}', { n: pin.trainId, r: p.reason ?? '' }), 'crit', { pinId: pin.id, trainId: pin.trainId });
         return;
       }
-      case 'incident.updated':
-        upsertIncident(p);
-        engine.log('info', m('Уточнено: {d}', { d: p.description }), 'ДЦ');
-        return;
-      case 'incident.resolved':
-        upsertIncident(p);
-        engine.log('ok', m('Устранено: {kind}', { kind: p.description }), 'ДЦ');
-        return;
-      case 'dc.log':
-      case 'dc.command_result':
-        engine.log(LEVEL[p.ok !== false], p.reason && p.ok === false ? `${p.command}: ${p.reason}` : p.command, p.actor ?? 'ДЦ');
-        return;
       case 'safety.violation':
         engine.log('crit', m('Нарушение безопасности: {d}', { d: typeof p === 'string' ? p : JSON.stringify(p) }), 'Безопасность');
-        engine.set({ safetyViolations: (st().safetyViolations ?? 0) + 1 });
         return;
       default:
     }
@@ -175,27 +195,27 @@ export function startLive(engine) {
 
   // ───────────── команды интерфейса → сервер ─────────────
   const ok = (r, what) => {
-    if (!r.ok) engine.log('warn', m('Сервер отклонил команду «{what}» ({code})', { what: m(what), code: r.status }), 'Сервер');
+    if (!r.ok) engine.log('warn', m('Сервер отклонил «{what}» ({code}): {detail}', { what: m(what), code: r.status, detail: r.detail ?? '' }), 'Сервер');
     return r.ok;
   };
+  const unsupported = (what) => engine.log('warn', m('«{what}» пока нет в API сервера (docs/backend-issues.md)', { what: m(what) }), 'Сервер');
   const commands = {
     async applyVariant(variantId) {
       if (!engine.allowed('section', 'утверждение плана')) return;
       const s = st();
       const v = s.pending?.variants.find((x) => x.id === variantId);
       if (!v) return;
-      const before = shownIndex(s).value;
       const r = await api.apply(variantId, v.basePlanVersion ?? s.pending.basePlanVersion);
       if (r.status === 409) {
-        // Вариант устарел — сервер уже пересчитывает варианты (§12.1).
-        engine.set({ pending: { ...st().pending, notice: m('Вариант устарел — план уже изменился, пересчитываю варианты…') } });
-        engine.log('warn', m('Вариант «{title}» устарел', { title: v.title }), 'Планировщик');
+        // Вариант устарел — сервер уже пересчитывает варианты (§12.1), это нормально.
+        if (st().pending) engine.set({ pending: { ...st().pending, notice: r.detail ?? m('Вариант устарел — план уже изменился, пересчитываю варианты…') } });
         return;
       }
       if (!ok(r, 'утверждение плана')) return;
-      const decision = { id: uid('S'), t: s.now, title: v.title, strategy: v.strategy, indexBefore: before, indexAfter: v.index.value, weightedDelayMin: v.weightedDelayMin, by: engine.actor(), auto: false };
-      engine.set({ decisions: [decision, ...st().decisions], pending: undefined });
-      engine.log('ok', m('Утверждён вариант «{title}»: индекс {a} → {b}', { title: v.title, a: before, b: v.index.value }), engine.actor());
+      if (s.pending?.source === 'manual') engine.toast(m('Указание: {d}', { d: s.pending.manual.description }));
+    },
+    async rejectVariant(variantId) {
+      if (engine.allowed('section', 'отклонение варианта')) ok(await api.reject(variantId), 'отклонение варианта');
     },
     async inject(specs) {
       if (!engine.allowed('scenario', 'создание события')) return;
@@ -203,105 +223,167 @@ export function startLive(engine) {
         const g = sp.segment !== undefined ? SECTION.segments[sp.segment] : null;
         const from = g ? SECTION.stations[g.from].km : null;
         const at = sp.pos ?? (g ? g.length / 2 : 0);
-        const type = SPEC_TYPE[sp.kind];
+        const onSeg = g && sp.kind !== 'breakdown' && sp.kind !== 'delay';
+        const kmAt = (m) => Math.round((from + (g.reversed ? g.length - m : m) / 1000) * 100) / 100;
+        // Предупреждение — отрезок ±1.5 км вокруг точки броска, в пределах перегона.
+        const warning = onSeg && sp.kind === 'signal' ? { km_from: kmAt(Math.max(0, at - 1500)), km_to: kmAt(Math.min(g.length, at + 1500)), v_kmh: sp.speedLimit ?? 40 } : {};
         ok(
           await api.createIncident({
-            type,
-            segment_id: g?.specId ?? null,
-            km: g ? Math.round((from + at / 1000) * 100) / 100 : null,
+            type: SPEC_TYPE[sp.kind],
+            segment_id: onSeg ? g.specId : null,
+            km: onSeg ? Math.round((from + (g.reversed ? g.length - at : at) / 1000) * 100) / 100 : null,
             train_id: sp.trainId ?? null,
-            started_at: sp.start !== undefined ? toServer(sp.start) : toServer(st().now),
-            est_min_s: sp.minMin * 60,
-            est_max_s: sp.maxMin * 60,
-            params: type === 'speed_restriction' ? { speed_kmh: 40, from_m: Math.max(0, at - 1500), to_m: Math.min(g?.length ?? at, at + 1500) } : type === 'train_delay' ? { delay_s: sp.minMin * 60 } : {},
-            description: sp.note ?? '',
+            est_min_min: sp.minMin,
+            est_max_min: sp.maxMin,
+            ...warning,
+            ...(sp.note ? { description: sp.note } : {}),
           }),
           'создание события',
         );
       }
     },
-    async massDisruptions() {
-      if (engine.allowed('scenario', 'вброс событий')) ok(await api.runScenario('mass_incidents'), 'вброс событий');
+    /** 8 сбоев подряд (сценарий проверки 8): сценариев в API нет, поэтому восемь POST /api/incidents. */
+    async massDisruptions(n = 8) {
+      if (!engine.allowed('scenario', 'вброс событий')) return;
+      const running = (st().live?.trains ?? []).filter((t) => t.segment !== undefined && t.status === 'running').map((t) => t.trainId);
+      const specs = [];
+      for (let i = 0; i < n; i++) {
+        const lo = 5 + Math.floor(Math.random() * 10);
+        const hi = lo + 5 + Math.floor(Math.random() * 15);
+        if (i % 3 === 2 && running.length) specs.push({ kind: 'breakdown', trainId: running.splice(Math.floor(Math.random() * running.length), 1)[0], minMin: lo, maxMin: hi });
+        else specs.push({ kind: i % 2 ? 'closure' : 'livestock', segment: Math.floor(Math.random() * SECTION.segments.length), minMin: lo, maxMin: hi });
+      }
+      engine.log('warn', m('Массовый вброс: {n} нештатных ситуаций', { n: specs.length }), engine.actor());
+      await commands.inject(specs);
     },
-    async refine(id, lo, hi) {
-      if (engine.allowed('scenario', 'уточнение длительности сбоя')) ok(await api.estimate(id, lo * 60, hi * 60), 'уточнение длительности сбоя');
+    refine() {
+      unsupported('уточнение длительности сбоя');
+    },
+    /** Смена установленного направления на перегоне (ДЦ, §11.3): только на свободном перегоне. */
+    async setDirection(segment, direction) {
+      if (!engine.allowed('section', 'смена направления')) return;
+      const g = SECTION.segments[segment];
+      const r = await api.setDirection(g.specId, direction);
+      if (r.status === 409) engine.toast(m('Направление не сменить: {r}', { r: r.detail ?? '' }), 'warn');
+      else ok(r, 'смена направления');
     },
     async resolve(id) {
       if (engine.allowed('scenario', 'отметка об устранении')) ok(await api.resolveIncident(id), 'отметка об устранении');
     },
     async setRunning(running) {
-      if (engine.allowed('scenario', 'управление временем')) ok(await api.clock(!running, st().speed), 'управление временем');
+      if (engine.allowed('scenario', 'управление временем')) ok(await api.clock({ paused: !running }), 'управление временем');
     },
     async setSpeed(speed) {
-      if (engine.allowed('scenario', 'управление временем')) ok(await api.clock(false, speed), 'управление временем');
+      if (engine.allowed('scenario', 'управление временем')) ok(await api.clock({ paused: false, speed }), 'управление временем');
     },
     async askVariants() {
       if (!engine.allowed('section', 'запрос вариантов') || st().pending) return;
-      if (ok(await api.replan(), 'запрос вариантов'))
+      if (ok(await api.replan(), 'запрос вариантов') && !st().pending)
         engine.set({ pending: { id: uid('R'), createdAt: st().now, status: 'computing', variants: [], disruptionIds: [] } });
     },
+    // ── ручное изменение времени на ГИД (ТЗ §6) ──
+    async manualBounds(trainId, station) {
+      const r = await api.manualBounds(trainId, SECTION.stations[station].specId);
+      if (!r.ok) {
+        engine.toast(r.status === 423 ? r.data?.reason ?? m('Точку менять нельзя') : r.status === 404 ? m('Поезд или пункт не найден в плане') : m('План обновился — повторите действие'), 'warn');
+        return null;
+      }
+      manualBase = r.data.base_plan_version;
+      return boundsFromSpec(r.data);
+    },
+    async manualPreview(req) {
+      const r = await api.manualPreview({ base_plan_version: manualBase, train_id: req.trainId, station_id: SECTION.stations[req.station].specId, kind: req.kind, time: toServer(req.time) });
+      if (!r.ok) throw new Error(String(r.status));
+      return previewFromSpec(r.data, st().plan, trains, { km: SECTION.stations[req.station].km });
+    },
+    async manualCommit(req) {
+      if (!engine.allowed('section', 'ручное изменение времени')) return;
+      const r = await api.manualCommit({ base_plan_version: manualBase, train_id: req.trainId, station_id: SECTION.stations[req.station].specId, kind: req.kind, time: toServer(req.time) });
+      if (r.status === 409) {
+        engine.toast(m('План обновился — повторите действие'), 'warn');
+        return;
+      }
+      if (!r.ok) throw new Error(String(r.status));
+      const variants = variantsFromSpec({ variants: r.data.variants ?? [] }, ctx());
+      const p = st().plan.trains[req.trainId]?.stops.find((x) => x.station === req.station);
+      const description = m(req.kind === 'dep' ? 'Задержать {n} отправлением со станции {st} до {t}' : 'Поезд {n}: прибытие на {st} в {t}', { n: req.trainId, st: m(SECTION.stations[req.station].short), t: fmtHM(req.time) });
+      engine.set({
+        pending: {
+          id: uid('R'),
+          source: 'manual',
+          manual: { ...req, from: p ? (req.kind === 'dep' ? p.dep : p.arr) : null, description },
+          createdAt: st().now,
+          status: 'ready',
+          variants,
+          disruptionIds: [],
+          basePlanVersion: manualBase,
+        },
+      });
+    },
+    /** С сервером: фиксируем изменение и сразу применяем вариант «Сохранить порядок». */
+    async manualApply(req) {
+      await commands.manualCommit(req);
+      const p = st().pending;
+      if (p?.source !== 'manual' || !p.variants.length) return;
+      const v = p.variants.find((x) => x.specStrategy === 'keep_order') ?? p.variants[0];
+      await commands.applyVariant(v.id);
+    },
+    cancelManual() {
+      if (st().pending?.source === 'manual') engine.set({ pending: undefined });
+    },
+    async removePin(id) {
+      if (!engine.allowed('section', 'снятие указания')) return;
+      const pin = (st().pins ?? []).find((x) => x.id === id);
+      if (ok(await api.deletePin(id), 'снятие указания')) {
+        engine.set({ pins: (st().pins ?? []).filter((x) => x.id !== id) });
+        engine.toast(m('Указание по {n} снято', { n: pin?.trainId ?? '' }));
+      }
+    },
     reset() {
-      engine.log('warn', m('Сброс участка выполняется на сервере (сценарии), в интерфейсе недоступен'), 'Сервер');
+      unsupported('сброс участка');
     },
     whatIfOpen() {
       if (!engine.allowed('section', 'what-if моделирование')) return;
       engine.set({ whatIf: { openedAt: st().now, mods: { speed: {}, priority: {}, cancelled: {}, durationMin: {} } } });
     },
     whatIfClose() {
-      whatIfRequest = null;
       engine.set({ whatIf: undefined });
     },
     whatIfSetMods(mods) {
       if (!st().whatIf || !engine.allowed('section', 'what-if моделирование')) return;
-      engine.set({ whatIf: { ...st().whatIf, mods, result: undefined } });
-      clearTimeout(whatIfTimer);
-      // Пользователь двигает значения — запрос уходит, когда он остановился.
-      whatIfTimer = setTimeout(async () => {
+      engine.set({ whatIf: { ...st().whatIf, mods, result: undefined, error: undefined } });
+      clearTimeout(commands.whatIfTimer);
+      // Пользователь вводит значения — запрос уходит, когда он остановился.
+      commands.whatIfTimer = setTimeout(async () => {
+        // Сервер (MVP) понимает скорость поезда (км/ч) и длительность сбоя (мин).
         const modifications = [
           ...Object.entries(mods.speed).filter(([, v]) => v >= 10).map(([id, v]) => ({ kind: 'train_speed', target_id: id, value: v })),
-          ...Object.entries(mods.durationMin).map(([id, v]) => ({ kind: 'incident_duration', target_id: id, value: v * 60 })),
-          ...Object.entries(mods.priority).map(([id, v]) => ({ kind: 'train_priority', target_id: id, value: v })),
-          ...Object.entries(mods.cancelled).filter(([, v]) => v).map(([id]) => ({ kind: 'cancel_train', target_id: id })),
+          ...Object.entries(mods.durationMin).map(([id, v]) => ({ kind: 'incident_duration', target_id: id, value: v })),
         ];
+        if (Object.keys(mods.priority).length || Object.values(mods.cancelled).some(Boolean)) unsupported('приоритет и отмена поезда в what-if');
         if (!modifications.length) return;
-        whatIfRequest = await api.whatif(modifications);
+        const r = await api.whatif(modifications);
+        if (!st().whatIf || st().whatIf.mods !== mods) return;
+        if (r.ok) engine.set({ whatIf: { ...st().whatIf, result: whatIfFromSpec(r.data, ctx()) } });
+        else ok(r, 'what-if моделирование');
       }, 400);
     },
-    async whatIfApply() {
-      const r = st().whatIf?.result;
-      if (!r?.requestId || !engine.allowed('section', 'перенос what-if в работу')) return;
-      if (ok(await api.promoteWhatIf(r.requestId), 'перенос what-if в работу')) {
-        engine.set({ whatIf: undefined });
-        engine.log('info', m('Результат what-if передан диспетчеру как вариант'), engine.actor());
-      }
+    whatIfApply() {
+      unsupported('перенос what-if в работу');
     },
-    updateSettings(settings) {
-      // Индекс считает сервер (§14); локально настройки влияют только на отображение.
-      engine.set({ settings });
-      engine.log('info', m('Настройки индекса и оптимизации обновлены'), engine.actor());
+    updateSettings() {
+      unsupported('изменение настроек индекса');
     },
   };
-  for (const [name, fn] of Object.entries(commands)) engine[name] = fn;
+  for (const [name, fn] of Object.entries(commands)) if (typeof fn === 'function') engine[name] = fn;
 
-  // ───────────── старт ─────────────
-  engine.set({ connection: 'connecting', liveMode: true });
-  void Promise.all([api.trains(), api.plan(), api.variants(), api.incidents(), api.scenarios()]).then(([tr, plan, variants, incidents, scenarios]) => {
-    if (tr.length) setTrains(tr);
-    if (plan) {
-      setPlan(plan);
-      if (plan.index) engine.set({ index: indexFromSpec(plan.index) });
-    }
-    for (const d of incidents) upsertIncident(d);
-    if (variants) setVariants(variants);
-    if (scenarios.length) engine.set({ scenarios });
-  });
-  const stream = connectStream(onEnvelope, (connection) => engine.set({ connection }));
+  // ───────────── поток ─────────────
+  const stream = connectStream(onMessage, (connection) => engine.set({ connection }));
   setInterval(() => {
     if (!latency.length) return;
     const sorted = [...latency].sort((a, b) => a - b);
     const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
     engine.set({ latencyP95: p95 });
     stream.reportLatency(p95);
-  }, 2000);
-  void toUi;
+  }, LATENCY_REPORT_MS);
 }

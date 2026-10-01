@@ -1,18 +1,28 @@
 /** Палитра событий: перетащите (или выберите и кликните) на перегон или поезд мнемосхемы. */
-import { Ban, Clock, Dices, PawPrint, Siren, Wrench } from 'lucide-react';
+import { Ban, Clock, Dices, Gauge, PawPrint, Siren, Wrench } from 'lucide-react';
+import { LIVE } from '../api/backend';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { segmentName } from '../core/section';
 import { fmtHM } from '../core/time';
 import { engine } from '../engine/store';
 import { t as tr } from '../i18n';
 
-export const EVENT_TYPES = [
+const DEMO_TYPES = [
   { kind: 'livestock', Icon: PawPrint, label: 'Препятствие (скот)', short: 'Препятствие', target: 'segment', preset: [20, 45] },
   { kind: 'closure', Icon: Ban, label: 'Окно (закрытие пути)', short: 'Окно', target: 'segment', preset: [30, 60] },
   { kind: 'signal', Icon: Siren, label: 'Отказ светофора', short: 'Светофор', target: 'segment', preset: [15, 30] },
   { kind: 'breakdown', Icon: Wrench, label: 'Неисправность поезда', short: 'Неисправность', target: 'train', preset: [15, 30] },
   { kind: 'delay', Icon: Clock, label: 'Опоздание', short: 'Опоздание', target: 'train', preset: [10, 20] },
 ];
+/**
+ * С сервером — только то, что принимает POST /api/incidents: ограничение скорости там — предупреждение
+ * (speed_restriction, §27.4), опозданий в API нет.
+ */
+export const EVENT_TYPES = LIVE
+  ? DEMO_TYPES.filter((e) => e.kind !== 'delay').map((e) =>
+      e.kind === 'signal' ? { ...e, Icon: Gauge, label: 'Предупреждение (ограничение скорости)', short: 'Предупреждение', preset: [30, 60] } : e,
+    )
+  : DEMO_TYPES;
 
 export const EVENT_BY_KIND = Object.fromEntries(EVENT_TYPES.map((e) => [e.kind, e]));
 
