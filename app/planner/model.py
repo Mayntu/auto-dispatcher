@@ -10,6 +10,7 @@ length and platforms checked when the candidate tracks are built). Per segment:
 
 from __future__ import annotations
 
+import logging
 import time
 
 from ortools.sat.python import cp_model
@@ -19,6 +20,7 @@ from app.railcore.evaluate import Deadlock, evaluate
 from app.railcore.models import PlanEntry
 from app.railcore.problem import Solution, Task
 
+log = logging.getLogger("planner.model")
 SCALE = 100  # objective coefficients are floats * SCALE
 EPS_FINAL = 0.01
 WAIT_FREE_S = 1200  # a train may wait this long at a station before the long-wait penalty starts
@@ -129,7 +131,8 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
                     m.Add(dev >= var - pin_t)
                     m.Add(dev >= pin_t - var)
                     objective.append(PIN_PENALTY * SCALE * dev)
-                    m.AddHint(var, max(0, pin_t))
+                    # no extra hint here: the warm start already hints this variable, and a duplicate hint makes
+                    # the whole model MODEL_INVALID (every solve then silently fell back to the fixed order)
             if fix and tid in fix:
                 fa, fd, fs = fix[tid][i]
                 m.Add(a == fa)
@@ -216,6 +219,8 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
     status = solver.Solve(m)
     ms = round((time.perf_counter() - t0) * 1000)
     name = solver.StatusName(status)
+    if status == cp_model.MODEL_INVALID:  # a bug in the model, never a property of the situation: make it loud
+        log.error("CP-SAT model invalid: %s", m.Validate())
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None, name, ms
     sol = TrackedSolution({

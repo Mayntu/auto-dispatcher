@@ -130,11 +130,35 @@ def test_cpsat_keeps_a_pin_through_an_incident(ctx):
         {"type": "obstacle", "segment_id": "R2-OZR", "est_min_min": 15, "est_max_min": 30})]})
     t0 = time.perf_counter()
     for strategy in ("balanced", "robust", "reoptimize"):
-        p = Plan.model_validate(solve_job(s2.model_dump(mode="json"), strategy, SETTINGS)["plan"])
+        res = solve_job(s2.model_dump(mode="json"), strategy, SETTINGS)
+        assert res["status"] in ("OPTIMAL", "FEASIBLE", "KEPT_CURRENT_ORDER"), f"{strategy}: {res['status']}"
+        p = Plan.model_validate(res["plan"])
+        assert p.solver == "cpsat", "the pin must not break the model (a fallback keeps the pin only by chance)"
         d = next(x for x in dwells(p, "2003") if x.station_id == e.station_id)
         assert abs(d.end - pin.time) <= 1, strategy
         assert p.pins and p.pins[0].id == pin.id
     assert time.perf_counter() - t0 < 15
+
+
+def test_pin_is_kept_by_cpsat_when_an_incident_delays_the_crossing_train():
+    """Regression (live run): an obstacle delays express 102, which crosses 2003 on R1-STP; keeping the
+    instruction means 102 waits at STP — CP-SAT must find that (it used to fail with MODEL_INVALID)."""
+    sim = new_sim()
+    plan = initial_plan(sim)
+    sim.set_plan(plan)
+    sim.step(1230)
+    snap = snapshot(sim, plan)
+    b = bounds(snap, WORLD, RTS, SETTINGS, plan, "2003", "R1")
+    r = preview(snap, WORLD, RTS, SETTINGS, plan, forecast_plan(snap, SETTINGS), "2003", "R1", "dep", b["dep"]["current"] + 900)
+    sim.set_plan(r["plan"])
+    sim.create_incident({"type": "obstacle", "segment_id": "R2-OZR", "est_min_min": 15, "est_max_min": 30})
+    s2 = snapshot(sim, r["plan"]).model_copy(update={"pins": [r["pin"]]})
+    for strategy in ("balanced", "robust", "passenger_first"):
+        res = solve_job(s2.model_dump(mode="json"), strategy, SETTINGS)
+        p = Plan.model_validate(res["plan"])
+        assert p.solver == "cpsat", f"{strategy}: {res['status']}"
+        d = next(x for x in dwells(p, "2003") if x.station_id == "R1")
+        assert abs(d.end - r["pin"].time) <= 60, strategy
 
 
 def test_impossible_pin_gives_a_plan_not_a_failure(ctx):
