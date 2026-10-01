@@ -21,7 +21,7 @@ class StateCache:
         if t == "field.state":
             self.field = env.payload
             self._track(env.payload)
-        elif t == "plan.approved":
+        elif t in ("plan.approved", "plan.refreshed"):
             self.plan = env.payload
         elif t == "planner.variants":
             self.variants = env.payload

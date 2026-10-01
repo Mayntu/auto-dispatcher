@@ -19,33 +19,52 @@ class Deadlock(Exception):
         self.trains = trains
 
 
-def evaluate(tasks: list[Task], order: list[PlanEntry], clear_s: int) -> Solution:
-    plan_start = {(e.train_id, e.segment_id): e.start for e in order if e.kind == "run"}
+def evaluate(tasks: list[Task], order: list[PlanEntry], clear_s: int, now: float = 0.0) -> Solution:
+    """`order` entries are in absolute sim time; task times are relative to `now`."""
+    plan_start = {(e.train_id, e.segment_id): e.start - now for e in order if e.kind == "run"}
     plan_stop = {(e.train_id, e.station_id): e.stop for e in order if e.kind == "dwell"}
+    # the field never runs ahead of the plan: planned times are lower bounds, deviations only push later
+    plan_time = {(e.train_id, e.station_id): (e.start - now, e.end - now) for e in order if e.kind == "dwell"}
     stops = {
         (t.train_id, i): n.stop_fixed or plan_stop.get((t.train_id, n.station_id), False)
         for t in tasks for i, n in enumerate(t.nodes)
     }
-    for _ in range(3):
-        times = _longest_path(tasks, plan_start, stops, clear_s)
+    slow: dict[tuple[str, int], float] = {}
+    for _ in range(4):
+        times = _longest_path(tasks, plan_start, plan_time, stops, clear_s)
         changed = False
+        slow = {}
         for t in tasks:
             for i, n in enumerate(t.nodes):
                 arr, dep = times[(t.train_id, i, "a")], times[(t.train_id, i, "d")]
-                s = n.stop_fixed or (n.kind == "mid" and dep - arr > n.pass_threshold + 1)
+                wait = dep - arr - n.pass_threshold
+                s = n.stop_fixed
+                if not s and n.kind == "mid" and wait > 1:
+                    # like the CP-SAT model: run slower (up to 1.3x) to pass without stopping when possible
+                    if i > 0 and wait <= _run_slack(t, i, stops):
+                        slow[(t.train_id, i)] = dep - n.pass_threshold
+                    else:
+                        s = True
                 if s != stops[(t.train_id, i)]:
                     stops[(t.train_id, i)] = s
                     changed = True
         if not changed:
             break
     return {
-        t.train_id: [(round(times[(t.train_id, i, "a")]), round(times[(t.train_id, i, "d")]), stops[(t.train_id, i)])
-                     for i in range(len(t.nodes))]
+        t.train_id: [(round(slow.get((t.train_id, i), times[(t.train_id, i, "a")])), round(times[(t.train_id, i, "d")]),
+                      stops[(t.train_id, i)]) for i in range(len(t.nodes))]
         for t in tasks
     }
 
 
-def _longest_path(tasks: list[Task], plan_start: dict, stops: dict, clear_s: int) -> dict:
+def _run_slack(t: Task, i: int, stops: dict) -> float:
+    """How much longer the leg into node i may take than its minimum (the model allows 1.3x)."""
+    leg = t.legs[i - 1]
+    run_min = leg.t_pp + leg.sup_start * stops[(t.train_id, i - 1)]
+    return round(1.3 * (leg.t_pp + leg.sup_start + leg.sup_end)) - run_min
+
+
+def _longest_path(tasks: list[Task], plan_start: dict, plan_time: dict, stops: dict, clear_s: int) -> dict:
     lb: dict[tuple, float] = {}
     edges: dict[tuple, list[tuple[tuple, float]]] = defaultdict(list)
     users: dict[str, list[tuple[float, tuple, tuple]]] = defaultdict(list)  # segment -> (key, start node, end node)
@@ -54,8 +73,9 @@ def _longest_path(tasks: list[Task], plan_start: dict, stops: dict, clear_s: int
         tid = t.train_id
         for i, n in enumerate(t.nodes):
             a, d = (tid, i, "a"), (tid, i, "d")
-            lb[a] = float(n.arr_fixed) if n.arr_fixed is not None else 0.0
-            lb[d] = float(n.dep_min)
+            pa, pd = plan_time.get((tid, n.station_id), (0.0, 0.0))
+            lb[a] = float(n.arr_fixed) if n.arr_fixed is not None else max(0.0, pa)
+            lb[d] = max(float(n.dep_min), pd)
             dwell = n.dest_dwell if n.kind == "dest" else n.dwell_min
             edges[a].append((d, dwell))
         if t.current:
@@ -66,7 +86,7 @@ def _longest_path(tasks: list[Task], plan_start: dict, stops: dict, clear_s: int
             edges[(tid, i, "d")].append(((tid, i + 1, "a"), run))
             key = plan_start.get((tid, leg.segment_id), float("inf"))
             if key == float("inf") and t.nodes[i].sched_dep is not None:
-                key = 1e9 + t.nodes[i].sched_dep  # not in the plan: after planned trains, by timetable
+                key = t.nodes[i].sched_dep  # not in the plan yet (entered the horizon later): by timetable
             users[leg.segment_id].append((key, (tid, i, "d"), (tid, i + 1, "a")))
 
     for seg_users in users.values():
@@ -74,6 +94,33 @@ def _longest_path(tasks: list[Task], plan_start: dict, stops: dict, clear_s: int
         for (_, _, end_a), (_, start_b, _) in zip(seg_users, seg_users[1:]):
             if start_b is not None:
                 edges[end_a].append((start_b, clear_s))
+
+    # station tracks (§12.5): spread visits over the tracks in plan order; on each track the next
+    # train arrives only after the previous one has left
+    visits: dict[str, list[tuple[float, float, str, int]]] = defaultdict(list)
+    capacity: dict[str, int] = {}
+    for t in tasks:
+        for i, n in enumerate(t.nodes):
+            capacity[n.station_id] = n.capacity
+            if n.arr_fixed is not None and n.arr_fixed <= 0:  # already at the station
+                start, end = float("-inf"), plan_time.get((t.train_id, n.station_id), (0.0, 0.0))[1]
+            elif (t.train_id, n.station_id) in plan_time:
+                start, end = plan_time[(t.train_id, n.station_id)]
+            else:
+                start = float(n.sched_arr if n.sched_arr is not None else (n.arr_fixed or 0))
+                end = float(n.sched_dep if n.sched_dep is not None else start + n.dest_dwell)
+            visits[n.station_id].append((start, end, t.train_id, i))
+    for st, vs in visits.items():
+        vs.sort(key=lambda v: (v[0], v[1]))
+        free: list[tuple[float, tuple | None]] = [(float("-inf"), None)] * capacity[st]
+        for start, end, tid, i in vs:
+            k = min(range(len(free)), key=lambda j: free[j][0])
+            prev_end, prev = free[k]
+            # only edges that agree with the plan's own times: a greedy track that is still busy at this
+            # arrival would add a backwards edge (a false deadlock cycle)
+            if prev is not None and prev[0] != tid and prev_end <= start + 1:
+                edges[(prev[0], prev[1], "d")].append(((tid, i, "a"), 0.0))
+            free[k] = (end, (tid, i))
 
     indeg = {v: 0 for v in lb}
     for u in edges:

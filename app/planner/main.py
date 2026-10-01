@@ -10,6 +10,7 @@ from app.bus.base import EventBus
 from app.bus.envelope import Envelope
 from app.planner.pool import SolverPool, forecast_plan
 from app.planner.snapshot import build_snapshot
+from app.planner.strategies import STRATEGIES, durations_for
 from app.planner.variants import generate_variants
 from app.planner.whatif import run_whatif
 from app.railcore.infra import World
@@ -36,6 +37,8 @@ class PlannerService:
         self._dirty = False
         self._gen_task: asyncio.Task | None = None
         self._tasks: list[asyncio.Task] = []
+        self._last_refresh = 0.0
+        self._forecast_fails = 0
 
     async def start(self) -> None:
         await self.bus.subscribe("field.state", self._on_field)
@@ -120,17 +123,50 @@ class PlannerService:
             fc = forecast_plan(self.snapshot(), self.settings)
             if fc is not None:
                 self.forecast = fc
+                self._forecast_fails = 0
+                await self._maybe_refresh(fc)
+            else:
+                # the approved order no longer fits where the trains are: re-plan from the current state
+                self._forecast_fails += 1
+                if self._forecast_fails == 3 and not any(v.status == "proposed" for v in self.variants.values()):
+                    log.warning("current plan is no longer executable, generating variants")
+                    self._dirty = True
+                    if self._gen_task is None or self._gen_task.done():
+                        self._gen_task = asyncio.create_task(self._generate_loop())
             src = self.forecast or self.plan
             await self.bus.publish("kpi.index", {
                 "index": src.index.model_dump(mode="json"), "kpi": src.kpi.model_dump(mode="json"),
                 "plan_version": self.version, "last_solve_ms": self.last_solve_ms, "forecast_ok": fc is not None,
+                "plan_broken": self._forecast_fails >= 3,
             }, source="planner", sim_time=self.field["sim_time"])
+
+    async def _maybe_refresh(self, fc: Plan) -> None:
+        """Refresh (§12.6): trains drifted from the plan but the order holds -> re-time the plan automatically.
+        The version is kept: the order (what the dispatcher approved) did not change, so variants stay valid."""
+        limit = self.settings["planner"]["replan_deviation_s"]
+        # only lagging counts: a train held before an obstacle looks "ahead" until the plan lets it go
+        drift = max((t["delay_s"] for t in self.field["trains"] if t["on_field"]), default=0)
+        new_trains = {e.train_id for e in fc.entries} - {e.train_id for e in self.plan.entries}
+        if (drift <= limit and not new_trains) or time.monotonic() - self._last_refresh < 5 \
+                or (self._gen_task and not self._gen_task.done()):
+            return
+        self._last_refresh = time.monotonic()
+        plan = fc.model_copy(update={"version": self.version, "base_version": self.plan.base_version,
+                                     "strategy": self.plan.strategy, "solver": "refresh"})
+        self.plan = plan
+        await self.bus.publish("plan.refreshed", plan, source="planner", sim_time=plan.created_at)
+        log.info("plan v%d re-timed: max lag %.0f s, entered horizon %s", self.version, drift, sorted(new_trains))
 
     # ---- commands ---------------------------------------------------------------------------
     async def _on_cmd(self, env: Envelope) -> None:
         cmd = env.type.rsplit(".", 1)[-1]
         if cmd == "apply":
             await self._apply(env)
+        elif cmd == "replan":
+            self._dirty = True
+            if self._gen_task is None or self._gen_task.done():
+                self._gen_task = asyncio.create_task(self._generate_loop())
+            await self._reply(env, ok=True, code=202)
         elif cmd == "whatif":
             await self._whatif(env)
         else:
@@ -149,13 +185,25 @@ class PlannerService:
                 v.status = "stale"
             return await self._reply(env, ok=False, code=409,
                                      reason=f"Вариант устарел: текущая версия плана {self.version}")
-        plan = v.plan.model_copy(deep=True)
+        # the variant was solved a while ago; keep its order (the decision) and re-time it from now
+        snap = self.snapshot().model_copy(update={"hint": v.plan.entries})
+        durations = durations_for(STRATEGIES[v.strategy], snap.incidents, self.settings)
+        plan = forecast_plan(snap, self.settings, durations)
+        if plan is None:  # the order no longer fits where the trains are now
+            v.status = "stale"
+            await self._publish_variants()
+            await self._on_cmd(env.model_copy(update={"type": "cmd.planner.replan", "corr_id": None}))
+            return await self._reply(env, ok=False, code=409,
+                                     reason="Поезда уже разъехались не так, как предполагал вариант — пересчитываю варианты")
+        plan.strategy, plan.solver, plan.solve_ms = v.strategy, v.plan.solver, v.plan.solve_ms
+        plan.kpi.robust_total_delay_s = v.plan.kpi.robust_total_delay_s
         await self._approve(plan, base)
         for other in self.variants.values():
             other.status = "applied" if other.id == vid else ("stale" if other.status == "proposed" else other.status)
         await self._publish_variants()
         log.info("variant %s (%s) applied as plan v%d", vid, v.strategy, self.version)
-        await self._reply(env, ok=True, code=200, plan_version=self.version)
+        await self._reply(env, ok=True, code=200, plan_version=self.version, index=plan.index.value,
+                          total_delay_s=plan.kpi.total_delay_s)
 
     async def _whatif(self, env: Envelope) -> None:
         req = WhatIfRequest.model_validate(env.payload)

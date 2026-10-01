@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import multiprocessing as mp
+import logging
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from functools import lru_cache
 
 from app.common.config import load_settings
@@ -15,6 +17,8 @@ from app.railcore.infra import get_world
 from app.railcore.models import IncidentType, Plan
 from app.railcore.problem import Snapshot, assemble_plan, build_tasks
 from app.railcore.running_time import RunningTimes
+
+log = logging.getLogger("planner.pool")
 
 
 @lru_cache
@@ -38,7 +42,7 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
     solver = "cpsat"
     if sol is None:
         solver = "fallback"
-        sol = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"])
+        sol = _fallback(tasks, snap, settings, strat)
     plan = assemble_plan(tasks, sol, snap, world, settings, solver=solver, strategy=strategy_id, solve_ms=ms)
 
     # robustness: keep this plan's order, incidents at their max duration
@@ -48,7 +52,7 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
         robust_dur.update({i.id: durations[i.id] for i in snap.incidents if i.type == IncidentType.TRAIN_FAILURE})
     try:
         rtasks = build_tasks(snap, world, rts, settings, robust_dur, strat.weight_mult)
-        rsol = evaluate(rtasks, plan.entries, settings["planner"]["segment_clear_s"])
+        rsol = evaluate(rtasks, plan.entries, settings["planner"]["segment_clear_s"], snap.now)
         rplan = assemble_plan(rtasks, rsol, snap, world, settings, solver="refresh", strategy=strategy_id, solve_ms=0)
         plan.kpi.robust_total_delay_s = rplan.kpi.total_delay_s
     except Deadlock:
@@ -56,25 +60,56 @@ def solve_job(snapshot: dict, strategy_id: str, settings: dict) -> dict:
     return {"plan": plan.model_dump(mode="json"), "status": status}
 
 
-def forecast_plan(snap: Snapshot, settings: dict) -> Plan | None:
-    """Current plan's order replayed from the current state with active incidents (expected durations).
-    Cheap (no CP-SAT): runs in the event loop once a second."""
+def _fallback(tasks, snap: Snapshot, settings: dict, strat):
+    """CP-SAT found nothing in time: keep the current order; if that order no longer fits, the timetable
+    order; as a last resort give CP-SAT a longer budget. Never leaves the dispatcher without a plan."""
+    clear = settings["planner"]["segment_clear_s"]
+    for order in (snap.hint, []):
+        try:
+            return evaluate(tasks, order, clear, snap.now)
+        except Deadlock:
+            continue
+    sol, status, _ = solve_cpsat(tasks, settings, [], snap.now, strat.lambda_stop_mult, time_limit_s=10)
+    if sol is None:
+        raise RuntimeError(f"no plan found ({status})")
+    return sol
+
+
+def forecast_plan(snap: Snapshot, settings: dict, durations: dict[str, int] | None = None) -> Plan | None:
+    """The order of `snap.hint` re-timed from the current state with active incidents (expected durations
+    unless given). Cheap (no CP-SAT): used for the 1 Hz forecast, refresh and re-timing on apply."""
     world, rts = get_world(), _rts()
-    tasks = build_tasks(snap, world, rts, settings)
+    tasks = build_tasks(snap, world, rts, settings, durations)
     try:
-        sol = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"])
+        sol = evaluate(tasks, snap.hint, settings["planner"]["segment_clear_s"], snap.now)
     except Deadlock:
         return None
     return assemble_plan(tasks, sol, snap, world, settings, solver="refresh", strategy=None, solve_ms=0)
 
 
 class SolverPool:
+    """CP-SAT runs in worker processes. A native crash in a worker breaks the whole executor, so the pool
+    is rebuilt and the job retried once instead of leaving the planner without a solver until restart."""
+
     def __init__(self, workers: int):
-        self._pool = ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("spawn"), initializer=_warmup)
+        self.workers = workers
+        self._pool = self._new()
+
+    def _new(self) -> ProcessPoolExecutor:
+        return ProcessPoolExecutor(max_workers=self.workers, mp_context=mp.get_context("spawn"), initializer=_warmup)
 
     async def solve(self, snapshot: dict, strategy_id: str, settings: dict) -> dict:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self._pool, solve_job, snapshot, strategy_id, settings)
+        for attempt in (1, 2):
+            pool = self._pool
+            try:
+                return await loop.run_in_executor(pool, solve_job, snapshot, strategy_id, settings)
+            except BrokenProcessPool:
+                log.error("solver process crashed (attempt %d), rebuilding the pool", attempt)
+                if self._pool is pool:
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    self._pool = self._new()
+        raise RuntimeError("solver pool crashed twice")
 
     async def warm(self, n: int) -> None:
         loop = asyncio.get_running_loop()

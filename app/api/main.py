@@ -75,7 +75,7 @@ class ClockRequest(BaseModel):
 
 
 async def subscribe_api(bus: EventBus, cache: StateCache, ws: WSManager, req: Requester) -> None:
-    for topic in ("field.state", "plan.approved", "planner.variants", "kpi.index"):
+    for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index"):
         await bus.subscribe(topic, cache.on_event)
     await bus.subscribe("#", ws.on_event)
     for topic in REPLY_TOPICS:
@@ -150,6 +150,10 @@ def create_app(bus: EventBus, world: World, settings: dict,
         if not res["ok"]:
             raise HTTPException(res.get("code", 409), res.get("reason"))
         return res
+
+    @app.post("/api/plan/replan", summary="Пересчитать план вручную: варианты придут в planner.variants")
+    async def replan() -> dict:
+        return await req.request("cmd.planner.replan", {})
 
     @app.post("/api/whatif", response_model=WhatIfResult, summary="What-if: прогноз на копии обстановки (≤ 3 с)")
     async def whatif(body: WhatIfBody) -> dict:

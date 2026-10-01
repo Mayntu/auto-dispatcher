@@ -154,6 +154,7 @@
     <span class="icon" id="sitIcon">⏳</span>
     <div class="body"><div id="sitMain">Подключаемся…</div><div class="sub" id="sitSub"></div></div>
     <button class="primary" id="sitBtn" style="display:none">Выбрать решение</button>
+    <button class="primary" id="replanBtn" style="display:none">Пересчитать план</button>
   </div>
 
   <div class="toolbar">
@@ -248,6 +249,7 @@ function waitingFor(tid, stationId) {
   if (!S.plan || !S.field) return null;
   return S.plan.meetings.find(m => m.waiting_train === tid && m.station_id === stationId && m.time > S.field.sim_time) || null;
 }
+const schedLate = tid => { const d = S.index && S.index.kpi.delayed_trains.find(([id]) => id === tid); return d ? d[1] : 0; };
 const planDwell = (tid, stationId) => S.plan && S.plan.entries.find(e => e.kind === 'dwell' && e.train_id === tid && e.station_id === stationId);
 
 // ---------- scheme ----------
@@ -318,7 +320,8 @@ function trainSvg(t, x, y, opts = {}) {
   if (bad) note = '⚠ неисправен';
   else if (held) note = '⏸ стоит перед препятствием';
   else if (t.station_id && t.stopped) { const m = waitingFor(t.train_id, t.station_id); if (m) note = `ждёт ${m.passing_train}`; }
-  if (!note && t.delay_s >= 120) note = `опазд. ${mins(t.delay_s)} мин`;
+  const late = schedLate(t.train_id);
+  if (!note && late >= 120) note = `к конечной +${mins(late)} мин`;
   if (note) s += `<text x="${x}" y="${opts.noteAbove ? y - h / 2 - 6 : y + h / 2 + 13}" font-size="11" text-anchor="middle" fill="${bad || held ? '#fca5a5' : '#fde68a'}">${note}</text>`;
   return s + '</g>';
 }
@@ -363,27 +366,44 @@ function renderScheme() {
 // ---------- situation & header ----------
 function renderSituation() {
   if (!S.field || !S.infra) return;
-  const f = S.field, incs = f.incidents;
+  const f = S.field, incs = f.incidents, idx = S.index && S.index.index;
   const onField = f.trains.filter(t => t.on_field), running = onField.filter(t => t.segment_id).length;
   const notYet = f.trains.filter(t => !t.on_field && t.status !== 'finished').length, done = f.trains.filter(t => t.status === 'finished').length;
-  const late = onField.filter(t => t.delay_s >= 120).sort((a, b) => b.delay_s - a.delay_s);
+  const lateSched = S.index ? S.index.kpi.delayed_trains.filter(([, d]) => d >= 120) : [];
   const proposed = S.variants ? S.variants.variants.filter(v => v.status === 'proposed') : [];
-  let cls = 'ok', icon = '✅', main, sub = `В пути ${running}, на станциях ${onField.length - running}, ещё не отправились ${notYet}, прибыли ${done}.`;
+  const lateText = lateSched.slice(0, 4).map(([id, d]) => `${id} +${mins(d)}`).join(', ') + (lateSched.length > 4 ? ` и ещё ${lateSched.length - 4}` : '');
+  let cls = 'ok', icon = '✅', main, sub = `В пути ${running}, на станциях ${onField.length - running}, ещё не отправились ${notYet}, прибыли ${done}.`, replan = false;
   if (incs.length) {
     cls = 'bad'; icon = '⚠️';
     main = incs.map(i => `<b>${INC_ICON[i.type]} ${i.description}</b> — ${i.type === 'train_failure' ? 'поезд ' + i.train_id : segName(i.segment_id)}, с ${clock(i.started_at, false)}, оценка ${mins(i.est_min_s)}–${mins(i.est_max_s)} мин`).join('<br>');
     const held = onField.filter(t => t.status === 'broken' || (t.status === 'stopped' && t.segment_id)).map(t => t.train_id);
-    const affected = [...new Set([...held, ...late.map(t => t.train_id)])];
-    sub = affected.length ? `Затронуты: ${affected.map(id => { const t = trainState(id); return id + (t.delay_s >= 60 ? ` (+${mins(t.delay_s)} мин)` : ''); }).join(', ')}. ` : '';
+    sub = held.length ? `Стоят из-за сбоя: ${held.join(', ')}. ` : '';
+    if (lateSched.length) sub += `Опоздают к конечной: ${lateText} мин. `;
     sub += S.computing ? 'Система считает варианты решения…' : proposed.length ? `Подготовлено ${proposed.length} ${plural(proposed.length, 'вариант', 'варианта', 'вариантов')} — выберите, как действовать.` : 'Решение принято, план перестроен.';
+  } else if (S.computing) {
+    cls = 'warn'; icon = '⏳'; main = '<b>Система пересчитывает план…</b>'; sub = 'Через пару секунд справа появятся варианты.';
   } else if (proposed.length) {
-    cls = 'warn'; icon = '↩️'; main = '<b>Сбой снят.</b> Можно вернуть движение к оптимальному графику.';
-    sub = 'Система подготовила варианты — выберите один справа.';
-  } else if (late.length) {
-    cls = 'warn'; icon = '🕒'; main = `<b>Движение по плану, но есть опоздания:</b> ${late.slice(0, 4).map(t => `${t.train_id} +${mins(t.delay_s)} мин`).join(', ')}`;
+    cls = 'warn'; icon = '↩️'; main = '<b>Есть варианты пересчёта плана.</b> Сравните их справа и примените лучший — или оставьте текущий.';
+    sub = 'Наведите на вариант, чтобы увидеть его на графике движения.';
+  } else if (idx && idx.category !== 'norm') {
+    cls = idx.category === 'critical' ? 'bad' : 'warn'; icon = '📉';
+    const weak = [...idx.components].sort((a, b) => (1 - b.score) * b.weight - (1 - a.score) * a.weight)[0];  // loses most points
+    const why = {
+      schedule: `поезда опаздывают к расписанию, в среднем на ${Math.round(weak.raw)} мин (${lateText} мин)`,
+      conflicts: `в плане ${weak.raw} вынужденных остановок на скрещениях`,
+      capacity: 'участок пропустит меньше поездов, чем положено по расписанию',
+      energy: 'лишние остановки и разгоны увеличивают расход энергии',
+      accuracy: 'пассажирские поезда прибывают не по расписанию',
+    }[weak.key];
+    main = `<b>Качество движения ${Math.round(idx.value)} — «${QNAME[idx.category]}»:</b> ${why}.`;
+    sub = 'Сбоев сейчас нет — это хвост прошедших сбоев: на однопутке опоздание передаётся встречным поездам. Нажмите «Пересчитать план» — система поищет порядок, при котором опоздания меньше.';
+    replan = true;
+  } else if (lateSched.length) {
+    cls = 'warn'; icon = '🕒'; main = `<b>Движение по плану, небольшие опоздания к расписанию:</b> ${lateText} мин.`;
   } else main = '<b>Штатное движение.</b> Все поезда следуют по плану, конфликтов нет.';
   $('situation').className = 'situation ' + cls; $('sitIcon').textContent = icon; $('sitMain').innerHTML = main; $('sitSub').textContent = sub;
   $('sitBtn').style.display = proposed.length ? '' : 'none';
+  $('replanBtn').style.display = replan ? '' : 'none';
   $('decBadge').style.display = proposed.length ? '' : 'none'; $('decBadge').textContent = proposed.length;
 }
 function renderHeader() {
@@ -481,7 +501,7 @@ function renderVariants() {
         </div>
         <div style="font-size:13px">${late.length ? 'Опоздают: ' + late.map(([t, s]) => `<b>${t}</b> +${mins(s)} мин`).join(', ') : 'Никто не опоздает к конечной.'}</div>
         <details><summary>Почему так</summary><ul>${v.explanation.map(x => `<li>${x}</li>`).join('')}</ul></details>
-        <div class="act">посчитано за ${(v.plan.solve_ms / 1000).toFixed(1)} с ${v.status === 'proposed' ? `<button class="primary" data-apply="${v.id}">Применить</button>` : ''}</div></div>`;
+        <div class="act">посчитано в ${clock(v.plan.created_at, false)} за ${(v.plan.solve_ms / 1000).toFixed(1)} с ${v.status === 'proposed' ? `<button class="primary" data-apply="${v.id}">Применить</button>` : ''}</div></div>`;
     }).join('');
 }
 
@@ -639,7 +659,7 @@ function connect() {
     switch (m.type) {
       case 'field.state': {
         const prev = S.field ? S.field.incidents.map(i => i.id).join() : '';
-        S.field = m.payload; pendingLat.push(m.ts_wall);
+        S.field = m.payload; if (!document.hidden) pendingLat.push(m.ts_wall);
         for (const t of m.payload.trains) if (t.on_field) { const a = (S.fact[t.train_id] ||= []); if (!a.length || m.payload.sim_time > a.at(-1)[0]) a.push([m.payload.sim_time, t.km]); }
         if (prev !== m.payload.incidents.map(i => i.id).join()) syncWhatIf();
         if (S.drawer && performance.now() - lastDrawer > 1000) { lastDrawer = performance.now(); renderDrawer(); }
@@ -647,6 +667,7 @@ function connect() {
       }
       case 'kpi.index': S.index = m.payload; schedule(); break;
       case 'plan.approved': S.plan = m.payload; S.ghost = S.whatif ? S.whatif.plan : null; schedule(); loadAto(); break;
+      case 'plan.refreshed': S.plan = m.payload; schedule(); break;
       case 'planner.variants': S.variants = m.payload; S.computing = false; S.lastSolveMs = m.payload.solve_ms; renderVariants(); schedule(); break;
       case 'incident.created': case 'incident.resolved': S.computing = true; S.computeStart = performance.now(); setTab('decide'); renderVariants(); schedule(); break;
     }
@@ -672,7 +693,7 @@ document.addEventListener('click', async e => {
     if (b.dataset.tab) setTab(b.dataset.tab);
     else if (b.dataset.inc) await api('POST', '/api/incidents', JSON.parse(b.dataset.inc));
     else if (b.dataset.resolve) await api('POST', `/api/incidents/${b.dataset.resolve}/resolve`);
-    else if (b.dataset.apply) { b.disabled = true; await api('POST', '/api/plan/apply', {variant_id: b.dataset.apply, base_plan_version: S.plan.version}); toast('План перестроен — поезда идут по новому графику', true); }
+    else if (b.dataset.apply) { b.disabled = true; const r = await api('POST', '/api/plan/apply', {variant_id: b.dataset.apply, base_plan_version: S.plan.version}); toast(`План перестроен по времени «сейчас»: качество движения ${Math.round(r.index)}, задержка всех поездов ${mins(r.total_delay_s)} мин`, true); }
     else if (b.dataset.p) await api('POST', '/api/sim/clock', {paused: !S.field.paused});
     else if (b.dataset.s) await api('POST', '/api/sim/clock', {paused: false, speed: +b.dataset.s});
     else if (b.dataset.goto) { closeNode(); if (b.dataset.goto === 'ato') $('atoTrain').value = b.dataset.train; else { $('wiTrain').value = b.dataset.train; syncWhatIf(); } setTab(b.dataset.goto); }
@@ -680,6 +701,12 @@ document.addEventListener('click', async e => {
 });
 $('quality').addEventListener('click', () => $('quality').classList.toggle('open'));
 $('sitBtn').addEventListener('click', () => setTab('decide'));
+$('replanBtn').addEventListener('click', async () => {
+  try { S.computing = true; S.computeStart = performance.now(); setTab('decide'); renderVariants(); schedule(); await api('POST', '/api/plan/replan'); }
+  catch (err) { S.computing = false; renderVariants(); toast(err.message); }
+});
+// a hidden tab pauses rendering: drop latency samples from that time, they are not UI lag
+document.addEventListener('visibilitychange', () => { pendingLat = []; if (!document.hidden) S.lat = []; });
 $('dClose').addEventListener('click', closeNode);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNode(); });
 $('variants').addEventListener('mouseover', e => { const c = e.target.closest('.var'); if (!c) return; const v = S.variants.variants.find(x => x.id === c.dataset.v); if (v && S.ghost !== v.plan) { S.ghost = v.plan; schedule(); } });

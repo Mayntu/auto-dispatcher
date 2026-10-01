@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.common.config import load_settings
 from app.field.sim import FieldSim
-from app.planner.pool import SolverPool, solve_job
+from app.planner.pool import SolverPool, forecast_plan, solve_job
 from app.planner.snapshot import build_snapshot
 from app.planner.variants import generate_variants
 from app.railcore.eco import eco_profile
@@ -109,6 +109,64 @@ def test_headless_run_with_obstacle_is_safe_and_completes():
     sim.set_plan(new_plan)
     while sim.now < 8 * 3600 and not all(t.loc == "done" for t in sim.trains.values()):
         sim.step(60)
+    assert sim.safety_violations == 0
+    assert all(t.loc == "done" for t in sim.trains.values())
+
+
+def test_forecast_matches_plan_in_normal_operation():
+    """Regression: the 1 Hz forecast must not invent delays when nothing happens (horizon entry, slow running)."""
+    sim = new_sim()
+    plan = initial_plan(sim)
+    sim.set_plan(plan)
+    for t in (600, 3000, 6000, 9000):
+        sim.step(t - sim.now)
+        fc = forecast_plan(snapshot(sim, plan), SETTINGS)
+        # trains entering the horizon after v1 may add ~1 min each until the service refreshes the plan
+        assert fc.kpi.total_delay_s <= 300, f"phantom delay at {t}: {fc.kpi.delayed_trains}"
+        assert fc.index.category == "norm"
+
+
+def test_variant_applied_late_is_retimed_from_now():
+    """Regression: a variant solved at T0 and applied later must not leave trains behind the new plan."""
+    sim = new_sim()
+    plan = initial_plan(sim)
+    sim.set_plan(plan)
+    sim.step(3000)
+    sim.create_incident(OBSTACLE)
+    variant = Plan.model_validate(solve_job(snapshot(sim, plan).model_dump(mode="json"), "balanced", SETTINGS)["plan"])
+    sim.step(600)  # the dispatcher reads the cards for 10 minutes
+    retimed = forecast_plan(snapshot(sim, plan).model_copy(update={"hint": variant.entries}), SETTINGS)
+    sim.set_plan(retimed)
+    sim.step(60)
+    drift = max(t["delay_s"] for t in sim.snapshot()["trains"] if t["on_field"])  # lag behind the new plan
+    assert drift <= SETTINGS["planner"]["replan_deviation_s"]
+
+
+def test_segment_closure_then_reapply_does_not_deadlock():
+    """Regression: closing R2-OZR, applying, re-applying after it clears used to fill R2 and OZR with
+    trains waiting for each other. The field must keep moving and every train must finish."""
+    sim = new_sim()
+    plan = initial_plan(sim)
+    sim.set_plan(plan)
+    sim.step(3000)
+    sim.create_incident({"type": "segment_closed", "segment_id": "R2-OZR", "est_min_min": 30, "est_max_min": 30})
+
+    def apply_best(current: Plan) -> Plan:
+        v = Plan.model_validate(solve_job(snapshot(sim, current).model_dump(mode="json"), "balanced", SETTINGS)["plan"])
+        new = forecast_plan(snapshot(sim, current).model_copy(update={"hint": v.entries}), SETTINGS)
+        sim.set_plan(new)
+        return new
+
+    plan = apply_best(plan)
+    while sim.active():
+        sim.step(60)
+    plan = apply_best(plan)
+    while sim.now < 30000 and not all(t.loc == "done" for t in sim.trains.values()):
+        sim.step(60)
+        fc = forecast_plan(snapshot(sim, plan), SETTINGS)
+        if fc is not None and max((t["delay_s"] for t in sim.snapshot()["trains"] if t["on_field"]), default=0) > 120:
+            plan = fc
+            sim.set_plan(plan)
     assert sim.safety_violations == 0
     assert all(t.loc == "done" for t in sim.trains.values())
 

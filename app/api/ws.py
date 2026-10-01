@@ -13,7 +13,7 @@ from app.api.state_cache import StateCache
 from app.bus.envelope import Envelope
 
 log = logging.getLogger("ws")
-FORWARD = ("field.state", "kpi.index", "plan.approved", "planner.variants", "planner.metrics",
+FORWARD = ("field.state", "kpi.index", "plan.approved", "plan.refreshed", "planner.variants", "planner.metrics",
            "incident.created", "incident.resolved", "dc.command_result", "safety.violation", "field.train_event")
 MAX_QUEUE = 500
 

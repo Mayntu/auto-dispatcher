@@ -1,0 +1,302 @@
+"""Live end-to-end check through the real server, acting as a dispatcher.
+
+Starts nothing: run `python -m app.all` first (fresh, sim time ~0). Then:
+
+    python -m tools.e2e_dispatcher [--speed 60]
+
+A monitor watches /api/state every second (safety, stalls, forecast growth, promise vs reality) and a WS
+client measures delivery latency, while a scripted dispatcher creates incidents, applies variants (right
+away, late, the worst one), runs what-if, asks for ATO profiles and also does wrong things on purpose
+(stale apply, unknown ids, bad payloads). Prints a PASS/FAIL report.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import time
+
+import httpx
+import websockets
+
+BASE = "http://127.0.0.1:8000"
+
+
+class Report:
+    def __init__(self) -> None:
+        self.fails: list[str] = []
+        self.notes: list[str] = []
+
+    def check(self, ok: bool, what: str) -> bool:
+        (self.notes if ok else self.fails).append(("ok   " if ok else "FAIL ") + what)
+        print(("  ok   " if ok else "  FAIL ") + what, flush=True)
+        return ok
+
+
+R = Report()
+
+
+class Monitor:
+    def __init__(self, c: httpx.AsyncClient):
+        self.c = c
+        self.state: dict | None = None
+        self.stop = False
+        self.max_viol = 0
+        self.last_move_t = 0.0
+        self.last_pos = None
+        self.stall = False
+        self.quiet_since = None
+        self.quiet_delay = None
+        self.max_quiet_growth = 0.0
+        self.http_5xx = 0
+
+    async def run(self) -> None:
+        while not self.stop:
+            try:
+                r = await self.c.get("/api/state")
+                if r.status_code >= 500:
+                    self.http_5xx += 1
+                s = r.json()
+                self.state = s
+                f = s["field"]
+                self.max_viol = max(self.max_viol, f["safety_violations"])
+                pos = tuple(round(t["km"], 2) for t in f["trains"])
+                on_field = any(t["on_field"] for t in f["trains"])
+                if pos != self.last_pos:
+                    self.last_pos, self.last_move_t = pos, f["sim_time"]
+                elif on_field and not f["incidents"] and not f["paused"] and f["sim_time"] - self.last_move_t > 1800:
+                    self.stall = True
+                if s["index"] and not f["incidents"]:
+                    d = s["index"]["kpi"]["total_delay_s"]
+                    if self.quiet_since is None:
+                        self.quiet_since, self.quiet_delay = f["sim_time"], d
+                    elif f["sim_time"] - self.quiet_since >= 1800:
+                        self.max_quiet_growth = max(self.max_quiet_growth, (d - self.quiet_delay) / 60)
+                        self.quiet_since, self.quiet_delay = f["sim_time"], d
+                elif f["incidents"]:
+                    self.quiet_since = None
+            except Exception as e:  # noqa: BLE001
+                print("monitor:", e)
+            await asyncio.sleep(1.0)
+
+    @property
+    def now(self) -> float:
+        return self.state["field"]["sim_time"] if self.state else 0.0
+
+
+async def ws_probe(stats: dict) -> None:
+    async with websockets.connect(BASE.replace("http", "ws") + "/ws", max_size=None) as ws:
+        first = json.loads(await ws.recv())
+        stats["snapshot"] = first.get("type") == "snapshot"
+        while not stats.get("stop"):
+            m = json.loads(await asyncio.wait_for(ws.recv(), 10))
+            stats["msgs"] = stats.get("msgs", 0) + 1
+            if m.get("type") == "field.state":
+                stats.setdefault("lat", []).append((time.time() - m["ts_wall"]) * 1000)
+
+
+async def wait_sim(mon: Monitor, t: float) -> None:
+    while mon.now < t:
+        await asyncio.sleep(0.5)
+
+
+async def wait_variants(c: httpx.AsyncClient, after_version: int | None, incident_id: str | None, timeout=8.0):
+    """Proposed variants for the current plan version (and the incident, if given); returns (variants, seconds)."""
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        vs = (await c.get("/api/variants")).json()
+        live = [v for v in vs if v["status"] == "proposed"]
+        if live and (incident_id is None or incident_id in live[0]["incident_ids"]) \
+                and (after_version is None or live[0]["base_plan_version"] >= after_version):
+            return live, time.time() - t0
+        await asyncio.sleep(0.1)
+    return [], time.time() - t0
+
+
+async def apply(c: httpx.AsyncClient, mon: Monitor, v: dict, label: str, check_promise: bool) -> dict | None:
+    plan = (await c.get("/api/plan")).json()
+    r = await c.post("/api/plan/apply", json={"variant_id": v["id"], "base_plan_version": plan["version"]})
+    if r.status_code == 409:
+        R.check(True, f"{label}: стейл-вариант корректно отклонён (409): {r.json()['detail']}")
+        return None
+    if not R.check(r.status_code == 200, f"{label}: применение -> {r.status_code}"):
+        return None
+    body = r.json()
+    await asyncio.sleep(3)
+    idx_now = mon.state["index"]["index"]["value"]
+    if check_promise:
+        R.check(abs(idx_now - body["index"]) <= 6,
+                f"{label}: обещано {v['plan']['index']['value']:.0f}, после пересчёта {body['index']:.0f}, "
+                f"прогноз через 3 с {idx_now:.0f}")
+    return body
+
+
+async def scenario(c: httpx.AsyncClient, mon: Monitor, speed: float) -> None:
+    print("\n# 0. старт")
+    R.check((await c.get("/health")).status_code == 200, "health")
+    R.check((await c.get("/docs")).status_code == 200, "Swagger /docs")
+    infra = (await c.get("/api/infra")).json()
+    R.check(len(infra["timetable"]) == 10 and len(infra["infra"]["stations"]) == 6, "infra: 6 пунктов, 10 поездов")
+    plan = (await c.get("/api/plan")).json()
+    R.check(plan["solver"] in ("cpsat", "refresh") and plan["index"]["value"] >= 95, f"план v{plan['version']}, индекс {plan['index']['value']}")
+    await c.post("/api/sim/clock", json={"speed": speed, "paused": False})
+
+    print("\n# 1. ошибки диспетчера и плохие запросы")
+    bad = [
+        ("POST", "/api/incidents", {"type": "obstacle", "segment_id": "NOPE", "est_min_min": 5, "est_max_min": 10}, 422),
+        ("POST", "/api/incidents", {"type": "train_failure", "train_id": "9999", "est_min_min": 5, "est_max_min": 10}, 422),
+        ("POST", "/api/incidents", {"type": "obstacle", "segment_id": "SEV-R1", "est_min_min": 30, "est_max_min": 10}, 422),
+        ("POST", "/api/incidents", {"type": "signal_failure", "station_id": "STP", "est_min_min": 5, "est_max_min": 10}, 422),
+        ("POST", "/api/incidents", {"type": "obstacle"}, 422),
+        ("POST", "/api/incidents/nope/resolve", None, 404),
+        ("POST", "/api/plan/apply", {"variant_id": "nope", "base_plan_version": 1}, 404),
+        ("POST", "/api/whatif", {"modifications": [{"kind": "add_train"}]}, 422),
+        ("POST", "/api/whatif", {"modifications": [{"kind": "train_speed", "target_id": "9999", "value": 60}]}, 422),
+        ("GET", "/api/ato/9999", None, 404),
+    ]
+    for method, url, body, want in bad:
+        r = await c.request(method, url, json=body)
+        R.check(r.status_code == want, f"{method} {url} {json.dumps(body, ensure_ascii=False)[:70]} -> {r.status_code} (ждали {want})")
+
+    print("\n# 2. what-if и автоведение в штатном режиме")
+    t0 = time.time()
+    r = await c.post("/api/whatif", json={"modifications": [{"kind": "train_speed", "target_id": "2003", "value": 60}]})
+    R.check(r.status_code == 200 and time.time() - t0 <= 3.5, f"what-if 2003→60 км/ч: {r.status_code}, {time.time() - t0:.1f} с, Δ {r.json().get('delta_index')}")
+    R.check((await c.get("/api/plan")).json()["version"] == plan["version"], "what-if не меняет действующий план")
+    codes = [(await c.get(f"/api/ato/{t['id']}")).status_code for t in infra["timetable"]]
+    R.check(all(code in (200, 404) for code in codes), f"ATO по всем поездам: {codes}")
+
+    print("\n# 3. скот на перегоне — применяем лучший сразу")
+    await wait_sim(mon, 2700)
+    v0 = (await c.get("/api/plan")).json()["version"]
+    t0 = time.time()
+    inc = (await c.post("/api/incidents", json={"type": "obstacle", "segment_id": "R1-STP", "km": 24.5,
+                                                 "est_min_min": 15, "est_max_min": 30})).json()
+    vs, dt = await wait_variants(c, v0, inc["id"])
+    R.check(len(vs) == 3 and dt <= 5, f"3 варианта за {dt:.1f} с (≤ 5)")
+    R.check(all(v["explanation"] for v in vs), "у каждого варианта есть объяснение")
+    best = max(vs, key=lambda v: v["plan"]["index"]["value"])
+    await apply(c, mon, best, "скот/лучший", check_promise=True)
+    other = next(v for v in vs if v["id"] != best["id"])
+    r = await c.post("/api/plan/apply", json={"variant_id": other["id"], "base_plan_version": v0})
+    R.check(r.status_code == 409, f"повторное применение другого варианта старой версии -> {r.status_code} (409)")
+    r = await c.post("/api/incidents/" + inc["id"] + "/resolve")
+    R.check(r.status_code == 200, "сбой снят диспетчером досрочно")
+    r = await c.post("/api/incidents/" + inc["id"] + "/resolve")
+    R.check(r.status_code == 404, f"повторное снятие -> {r.status_code} (404)")
+    vs, dt = await wait_variants(c, None, None)
+    if vs:
+        await apply(c, mon, max(vs, key=lambda v: v["plan"]["index"]["value"]), "после снятия/лучший", check_promise=True)
+
+    print("\n# 4. поломка 2003 в пути — вспомогательный локомотив")
+    await wait_sim(mon, 4500)
+    st = next(t for t in mon.state["field"]["trains"] if t["train_id"] == "2003")
+    v0 = (await c.get("/api/plan")).json()["version"]
+    r = await c.post("/api/incidents", json={"type": "train_failure", "train_id": "2003", "est_min_min": 20, "est_max_min": 45})
+    if R.check(r.status_code == 200, f"поломка 2003 ({st['status']}, {st['segment_id'] or st['station_id']})"):
+        inc = r.json()
+        vs, dt = await wait_variants(c, v0, inc["id"])
+        R.check(len(vs) == 3 and dt <= 5, f"3 варианта за {dt:.1f} с; стратегии {[v['strategy'] for v in vs]}")
+        rescue = next((v for v in vs if v["strategy"] == "rescue"), None)
+        R.check(rescue is not None, "есть вариант «Вспомогательный локомотив»")
+        if vs:
+            await apply(c, mon, rescue or vs[0], "поломка/локомотив", check_promise=True)
+
+    print("\n# 5. закрытие перегона — применяем ХУДШИЙ вариант и с опозданием 10 мин")
+    await wait_sim(mon, 6000)
+    v0 = (await c.get("/api/plan")).json()["version"]
+    r = await c.post("/api/incidents", json={"type": "segment_closed", "segment_id": "R2-OZR", "est_min_min": 30, "est_max_min": 30})
+    inc = r.json()
+    vs, dt = await wait_variants(c, v0, inc["id"])
+    R.check(len(vs) == 3 and dt <= 5, f"3 варианта за {dt:.1f} с")
+    await wait_sim(mon, mon.now + 600)
+    worst = min(vs, key=lambda v: v["plan"]["index"]["value"]) if vs else None
+    if worst:
+        await apply(c, mon, worst, "закрытие/худший/поздно", check_promise=False)
+    r = await c.post("/api/whatif", json={"modifications": [{"kind": "incident_duration", "target_id": inc["id"], "value": 60}]})
+    R.check(r.status_code == 200, f"what-if «закрытие продлится 60 мин»: Δ {r.json().get('delta_index')}")
+
+    print("\n# 6. массовые сбои: 8 штук за 2 минуты")
+    await wait_sim(mon, 8400)
+    v0 = (await c.get("/api/plan")).json()["version"]
+    reqs = [
+        {"type": "obstacle", "segment_id": "SEV-R1", "km": 7, "est_min_min": 10, "est_max_min": 20},
+        {"type": "obstacle", "segment_id": "OZR-YUZ", "km": 75, "est_min_min": 10, "est_max_min": 25},
+        {"type": "segment_closed", "segment_id": "STP-R2", "est_min_min": 15, "est_max_min": 15},
+        {"type": "train_failure", "train_id": "2004", "est_min_min": 10, "est_max_min": 30},
+        {"type": "train_failure", "train_id": "2005", "est_min_min": 10, "est_max_min": 30},
+        {"type": "obstacle", "segment_id": "R1-STP", "km": 20, "est_min_min": 5, "est_max_min": 15},
+        {"type": "segment_closed", "segment_id": "R2-OZR", "est_min_min": 10, "est_max_min": 20},
+        {"type": "train_failure", "train_id": "2006", "est_min_min": 5, "est_max_min": 15},
+    ]
+    created = []
+    for q in reqs:
+        r = await c.post("/api/incidents", json=q)
+        if r.status_code == 200:
+            created.append(r.json()["id"])
+        await asyncio.sleep(0.2)
+    R.check(len(created) >= 6, f"создано {len(created)} сбоев из 8")
+    vs, dt = await wait_variants(c, v0, created[-1] if created else None, timeout=10)
+    R.check(len(vs) == 3 and dt <= 5, f"варианты по всем сбоям за {dt:.1f} с после последнего")
+    if vs:
+        await apply(c, mon, max(vs, key=lambda v: v["plan"]["index"]["value"]), "массовые/лучший", check_promise=True)
+
+    print("\n# 7. пауза/скорость и ручной пересчёт без сбоев")
+    await c.post("/api/sim/clock", json={"paused": True})
+    t = mon.now
+    await asyncio.sleep(2.5)
+    R.check(abs(mon.now - t) < 1, "пауза останавливает время")
+    await c.post("/api/sim/clock", json={"paused": False, "speed": speed})
+    while mon.state["field"]["incidents"]:
+        await asyncio.sleep(1)
+    await wait_sim(mon, mon.now + 300)
+    v0 = (await c.get("/api/plan")).json()["version"]
+    r = await c.post("/api/plan/replan")
+    R.check(r.status_code == 200, "ручной «Пересчитать план»")
+    vs, dt = await wait_variants(c, v0, None)
+    R.check(len(vs) == 3, f"варианты пересчёта за {dt:.1f} с")
+    if vs:
+        await apply(c, mon, max(vs, key=lambda v: v["plan"]["index"]["value"]), "пересчёт/лучший", check_promise=True)
+
+    print("\n# 8. доводим день до конца")
+    while any(t["status"] != "finished" for t in mon.state["field"]["trains"]) and mon.now < 40000 and not mon.stall:
+        await asyncio.sleep(2)
+
+
+async def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--speed", type=float, default=60)
+    args = ap.parse_args()
+    async with httpx.AsyncClient(base_url=BASE, timeout=20) as c:
+        mon = Monitor(c)
+        mt = asyncio.create_task(mon.run())
+        ws_stats: dict = {}
+        wt = asyncio.create_task(ws_probe(ws_stats))
+        await asyncio.sleep(2)
+        t0 = time.time()
+        try:
+            await scenario(c, mon, args.speed)
+        finally:
+            mon.stop, ws_stats["stop"] = True, True
+            await asyncio.sleep(1.2)
+            mt.cancel()
+            wt.cancel()
+        f = mon.state["field"]
+        print("\n# итог")
+        R.check(mon.max_viol == 0, f"нарушений безопасности: {mon.max_viol}")
+        R.check(not mon.stall, "нет остановки движения (блокировки) без сбоев")
+        fin = sum(t["status"] == "finished" for t in f["trains"])
+        R.check(fin == 10, f"все поезда доехали: {fin}/10 к {f['sim_time'] / 3600 + 7 + 55 / 60:.1f} ч")
+        R.check(mon.max_quiet_growth <= 10, f"без сбоев прогноз не растёт: макс. рост {mon.max_quiet_growth:.1f} мин за 30 мин")
+        R.check(mon.http_5xx == 0, f"ответов 5xx: {mon.http_5xx}")
+        lat = sorted(ws_stats.get("lat", [0]))
+        p95 = lat[int(len(lat) * 0.95) - 1] if lat else 0
+        R.check(ws_stats.get("snapshot") and p95 < 500, f"WS: snapshot при подключении, {ws_stats.get('msgs', 0)} сообщений, p95 доставки {p95:.0f} мс")
+        print(f"\n{len(R.notes)} ok, {len(R.fails)} FAIL за {time.time() - t0:.0f} с")
+        for x in R.fails:
+            print("  ", x)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

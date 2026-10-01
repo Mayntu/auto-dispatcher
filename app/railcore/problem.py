@@ -47,6 +47,7 @@ class Node:
     dep_min: int = 0
     stop_fixed: bool = False
     dest_dwell: int = 0
+    capacity: int = 1  # tracks at the station
 
 
 @dataclass
@@ -137,7 +138,7 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
             t_pass = round(rts.t_pass(cat.id, seg_id, train.direction, clear_m, ov))
             kind = "origin" if k == 0 else "dest" if k == last else "mid"
             node = Node(station_id=s.station_id, kind=kind, sched_arr=rel(s.arr), sched_dep=rel(s.dep),
-                        sched_stop=s.stop, dwell_min=0, pass_threshold=t_pass)
+                        sched_stop=s.stop, dwell_min=0, pass_threshold=t_pass, capacity=world.capacity(s.station_id))
             if kind == "mid":
                 node.dwell_min = max(s.min_dwell_s, cat.min_dwell_s) if s.stop else t_pass
                 node.stop_fixed = s.stop
@@ -178,7 +179,10 @@ def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
             n0.arr_fixed = 0
             elapsed = max(0.0, now - (st.arrived_at if st.arrived_at is not None else now))
             if n0.kind == "dest":
-                n0.dest_dwell = max(0, round(leave - elapsed))
+                # already arrived: keep the real arrival time (in the past), not "now" — otherwise the
+                # train looks later and later while it stands at its terminus
+                n0.arr_fixed = -round(elapsed)
+                n0.dest_dwell = leave
             elif n0.kind == "mid":
                 n0.dep_min = max(n0.dep_min, round(n0.dwell_min - elapsed)) if n0.sched_stop else n0.dep_min
                 n0.pass_threshold = max(0, round(n0.pass_threshold - elapsed))

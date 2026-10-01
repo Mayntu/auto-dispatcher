@@ -27,12 +27,13 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
 
     # warm start: the hint plan's order replayed on the current problem (a full, nearly feasible assignment)
     try:
-        warm = evaluate(tasks, hint, clear)
+        warm = evaluate(tasks, hint, clear, now)
     except Deadlock:
         warm = {}
     ub = max([p["horizon_s"] + 7200] + [d + 1800 for times in warm.values() for _, d, _ in times])
     seg_intervals: dict[str, list] = {}
     station_intervals: dict[str, list] = {}
+    station_dir_intervals: dict[tuple[str, str], list] = {}
     objective = []
     vars_by_train: dict[str, list[tuple]] = {}
 
@@ -52,7 +53,9 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
                 if not n.stop_fixed:
                     m.Add(dwell <= n.pass_threshold + ub * s)
                     objective.append(round(p["lambda_stop"] * lambda_stop_mult * SCALE) * s)
-            station_intervals.setdefault(n.station_id, []).append(m.NewIntervalVar(a, dwell, d, f"st_{tid}_{i}"))
+            iv = m.NewIntervalVar(a, dwell, d, f"st_{tid}_{i}")
+            station_intervals.setdefault(n.station_id, []).append(iv)
+            station_dir_intervals.setdefault((n.station_id, t.direction.value), []).append(iv)
             if (n.kind != "origin" and n.sched_arr is not None and n.arr_fixed is None
                     and (n.kind == "dest" or (n.sched_stop and t.category != "freight"))):
                 late = m.NewIntVar(0, ub, f"late_{tid}_{i}")
@@ -90,13 +93,16 @@ def solve_cpsat(tasks: list[Task], settings: dict, hint: list[PlanEntry], now: f
     world = get_world()
     for st_id, ivs in station_intervals.items():
         m.AddCumulative(ivs, [1] * len(ivs), world.capacity(st_id))
+    # as the field enforces: one track per station stays free for opposite traffic (deadlock avoidance)
+    for (st_id, _), ivs in station_dir_intervals.items():
+        m.AddCumulative(ivs, [1] * len(ivs), max(1, world.capacity(st_id) - 1))
     m.Minimize(sum(objective))
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s if time_limit_s is not None else p["time_limit_s"]
-    solver.parameters.num_workers = 4
+    solver.parameters.num_workers = p.get("cpsat_workers", 4)
     solver.parameters.random_seed = 42
-    solver.parameters.repair_hint = True
+    # no repair_hint: OR-Tools 9.15 aborts the whole process in MinimizeL1DistanceWithHint on some models
     t0 = time.perf_counter()
     status = solver.Solve(m)
     ms = round((time.perf_counter() - t0) * 1000)

@@ -24,6 +24,7 @@ from app.railcore.running_time import RunningTimes
 
 log = logging.getLogger("field")
 SUBSTEP_S = 1.0
+STALL_OVERRIDE_S = 600.0  # nothing moved this long -> the DC lets a physically possible move go out of plan order
 
 
 @dataclass
@@ -58,6 +59,8 @@ class FieldSim:
         self._seg_order: dict[str, list[tuple[float, str]]] = {}
         self.safety_violations = 0
         self._violating: set[str] = set()
+        self._last_progress = 0.0
+        self.plan_overrides = 0
 
     # ---- plan -------------------------------------------------------------------------------
     def set_plan(self, plan: Plan) -> None:
@@ -155,7 +158,9 @@ class FieldSim:
             origin = tr.route[0]
             d = self._dwell.get((tid, origin))
             appear = d.start if d else tr.train.stops[0].dep - self.settings["station"]["ready_before_dep_s"]
-            if t >= appear and self._occupancy(origin, tid) < self.world.capacity(origin):
+            if t >= appear and self._occupancy(origin, tid) < self.world.capacity(origin) \
+                    and self._direction_ok(tr, origin):
+                self._last_progress = t
                 tr.loc, tr.idx, tr.arrived_at, tr.stopped = "station", 0, t, True
                 tr.track_id = self._pick_track(tr, origin, will_stop=True)
             return None
@@ -169,6 +174,7 @@ class FieldSim:
         tr.speed_kmh = 0.0 if tr.stopped else tr.speed_kmh
         if k == last:
             if t >= tr.arrived_at + self.settings["station"]["leave_after_arr_s"]:
+                self._last_progress = t
                 tr.loc = "done"
                 return {"kind": "finished", "station_id": st_id}
             return None
@@ -189,16 +195,16 @@ class FieldSim:
                 o.loc == "segment" and self._seg(o, o.idx).id == seg.id for o in self.trains.values()):
             return None
         nxt = tr.route[k + 1]
-        if self._occupancy(nxt, tid) >= self.world.capacity(nxt):
+        if self._occupancy(nxt, tid) >= self.world.capacity(nxt) or not self._direction_ok(tr, nxt):
             return None
-        my_run = self._run.get((tid, seg.id))
-        if my_run is not None:
-            for start, other_id in self._seg_order.get(seg.id, []):
-                if start >= my_run.start:
-                    break
-                o = self.trains[other_id]
-                if other_id != tid and o.loc != "done" and seg.id not in o.done_segments:
-                    return None
+        if not (self._segment_turn(tr, seg.id) and self._my_turn_at(tr, nxt)):
+            # waiting for the plan's order is right, unless the whole field has stopped: then the order is
+            # stale (the plan no longer matches reality) and a physically safe move is let through
+            if t - self._last_progress < STALL_OVERRIDE_S or not self._safe_out_of_order(tr, nxt):
+                return None
+            self.plan_overrides += 1
+            log.warning("field stalled %.0f s: %s leaves %s out of plan order", t - self._last_progress, tid, st_id)
+        self._last_progress = t
         rt = self.rts.get(cat.id, seg.id, tr.train.direction, tr.train.v_max_override_kmh)
         if tr.stopped:
             tr.energy_kwh += rt.e_start_kwh
@@ -224,6 +230,8 @@ class FieldSim:
         if run is not None:
             rate = min((1.0 - tr.progress) / max(run.end - t, 1.0), rate)
         new_p = min(tr.progress + rate * h, cap)
+        if new_p > tr.progress:
+            self._last_progress = t
         tr.held_at_obstacle = new_p >= cap - 1e-9 and cap < 1.0
         tr.speed_kmh = (new_p - tr.progress) * seg.length_m / h * 3.6
         tr.energy_kwh += rt.e_pp_kwh * (new_p - tr.progress)
@@ -240,6 +248,68 @@ class FieldSim:
             tr.track_id = self._pick_track(tr, st_id, will_stop)
             return {"kind": "arrived", "station_id": st_id, "track_id": tr.track_id}
         return None
+
+    def _direction_ok(self, tr: SimTrain, station_id: str) -> bool:
+        """Single-track deadlock avoidance: a station never fills up with trains of one direction while an
+        opposite train still has to pass it — one track stays for the crossing. Any chain of waiting trains
+        then unwinds from the termini, where trains finish and free their tracks."""
+        d = tr.train.direction
+        opposite_needs = False
+        same = 0
+        for o in self.trains.values():
+            if o is tr or o.loc == "done" or station_id not in o.route:
+                continue
+            k = o.route.index(station_id)
+            here = (o.loc == "station" and o.idx == k) or (o.loc == "segment" and o.idx + 1 == k)
+            if o.train.direction == d:
+                same += here
+            elif here or o.loc == "none" or k > o.idx:
+                opposite_needs = True
+        return not opposite_needs or same + 1 <= self.world.capacity(station_id) - 1
+
+    def _segment_turn(self, tr: SimTrain, seg_id: str) -> bool:
+        """Every train planned onto this segment before this one has already passed it."""
+        my_run = self._run.get((tr.train.id, seg_id))
+        if my_run is None:
+            return True
+        for start, other_id in self._seg_order.get(seg_id, []):
+            if start >= my_run.start:
+                break
+            o = self.trains[other_id]
+            if other_id != tr.train.id and o.loc != "done" and seg_id not in o.done_segments:
+                return False
+        return True
+
+    def _safe_out_of_order(self, tr: SimTrain, station_id: str) -> bool:
+        """An out-of-order move must not create a new deadlock: leave a free track at the next station, or
+        be able to roll on through it right away."""
+        if self._occupancy(station_id, tr.train.id) + 1 < self.world.capacity(station_id):
+            return True
+        k = tr.route.index(station_id)
+        if k == len(tr.route) - 1:
+            return True
+        seg = self.world.segment_between(station_id, tr.route[k + 1])
+        busy = any(o.loc == "segment" and self._seg(o, o.idx).id == seg.id for o in self.trains.values())
+        return not busy and not self._closed(seg.id) \
+            and self._occupancy(tr.route[k + 1], tr.train.id) < self.world.capacity(tr.route[k + 1])
+
+    def _my_turn_at(self, tr: SimTrain, station_id: str) -> bool:
+        """Like the DC following the approved plan: keep a track reserved for every train that the plan
+        brings to this station earlier and that will still be there when this train arrives. Without the
+        reservation two sidings can fill with trains waiting for each other (single-track deadlock)."""
+        mine = self._dwell.get((tr.train.id, station_id))
+        if mine is None:
+            return True
+        reserved = 0
+        for o in self.trains.values():
+            if o is tr or o.loc == "done" or station_id not in o.route:
+                continue
+            if o.loc != "none" and o.route.index(station_id) <= o.idx + (o.loc == "segment"):
+                continue  # already there or heading in: counted by _occupancy
+            theirs = self._dwell.get((o.train.id, station_id))
+            if theirs is not None and theirs.start < mine.start and theirs.end > mine.start:
+                reserved += 1
+        return self._occupancy(station_id, tr.train.id) + reserved < self.world.capacity(station_id)
 
     def _pick_track(self, tr: SimTrain, station_id: str, will_stop: bool) -> str | None:
         """Through trains take the main track; stopping trains take a side track that fits the train
@@ -345,6 +415,7 @@ class FieldSim:
             "occupied_segments": occupied,
             "signals": self.signals(),
             "safety_violations": self.safety_violations,
+            "plan_overrides": self.plan_overrides,
             "plan_version": self.plan.version if self.plan else None,
         }
 
@@ -362,6 +433,7 @@ class FieldService:
 
     async def start(self) -> None:
         await self.bus.subscribe("plan.approved", self._on_plan)
+        await self.bus.subscribe("plan.refreshed", self._on_plan)
         await self.bus.subscribe("cmd.field.*", self._on_cmd)
         await self._publish_state()
         self._task = asyncio.create_task(self._loop())
