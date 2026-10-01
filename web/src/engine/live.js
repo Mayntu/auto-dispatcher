@@ -294,7 +294,7 @@ export function startLive(engine) {
     async manualPreview(req) {
       const r = await api.manualPreview({ base_plan_version: manualBase, train_id: req.trainId, station_id: SECTION.stations[req.station].specId, kind: req.kind, time: toServer(req.time) });
       if (!r.ok) throw new Error(String(r.status));
-      return previewFromSpec(r.data, st().plan, trains);
+      return previewFromSpec(r.data, st().plan, trains, { km: SECTION.stations[req.station].km });
     },
     async manualCommit(req) {
       if (!engine.allowed('section', 'ручное изменение времени')) return;

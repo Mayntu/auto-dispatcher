@@ -156,7 +156,7 @@ export function boundsFromSpec(r) {
   };
 }
 /** PreviewResponse → прогноз: нитки затронутых поездов накладываются на действующий план. */
-export function previewFromSpec(r, plan, trains) {
+export function previewFromSpec(r, plan, trains, at = null) {
   const idx = stIdx();
   const out = { ...plan.trains };
   for (const th of r.threads ?? []) {
@@ -187,7 +187,14 @@ export function previewFromSpec(r, plan, trains) {
     dragged: { arr: toUi(d.arr ?? null), dep: toUi(d.dep ?? null), dwell: d.dwell_s ?? 0, prevRun: d.prev_run_s ?? null },
     plan: { ...plan, trains: out },
     changed: (r.affected ?? []).map((a) => ({ trainId: a.train_id, number: num.get(a.train_id) ?? a.train_id, deltaFinal: a.delta_final_s, deltaMax: a.delta_max_s })),
-    conflicts: (r.conflicts ?? []).map((c) => ({ time: toUi(c.time_from), km: kmOf(c.resource_id), trains: c.trains, kind: c.kind })),
+    // Конфликт сервера — {kind, trains, text} без места и времени: маркер ставим в перетаскиваемую точку.
+    conflicts: (r.conflicts ?? []).map((c) => ({
+      time: c.time_from != null ? toUi(c.time_from) : toUi(r.time),
+      km: c.resource_id ? kmOf(c.resource_id) : (at?.km ?? 0),
+      trains: c.trains,
+      kind: c.kind,
+      text: c.text,
+    })),
     index: { value: r.index_forecast },
     deltaIndex: r.delta_index ?? 0,
     totalDelayDelta: (r.total_delay_delta_s ?? 0) / 60,

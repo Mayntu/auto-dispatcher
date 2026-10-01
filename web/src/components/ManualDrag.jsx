@@ -247,6 +247,7 @@ export function useManualDrag({ s, plan, geo, svgRef, canEdit, focus, onHandleEn
         })}
       {drag?.preview?.conflicts?.map((c, i) => (
         <g key={i} transform={`translate(${x(c.time)} ${y(c.km)})`} className="gv-conflict">
+          {c.text && <title>{t(c.text)}</title>}
           <circle r={8} />
           <text y={4} textAnchor="middle">
             !
