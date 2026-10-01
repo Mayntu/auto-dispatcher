@@ -1,0 +1,257 @@
+"""Shared problem description for the CP-SAT model and the fixed-order evaluator.
+
+`Snapshot` (the "now" state) -> list[Task] (per-train chain of station nodes and segment legs,
+times in int seconds relative to `now`) -> solution {train_id: [(arr, dep, stop), ...]} -> `Plan`.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from pydantic import BaseModel
+
+from app.railcore.index import compute_index
+from app.railcore.infra import World
+from app.railcore.meetings import find_meetings
+from app.railcore.models import (
+    KPI, Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus,
+)
+from app.railcore.running_time import RunningTimes
+
+CLOSING_TYPES = {IncidentType.OBSTACLE, IncidentType.SEGMENT_CLOSED}
+OBSTACLE_STOP_M = 200.0  # trains stop this far before an obstacle
+MIN_REMAINING_S = 60  # an incident past its estimate but still active blocks for at least this long
+
+Solution = dict[str, list[tuple[int, int, bool]]]
+
+
+class Snapshot(BaseModel):
+    now: float
+    trains: list[Train]  # effective timetable (what-if overrides applied)
+    states: dict[str, TrainState] = {}
+    incidents: list[Incident] = []  # active only
+    duration_override_s: dict[str, int] = {}  # incident id -> total duration (what-if)
+    hint: list[PlanEntry] = []  # current plan, for warm start and fixed order
+
+
+@dataclass
+class Node:
+    station_id: str
+    kind: str  # origin | mid | dest
+    sched_arr: int | None
+    sched_dep: int | None
+    sched_stop: bool
+    dwell_min: int  # dep - arr lower bound
+    pass_threshold: int  # dwell above this means the train stopped
+    arr_fixed: int | None = None
+    dep_min: int = 0
+    stop_fixed: bool = False
+    dest_dwell: int = 0
+
+
+@dataclass
+class Leg:
+    segment_id: str
+    t_pp: int
+    sup_start: int
+    sup_end: int
+    e_pp: float
+    e_start: float
+
+
+@dataclass
+class Current:
+    segment_id: str
+    remaining: int  # minimum time to reach nodes[0], before the stop supplement
+    sup_end: int
+    e_rest: float
+
+
+@dataclass
+class Task:
+    train_id: str
+    category: str
+    direction: Direction
+    weight: float  # strategy weight (objective)
+    base_weight: float  # category weight (KPI)
+    nodes: list[Node]
+    legs: list[Leg]  # legs[i] goes nodes[i] -> nodes[i+1]
+    current: Current | None = None
+    meta: dict = field(default_factory=dict)
+
+
+def incident_remaining(inc: Incident, now: float, durations: dict[str, int]) -> int:
+    d = durations.get(inc.id, inc.est_expected_s)
+    return max(MIN_REMAINING_S, round(inc.started_at + d - now))
+
+
+def build_tasks(snap: Snapshot, world: World, rts: RunningTimes, settings: dict,
+                durations: dict[str, int] | None = None, weight_mult: dict[str, float] | None = None) -> list[Task]:
+    now = snap.now
+    durations = {**(durations or {}), **snap.duration_override_s}
+    weight_mult = weight_mult or {}
+    horizon = settings["planner"]["horizon_s"]
+    st_cfg = settings["station"]
+    ready, leave, clear_m = st_cfg["ready_before_dep_s"], st_cfg["leave_after_arr_s"], st_cfg["pass_clear_m"]
+
+    def rel(t: float | None) -> int | None:
+        return None if t is None else round(t - now)
+
+    closed: dict[str, int] = {}
+    obstacles: list[tuple[Incident, int]] = []
+    failures: dict[str, int] = {}
+    for inc in snap.incidents:
+        if inc.status != "active":
+            continue
+        rem = incident_remaining(inc, now, durations)
+        if inc.type in CLOSING_TYPES and inc.segment_id:
+            closed[inc.segment_id] = max(closed.get(inc.segment_id, 0), rem)
+            if inc.type == IncidentType.OBSTACLE:
+                obstacles.append((inc, rem))
+        elif inc.type == IncidentType.TRAIN_FAILURE and inc.train_id:
+            failures[inc.train_id] = max(failures.get(inc.train_id, 0), rem)
+
+    tasks: list[Task] = []
+    for train in snap.trains:
+        if train.cancelled:
+            continue
+        st = snap.states.get(train.id)
+        if st is not None and st.status == TrainStatus.FINISHED:
+            continue
+        route = world.route(train)
+        last = len(route) - 1
+        cat = world.categories[train.category]
+        ov = train.v_max_override_kmh
+        if (st is None or not st.on_field) and train.stops[0].dep is not None and train.stops[0].dep - now > horizon:
+            continue
+
+        legs_all = []
+        for k in range(last):
+            seg = world.segment_between(route[k], route[k + 1])
+            rt = rts.get(cat.id, seg.id, train.direction, ov)
+            legs_all.append(Leg(seg.id, round(rt.t_pp), round(rt.sup_start), round(rt.sup_end), rt.e_pp_kwh, rt.e_start_kwh))
+
+        def make_node(k: int) -> Node:
+            s = train.stops[k]
+            seg_id = legs_all[min(k, last - 1)].segment_id
+            t_pass = round(rts.t_pass(cat.id, seg_id, train.direction, clear_m, ov))
+            kind = "origin" if k == 0 else "dest" if k == last else "mid"
+            node = Node(station_id=s.station_id, kind=kind, sched_arr=rel(s.arr), sched_dep=rel(s.dep),
+                        sched_stop=s.stop, dwell_min=0, pass_threshold=t_pass)
+            if kind == "mid":
+                node.dwell_min = max(s.min_dwell_s, cat.min_dwell_s) if s.stop else t_pass
+                node.stop_fixed = s.stop
+                if s.stop and cat.id != "freight" and node.sched_dep is not None:
+                    node.dep_min = max(0, node.sched_dep)
+            elif kind == "origin":
+                node.stop_fixed = True
+                node.dep_min = max(0, node.sched_dep or 0)
+            else:
+                node.stop_fixed = True
+                node.dest_dwell = leave
+            if k < last and legs_all[k].segment_id in closed:
+                node.dep_min = max(node.dep_min, closed[legs_all[k].segment_id])
+            return node
+
+        current = None
+        if st is None or not st.on_field:
+            first = 0
+            nodes = [make_node(k) for k in range(len(route))]
+            nodes[0].arr_fixed = max(0, round(train.stops[0].dep - ready - now))
+        elif st.segment_id:
+            first = route.index(st.next_station_id)
+            nodes = [make_node(k) for k in range(first, len(route))]
+            leg = legs_all[first - 1]
+            rest = 1.0 - st.progress
+            remaining = rest * leg.t_pp
+            for inc, rem in obstacles:
+                if inc.segment_id == leg.segment_id and inc.km is not None:
+                    obs_pos = world.pos_of_km(leg.segment_id, inc.km, train.direction)
+                    if st.pos_m < obs_pos - OBSTACLE_STOP_M + 1:
+                        remaining = max(remaining, rem + rest * leg.t_pp)
+            remaining += failures.get(train.id, 0)
+            current = Current(leg.segment_id, round(remaining), leg.sup_end, rest * leg.e_pp)
+        else:
+            first = route.index(st.station_id)
+            nodes = [make_node(k) for k in range(first, len(route))]
+            n0 = nodes[0]
+            n0.arr_fixed = 0
+            elapsed = max(0.0, now - (st.arrived_at if st.arrived_at is not None else now))
+            if n0.kind == "dest":
+                n0.dest_dwell = max(0, round(leave - elapsed))
+            elif n0.kind == "mid":
+                n0.dep_min = max(n0.dep_min, round(n0.dwell_min - elapsed)) if n0.sched_stop else n0.dep_min
+                n0.pass_threshold = max(0, round(n0.pass_threshold - elapsed))
+                n0.dwell_min = 0
+                n0.stop_fixed = n0.stop_fixed or st.stopped
+            if train.id in failures:
+                n0.dep_min = max(n0.dep_min, failures[train.id])
+
+        base_w = train.priority_override or settings["priority_weights"][cat.id]
+        tasks.append(Task(
+            train_id=train.id, category=cat.id, direction=train.direction,
+            weight=base_w * weight_mult.get(cat.id, 1.0), base_weight=base_w,
+            nodes=nodes, legs=legs_all[first:], current=current,
+            meta={"final_sched_arr": rel(train.stops[-1].arr)},
+        ))
+    return tasks
+
+
+def assemble_plan(tasks: list[Task], sol: Solution, snap: Snapshot, world: World, settings: dict, *,
+                  solver: str, strategy: str | None, solve_ms: int, version: int = 0,
+                  base_version: int | None = None) -> Plan:
+    now = snap.now
+    horizon = settings["planner"]["horizon_s"]
+    window = settings["index"]["refs"]["accuracy_window_s"]
+    entries: list[PlanEntry] = []
+    total = weighted = 0.0
+    delayed: list[tuple[str, float]] = []
+    unplanned = throughput = planned = acc_ok = acc_n = 0
+    energy = energy_ideal = 0.0
+
+    for task in tasks:
+        times = sol[task.train_id]
+        if task.current:
+            entries.append(PlanEntry(train_id=task.train_id, kind="run", segment_id=task.current.segment_id,
+                                     station_id=None, track_id=None, start=now, end=now + times[0][0]))
+            energy += task.current.e_rest
+            energy_ideal += task.current.e_rest
+        for i, (node, (arr, dep, stop)) in enumerate(zip(task.nodes, times)):
+            is_unplanned = stop and node.kind == "mid" and not node.sched_stop
+            unplanned += is_unplanned
+            entries.append(PlanEntry(train_id=task.train_id, kind="dwell", segment_id=None, station_id=node.station_id,
+                                     track_id=None, start=now + arr, end=now + dep, stop=stop, unplanned=is_unplanned))
+            if i < len(task.legs):
+                leg = task.legs[i]
+                entries.append(PlanEntry(train_id=task.train_id, kind="run", segment_id=leg.segment_id,
+                                         station_id=None, track_id=None, start=now + dep, end=now + times[i + 1][0]))
+                energy += leg.e_pp + leg.e_start * stop
+                energy_ideal += leg.e_pp + leg.e_start * (node.kind == "origin" or node.sched_stop)
+            if (task.category != "freight" and node.sched_stop and node.kind != "origin"
+                    and node.arr_fixed is None and node.sched_arr is not None):
+                acc_n += 1
+                acc_ok += abs(arr - node.sched_arr) <= window
+        dest_arr = times[-1][0]
+        sched_dest = task.meta["final_sched_arr"]
+        late = max(0, dest_arr - sched_dest) if sched_dest is not None else 0
+        total += late
+        weighted += late * task.base_weight
+        if late >= 60:
+            delayed.append((task.train_id, float(late)))
+        throughput += dest_arr <= horizon
+        planned += sched_dest is not None and sched_dest <= horizon
+
+    kpi = KPI(
+        total_delay_s=total, weighted_delay_s=weighted, delayed_trains=sorted(delayed, key=lambda x: -x[1]),
+        unplanned_stops=unplanned, energy_kwh=round(energy, 1), energy_ideal_kwh=round(energy_ideal, 1),
+        conflicts=unplanned, throughput=throughput, planned_throughput=planned,
+        arrival_accuracy=acc_ok / acc_n if acc_n else 1.0,
+    )
+    directions = {t.train_id: t.direction.value for t in tasks}
+    base_dwell = {(t.train_id, n.station_id): float(n.dwell_min) for t in tasks for n in t.nodes if n.kind == "mid"}
+    return Plan(
+        version=version, base_version=base_version, created_at=now, horizon_end=now + horizon,
+        entries=entries, meetings=find_meetings(entries, directions, base_dwell), kpi=kpi,
+        index=compute_index(kpi, sum(t.base_weight for t in tasks), horizon, settings),
+        strategy=strategy, solver=solver, solve_ms=solve_ms,
+    )

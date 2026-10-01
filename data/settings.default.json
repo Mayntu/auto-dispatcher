@@ -1,0 +1,49 @@
+{
+  "index": {
+    "weights": {
+      "schedule": 0.3,
+      "capacity": 0.2,
+      "energy": 0.15,
+      "conflicts": 0.2,
+      "accuracy": 0.15
+    },
+    "thresholds": {
+      "norm": 80,
+      "attention": 60
+    },
+    "refs": {
+      "delay_ref_min": 15,
+      "conflicts_ref": 3,
+      "accuracy_window_s": 120
+    }
+  },
+  "priority_weights": {
+    "express": 5,
+    "passenger": 3,
+    "freight": 1
+  },
+  "planner": {
+    "time_limit_s": 1.5,
+    "workers": 3,
+    "horizon_s": 7200,
+    "debounce_ms": 300,
+    "segment_clear_s": 60,
+    "lambda_stop": 120,
+    "lambda_side_track": 30,
+    "replan_deviation_s": 120,
+    "rescue_eta_s": 1800,
+    "rescue_haul_s": 600
+  },
+  "sim": {
+    "speed": 20,
+    "tick_s": 0.5,
+    "auto_routes": true,
+    "ato_compliance": 1.0
+  },
+  "station": {
+    "side_track_kmh": 40,
+    "pass_clear_m": 300,
+    "ready_before_dep_s": 300,
+    "leave_after_arr_s": 300
+  }
+}

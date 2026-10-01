@@ -1,0 +1,492 @@
+{
+ "stations": [
+  {
+   "id": "SEV",
+   "name": "Ст. Северная",
+   "kind": "station",
+   "km": 0,
+   "tracks": [
+    {
+     "id": "I",
+     "length_m": 1200,
+     "main": true,
+     "platform": true
+    },
+    {
+     "id": "3",
+     "length_m": 1050,
+     "main": false,
+     "platform": true
+    },
+    {
+     "id": "4",
+     "length_m": 1050,
+     "main": false,
+     "platform": false
+    },
+    {
+     "id": "5",
+     "length_m": 850,
+     "main": false,
+     "platform": false
+    }
+   ]
+  },
+  {
+   "id": "R1",
+   "name": "Рзд. 1",
+   "kind": "siding",
+   "km": 15,
+   "tracks": [
+    {
+     "id": "I",
+     "length_m": 1100,
+     "main": true,
+     "platform": false
+    },
+    {
+     "id": "2",
+     "length_m": 1050,
+     "main": false,
+     "platform": false
+    }
+   ]
+  },
+  {
+   "id": "STP",
+   "name": "Ст. Степная",
+   "kind": "station",
+   "km": 33,
+   "tracks": [
+    {
+     "id": "I",
+     "length_m": 1200,
+     "main": true,
+     "platform": true
+    },
+    {
+     "id": "3",
+     "length_m": 1050,
+     "main": false,
+     "platform": true
+    },
+    {
+     "id": "4",
+     "length_m": 900,
+     "main": false,
+     "platform": false
+    }
+   ]
+  },
+  {
+   "id": "R2",
+   "name": "Рзд. 2",
+   "kind": "siding",
+   "km": 49,
+   "tracks": [
+    {
+     "id": "I",
+     "length_m": 1100,
+     "main": true,
+     "platform": false
+    },
+    {
+     "id": "2",
+     "length_m": 1050,
+     "main": false,
+     "platform": false
+    }
+   ]
+  },
+  {
+   "id": "OZR",
+   "name": "Ст. Озёрная",
+   "kind": "station",
+   "km": 66,
+   "tracks": [
+    {
+     "id": "I",
+     "length_m": 1200,
+     "main": true,
+     "platform": true
+    },
+    {
+     "id": "3",
+     "length_m": 1050,
+     "main": false,
+     "platform": true
+    }
+   ]
+  },
+  {
+   "id": "YUZ",
+   "name": "Ст. Южная",
+   "kind": "station",
+   "km": 84,
+   "tracks": [
+    {
+     "id": "I",
+     "length_m": 1200,
+     "main": true,
+     "platform": true
+    },
+    {
+     "id": "3",
+     "length_m": 1050,
+     "main": false,
+     "platform": true
+    },
+    {
+     "id": "4",
+     "length_m": 1050,
+     "main": false,
+     "platform": false
+    },
+    {
+     "id": "5",
+     "length_m": 850,
+     "main": false,
+     "platform": false
+    }
+   ]
+  }
+ ],
+ "segments": [
+  {
+   "id": "SEV-R1",
+   "from_station": "SEV",
+   "to_station": "R1",
+   "length_m": 15000,
+   "v_max_kmh": 120
+  },
+  {
+   "id": "R1-STP",
+   "from_station": "R1",
+   "to_station": "STP",
+   "length_m": 18000,
+   "v_max_kmh": 120,
+   "speed_zones": [
+    {
+     "from_m": 9000,
+     "to_m": 11000,
+     "v_kmh": 70
+    }
+   ]
+  },
+  {
+   "id": "STP-R2",
+   "from_station": "STP",
+   "to_station": "R2",
+   "length_m": 16000,
+   "v_max_kmh": 100,
+   "grade_zones": [
+    {
+     "from_m": 4000,
+     "to_m": 10000,
+     "permille": 8
+    }
+   ]
+  },
+  {
+   "id": "R2-OZR",
+   "from_station": "R2",
+   "to_station": "OZR",
+   "length_m": 17000,
+   "v_max_kmh": 120
+  },
+  {
+   "id": "OZR-YUZ",
+   "from_station": "OZR",
+   "to_station": "YUZ",
+   "length_m": 18000,
+   "v_max_kmh": 120,
+   "grade_zones": [
+    {
+     "from_m": 6000,
+     "to_m": 12000,
+     "permille": -5
+    }
+   ]
+  }
+ ],
+ "signals": [
+  {
+   "id": "SEV-odd-entry",
+   "station_id": "SEV",
+   "direction": "odd",
+   "kind": "entry"
+  },
+  {
+   "id": "SEV-odd-exit",
+   "station_id": "SEV",
+   "direction": "odd",
+   "kind": "exit"
+  },
+  {
+   "id": "SEV-even-entry",
+   "station_id": "SEV",
+   "direction": "even",
+   "kind": "entry"
+  },
+  {
+   "id": "SEV-even-exit",
+   "station_id": "SEV",
+   "direction": "even",
+   "kind": "exit"
+  },
+  {
+   "id": "R1-odd-entry",
+   "station_id": "R1",
+   "direction": "odd",
+   "kind": "entry"
+  },
+  {
+   "id": "R1-odd-exit",
+   "station_id": "R1",
+   "direction": "odd",
+   "kind": "exit"
+  },
+  {
+   "id": "R1-even-entry",
+   "station_id": "R1",
+   "direction": "even",
+   "kind": "entry"
+  },
+  {
+   "id": "R1-even-exit",
+   "station_id": "R1",
+   "direction": "even",
+   "kind": "exit"
+  },
+  {
+   "id": "STP-odd-entry",
+   "station_id": "STP",
+   "direction": "odd",
+   "kind": "entry"
+  },
+  {
+   "id": "STP-odd-exit",
+   "station_id": "STP",
+   "direction": "odd",
+   "kind": "exit"
+  },
+  {
+   "id": "STP-even-entry",
+   "station_id": "STP",
+   "direction": "even",
+   "kind": "entry"
+  },
+  {
+   "id": "STP-even-exit",
+   "station_id": "STP",
+   "direction": "even",
+   "kind": "exit"
+  },
+  {
+   "id": "R2-odd-entry",
+   "station_id": "R2",
+   "direction": "odd",
+   "kind": "entry"
+  },
+  {
+   "id": "R2-odd-exit",
+   "station_id": "R2",
+   "direction": "odd",
+   "kind": "exit"
+  },
+  {
+   "id": "R2-even-entry",
+   "station_id": "R2",
+   "direction": "even",
+   "kind": "entry"
+  },
+  {
+   "id": "R2-even-exit",
+   "station_id": "R2",
+   "direction": "even",
+   "kind": "exit"
+  },
+  {
+   "id": "OZR-odd-entry",
+   "station_id": "OZR",
+   "direction": "odd",
+   "kind": "entry"
+  },
+  {
+   "id": "OZR-odd-exit",
+   "station_id": "OZR",
+   "direction": "odd",
+   "kind": "exit"
+  },
+  {
+   "id": "OZR-even-entry",
+   "station_id": "OZR",
+   "direction": "even",
+   "kind": "entry"
+  },
+  {
+   "id": "OZR-even-exit",
+   "station_id": "OZR",
+   "direction": "even",
+   "kind": "exit"
+  },
+  {
+   "id": "YUZ-odd-entry",
+   "station_id": "YUZ",
+   "direction": "odd",
+   "kind": "entry"
+  },
+  {
+   "id": "YUZ-odd-exit",
+   "station_id": "YUZ",
+   "direction": "odd",
+   "kind": "exit"
+  },
+  {
+   "id": "YUZ-even-entry",
+   "station_id": "YUZ",
+   "direction": "even",
+   "kind": "entry"
+  },
+  {
+   "id": "YUZ-even-exit",
+   "station_id": "YUZ",
+   "direction": "even",
+   "kind": "exit"
+  }
+ ],
+ "switches": [
+  {
+   "id": "SEV-3-W",
+   "station_id": "SEV",
+   "throat": "west",
+   "track_id": "3"
+  },
+  {
+   "id": "SEV-3-E",
+   "station_id": "SEV",
+   "throat": "east",
+   "track_id": "3"
+  },
+  {
+   "id": "SEV-4-W",
+   "station_id": "SEV",
+   "throat": "west",
+   "track_id": "4"
+  },
+  {
+   "id": "SEV-4-E",
+   "station_id": "SEV",
+   "throat": "east",
+   "track_id": "4"
+  },
+  {
+   "id": "SEV-5-W",
+   "station_id": "SEV",
+   "throat": "west",
+   "track_id": "5"
+  },
+  {
+   "id": "SEV-5-E",
+   "station_id": "SEV",
+   "throat": "east",
+   "track_id": "5"
+  },
+  {
+   "id": "R1-2-W",
+   "station_id": "R1",
+   "throat": "west",
+   "track_id": "2"
+  },
+  {
+   "id": "R1-2-E",
+   "station_id": "R1",
+   "throat": "east",
+   "track_id": "2"
+  },
+  {
+   "id": "STP-3-W",
+   "station_id": "STP",
+   "throat": "west",
+   "track_id": "3"
+  },
+  {
+   "id": "STP-3-E",
+   "station_id": "STP",
+   "throat": "east",
+   "track_id": "3"
+  },
+  {
+   "id": "STP-4-W",
+   "station_id": "STP",
+   "throat": "west",
+   "track_id": "4"
+  },
+  {
+   "id": "STP-4-E",
+   "station_id": "STP",
+   "throat": "east",
+   "track_id": "4"
+  },
+  {
+   "id": "R2-2-W",
+   "station_id": "R2",
+   "throat": "west",
+   "track_id": "2"
+  },
+  {
+   "id": "R2-2-E",
+   "station_id": "R2",
+   "throat": "east",
+   "track_id": "2"
+  },
+  {
+   "id": "OZR-3-W",
+   "station_id": "OZR",
+   "throat": "west",
+   "track_id": "3"
+  },
+  {
+   "id": "OZR-3-E",
+   "station_id": "OZR",
+   "throat": "east",
+   "track_id": "3"
+  },
+  {
+   "id": "YUZ-3-W",
+   "station_id": "YUZ",
+   "throat": "west",
+   "track_id": "3"
+  },
+  {
+   "id": "YUZ-3-E",
+   "station_id": "YUZ",
+   "throat": "east",
+   "track_id": "3"
+  },
+  {
+   "id": "YUZ-4-W",
+   "station_id": "YUZ",
+   "throat": "west",
+   "track_id": "4"
+  },
+  {
+   "id": "YUZ-4-E",
+   "station_id": "YUZ",
+   "throat": "east",
+   "track_id": "4"
+  },
+  {
+   "id": "YUZ-5-W",
+   "station_id": "YUZ",
+   "throat": "west",
+   "track_id": "5"
+  },
+  {
+   "id": "YUZ-5-E",
+   "station_id": "YUZ",
+   "throat": "east",
+   "track_id": "5"
+  }
+ ]
+}

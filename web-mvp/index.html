@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Автодиспетчер</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.6.0/echarts.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #151b23; --panel2: #1c2430; --line: #2a3442; --text: #e6edf3; --muted: #8b98a8; --dim: #5b6778;
+    --ok: #22c55e; --warn: #eab308; --bad: #ef4444; --accent: #38bdf8;
+    --express: #a78bfa; --passenger: #60a5fa; --freight: #f59e0b;
+    --rail: #7c8a9c; --rail-side: #566375;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); color: #04131c; border-color: var(--accent); font-weight: 600; }
+  button.primary { background: #0e7490; border-color: #0891b2; font-weight: 600; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  select, input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+
+  .app { display: grid; grid-template-rows: auto auto auto minmax(250px, auto) 1fr; height: 100vh; }
+
+  header { display: flex; align-items: center; gap: 20px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+  header h1 small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+  .clock { font: 600 24px/1 ui-monospace, Menlo, monospace; letter-spacing: 1px; }
+  .speed { display: flex; gap: 4px; align-items: center; }
+  .speed .lbl { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  .quality { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 10px; background: var(--panel2); cursor: pointer; position: relative; }
+  .quality .num { font-size: 26px; font-weight: 700; }
+  .quality .txt { font-size: 12px; line-height: 1.2; }
+  .quality .pop { display: none; position: absolute; top: 100%; left: 0; margin-top: 6px; z-index: 20; width: 380px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; box-shadow: 0 10px 30px #0008; cursor: default; }
+  .quality.open .pop { display: block; }
+  .factor { margin: 8px 0; }
+  .factor .bar { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .factor .bar i { display: block; height: 100%; }
+  .spacer { flex: 1; }
+  .conn { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+  .dot.ok { background: var(--ok); }
+
+  .situation { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .situation .icon { font-size: 22px; }
+  .situation .body { flex: 1; }
+  .situation .body b { font-weight: 600; }
+  .situation .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .situation.ok { background: linear-gradient(90deg, #0f2a1b, var(--bg) 60%); }
+  .situation.warn { background: linear-gradient(90deg, #2e2608, var(--bg) 60%); }
+  .situation.bad { background: linear-gradient(90deg, #3a1214, var(--bg) 60%); }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  .toolbar .lbl { color: var(--muted); font-size: 12px; }
+  .legend { display: flex; gap: 14px; margin-left: auto; font-size: 12px; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 22px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+
+  .scheme { background: var(--bg); border-bottom: 1px solid var(--line); position: relative; }
+  .scheme svg { display: block; width: 100%; height: 100%; }
+  .scheme .hint { position: absolute; right: 16px; top: 8px; font-size: 12px; color: var(--dim); }
+  svg text { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .node { cursor: pointer; }
+  .node:hover .hl { stroke: var(--accent); stroke-opacity: .5; }
+
+  .bottom { display: grid; grid-template-columns: 1fr 480px; min-height: 0; }
+  .graphbox { position: relative; border-right: 1px solid var(--line); min-height: 0; }
+  .graphbox .cap { position: absolute; left: 16px; top: 8px; right: 16px; z-index: 2; font-size: 12px; color: var(--muted); }
+  .graphbox .cap b { color: var(--text); font-weight: 600; margin-right: 10px; }
+  #graph { position: absolute; inset: 0; }
+  .side { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .tabs button { flex: 1; border: 0; border-radius: 0; background: transparent; padding: 10px; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; background: transparent; }
+  .tabs .badge { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; margin-left: 4px; }
+  .pane { overflow-y: auto; padding: 14px 16px; display: none; }
+  .pane.on { display: block; }
+  .empty { color: var(--muted); padding: 20px 4px; text-align: center; }
+
+  .var { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--panel); }
+  .var:hover { border-color: var(--accent); }
+  .var.best { border-color: #166534; }
+  .var.dim { opacity: .45; }
+  .var .top { display: flex; align-items: center; gap: 8px; }
+  .var .top b { font-size: 15px; }
+  .tag { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: #14532d; color: #86efac; }
+  .tag.grey { background: #334155; color: #cbd5e1; }
+  .tag.blue { background: #0c4a6e; color: #7dd3fc; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 8px; }
+  .grid3 div { background: var(--panel2); border-radius: 8px; padding: 6px 8px; }
+  .grid3 span { display: block; font-size: 11px; color: var(--muted); }
+  .grid3 b { font-size: 16px; }
+  .var details { margin-top: 6px; }
+  .var summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .var ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: #c8d3df; }
+  .var .act { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .var .act button { margin-left: auto; }
+  .skeleton { height: 110px; border-radius: 10px; margin-bottom: 10px; background: linear-gradient(90deg, var(--panel) 0%, var(--panel2) 50%, var(--panel) 100%); background-size: 200% 100%; animation: sh 1.2s infinite; }
+  @keyframes sh { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+  .sentence { font-size: 15px; line-height: 2.2; }
+  .sentence input[type=number] { width: 64px; }
+  .result { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .bigdelta { font-size: 18px; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.r, th.r { text-align: right; }
+
+  #ato { width: 100%; height: 230px; }
+  .atoText { font-size: 14px; margin: 6px 0 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .kpis div { background: var(--panel); border-radius: 8px; padding: 6px 8px; }
+  .kpis span { display: block; font-size: 11px; color: var(--muted); }
+
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 560px; background: var(--panel); border-left: 1px solid var(--line);
+    box-shadow: -20px 0 40px #0009; transform: translateX(100%); transition: transform .2s; z-index: 30; display: flex; flex-direction: column; }
+  .drawer.open { transform: none; }
+  .drawer .dh { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .drawer .dh h2 { margin: 0; font-size: 18px; flex: 1; }
+  .drawer .db { overflow-y: auto; padding: 14px 18px; }
+  .drawer h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 18px 0 6px; }
+  .drawer .zoom { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+  .incbox { margin-top: 8px; padding: 8px; border: 1px solid #7f1d1d; border-radius: 8px; background: #2a1215; }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #7f1d1d; padding: 10px 16px; border-radius: 8px; display: none; z-index: 40; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Автодиспетчер<small>Участок Северная — Южная · 84 км, однопутный</small></h1>
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="speed" id="speed"><span class="lbl">Время</span>
+      <button data-p="1" title="Пауза">⏸</button><button data-s="10">×10</button><button data-s="20">×20</button><button data-s="60">×60</button>
+    </div>
+    <div class="quality" id="quality" title="Нажмите, чтобы увидеть, из чего складывается оценка">
+      <span class="num" id="qnum">—</span>
+      <span class="txt">Качество движения<br><b id="qcat">—</b> <span class="muted">из 100</span></span>
+      <div class="pop" id="qpop"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="conn"><span class="muted" id="metrics"></span></div>
+    <div class="conn"><span class="dot" id="wsdot"></span><span id="wstext">нет связи</span> · <a href="/docs" target="_blank" style="color:var(--accent)">API</a></div>
+  </header>
+
+  <div class="situation ok" id="situation">
+    <span class="icon" id="sitIcon">⏳</span>
+    <div class="body"><div id="sitMain">Подключаемся…</div><div class="sub" id="sitSub"></div></div>
+    <button class="primary" id="sitBtn" style="display:none">Выбрать решение</button>
+  </div>
+
+  <div class="toolbar">
+    <span class="lbl">Смоделировать сбой:</span>
+    <button data-inc='{"type":"obstacle","segment_id":"R1-STP","km":24.5,"est_min_min":15,"est_max_min":30}'>🐄 Скот на перегоне Рзд. 1 — Степная</button>
+    <button data-inc='{"type":"train_failure","train_id":"2003","est_min_min":20,"est_max_min":45}'>⚙️ Поломка поезда 2003</button>
+    <button data-inc='{"type":"segment_closed","segment_id":"R2-OZR","est_min_min":30,"est_max_min":30}'>⛔ Закрыть перегон Рзд. 2 — Озёрная</button>
+    <span class="lbl">· или нажмите на перегон на схеме</span>
+    <div class="legend">
+      <span><i style="background:var(--express)"></i>скорый</span>
+      <span><i style="background:var(--passenger)"></i>пассажирский</span>
+      <span><i style="background:var(--freight)"></i>грузовой</span>
+      <span>🟢🔴 светофор</span>
+      <span><b class="bad">✕</b> препятствие</span>
+    </div>
+  </div>
+
+  <div class="scheme"><svg id="scheme" viewBox="0 0 2000 290" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="hint">нажмите на станцию, перегон или поезд — откроется подробная схема узла</div></div>
+
+  <div class="bottom">
+    <div class="graphbox">
+      <div class="cap"><b>График движения</b>по горизонтали — время, по вертикали — станции. Сплошная линия — как ехали, пунктир — план, точки — предлагаемый вариант. Горизонтальный участок — стоянка.</div>
+      <div id="graph"></div>
+    </div>
+    <div class="side">
+      <div class="tabs">
+        <button data-tab="decide" class="on">Решения<span class="badge" id="decBadge" style="display:none">3</span></button>
+        <button data-tab="whatif">Что если…</button>
+        <button data-tab="ato">Автоведение</button>
+      </div>
+      <div class="pane on" id="pane-decide"><div id="variants"></div></div>
+      <div class="pane" id="pane-whatif">
+        <div class="sentence">
+          Что будет, если поезд <select id="wiTrain"></select><br>
+          пойдёт со скоростью <input type="number" id="wiSpeed" min="20" max="140" step="5" value="60"> км/ч
+          <span class="muted" id="wiVmax"></span>
+          <span id="wiIncRow"><br>и сбой <select id="wiInc"></select> продлится <input type="number" id="wiDur" min="5" max="180" step="5" value="40"> мин</span>?
+        </div>
+        <div class="btnrow"><button class="primary" id="wiRun">Рассчитать прогноз</button><button id="wiClear">Сбросить</button><span class="muted" id="wiStatus" style="align-self:center"></span></div>
+        <div id="wiResult"></div>
+        <p class="muted" style="font-size:12px">Действующий план не меняется — это песочница. Сравнение идёт с таким же пересчётом без изменений.</p>
+      </div>
+      <div class="pane" id="pane-ato">
+        <div class="sentence">Рекомендация машинисту поезда <select id="atoTrain"></select></div>
+        <div class="atoText" id="atoText"></div>
+        <div id="ato"></div>
+        <div class="kpis" id="atoKpi"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer" id="drawer"><div class="dh"><h2 id="dTitle"></h2><button class="ghost" id="dClose">✕</button></div><div class="db" id="dBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const CAT = {express: ['Скорый', '#a78bfa'], passenger: ['Пассажирский', '#60a5fa'], freight: ['Грузовой', '#f59e0b']};
+const QCOL = {norm: '#22c55e', attention: '#eab308', critical: '#ef4444'};
+const QNAME = {norm: 'Норма', attention: 'Внимание', critical: 'Критично'};
+const REGIME = {accel: ['Разгон', '#22c55e'], cruise: ['Ход', '#38bdf8'], coast: ['Накат (без тяги)', '#f59e0b'], brake: ['Торможение', '#ef4444']};
+const STATUS = {waiting: 'готовится к отправлению', running: 'в пути', dwelling: 'стоянка', stopped: 'стоит', broken: 'неисправен', finished: 'прибыл'};
+const INC_ICON = {obstacle: '🐄', train_failure: '⚙️', segment_closed: '⛔'};
+
+const S = {infra: null, stations: {}, segments: {}, trains: {}, segTimes: {}, epochSec: 0,
+  field: null, plan: null, variants: null, index: null, fact: {}, ghost: null, whatif: null,
+  computing: false, lat: [], drawer: null, tab: 'decide', layout: null};
+
+// ---------- utils ----------
+const pad = n => String(n).padStart(2, '0');
+function clock(t, sec = true) {
+  const s = Math.round(S.epochSec + t), d = ((s % 86400) + 86400) % 86400;
+  return pad(Math.floor(d / 3600)) + ':' + pad(Math.floor(d / 60) % 60) + (sec ? ':' + pad(d % 60) : '');
+}
+const mins = s => Math.round(s / 60);
+const sgn = (v, unit = ' мин') => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(Math.round(v)) + unit;
+const plural = (n, a, b, c) => n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? b : c;
+const tname = id => `${CAT[S.trains[id].category][0]} ${id}`;
+const sname = id => S.stations[id].name;
+const segName = id => { const s = S.segments[id]; return `${sname(s.from_station)} — ${sname(s.to_station)}`; };
+const dirText = id => { const r = S.trains[id].stops; return `${sname(r[0].station_id)} → ${sname(r.at(-1).station_id)}`; };
+function toast(msg, ok = false) { const t = $('toast'); t.textContent = msg; t.style.background = ok ? '#14532d' : '#7f1d1d'; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 4000); }
+async function api(method, url, body) {
+  const r = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+const trainState = id => S.field && S.field.trains.find(t => t.train_id === id);
+function waitingFor(tid, stationId) {
+  if (!S.plan || !S.field) return null;
+  return S.plan.meetings.find(m => m.waiting_train === tid && m.station_id === stationId && m.time > S.field.sim_time) || null;
+}
+const planDwell = (tid, stationId) => S.plan && S.plan.entries.find(e => e.kind === 'dwell' && e.train_id === tid && e.station_id === stationId);
+
+// ---------- scheme ----------
+function trackOffsets(station, step) {
+  const out = {[station.tracks.find(t => t.main).id]: 0};
+  station.tracks.filter(t => !t.main).forEach((t, k) => out[t.id] = (k % 2 === 0 ? -1 : 1) * step * (Math.floor(k / 2) + 1));
+  return out;
+}
+function buildLayout() {
+  const order = S.infra.station_order, W = 2000, M = 50, Y = 140;
+  const stW = id => S.stations[id].kind === 'station' ? 190 : 140;
+  const totalSt = order.reduce((a, id) => a + stW(id), 0);
+  const pxKm = (W - 2 * M - totalSt) / (S.stations[order.at(-1)].km - S.stations[order[0]].km);
+  const st = {}; let x = M;
+  order.forEach((id, i) => {
+    const off = trackOffsets(S.stations[id], 30), tracks = {};
+    for (const k in off) tracks[k] = Y + off[k];
+    st[id] = {x0: x, x1: x + stW(id), tracks};
+    x += stW(id);
+    if (i < order.length - 1) x += (S.stations[order[i + 1]].km - S.stations[id].km) * pxKm;
+  });
+  S.layout = {st, Y};
+}
+function segX(segId) { const s = S.segments[segId], L = S.layout.st; return [L[s.from_station].x1, L[s.to_station].x0]; }
+function kmToX(segId, km) {
+  const s = S.segments[segId], [a, b] = segX(segId), ka = S.stations[s.from_station].km, kb = S.stations[s.to_station].km;
+  return a + (km - ka) / (kb - ka) * (b - a);
+}
+function stationSvg(id, L, opts = {}) {
+  const st = S.stations[id], g = L.st[id], Y = L.Y, inset = opts.inset ?? 34;
+  let h = `<g class="node" data-node="station:${id}"><rect class="hl" x="${g.x0}" y="${Y - 80}" width="${g.x1 - g.x0}" height="160" fill="transparent" stroke="transparent" stroke-width="2" rx="10"/>`;
+  for (const t of st.tracks) {
+    const y = g.tracks[t.id];
+    if (t.main) h += `<line x1="${g.x0}" y1="${Y}" x2="${g.x1}" y2="${Y}" stroke="var(--rail)" stroke-width="4"/>`;
+    else {
+      const a = g.x0 + inset, b = g.x1 - inset;
+      h += `<polyline points="${g.x0 + 8},${Y} ${a},${y} ${b},${y} ${g.x1 - 8},${Y}" fill="none" stroke="var(--rail-side)" stroke-width="3"/>`;
+      h += `<circle cx="${g.x0 + 8}" cy="${Y}" r="2.5" fill="var(--muted)"/><circle cx="${g.x1 - 8}" cy="${Y}" r="2.5" fill="var(--muted)"/>`;
+    }
+    if (t.platform) h += `<rect x="${g.x0 + inset + 8}" y="${y + (y <= Y ? -11 : 6)}" width="${g.x1 - g.x0 - 2 * inset - 16}" height="5" rx="2" fill="#3a4555"/>`;
+    const label = opts.big ? `${t.main ? 'Путь I (главный)' : 'Путь ' + t.id} · ${t.length_m} м${t.platform ? ' · платформа' : ''}` : t.id;
+    h += `<text x="${t.main ? g.x0 + 10 : g.x0 + inset + 2}" y="${y - 6}" font-size="${opts.big ? 12 : 10}" fill="var(--dim)">${label}</text>`;
+  }
+  if (!opts.noLabel) {
+    h += `<text x="${(g.x0 + g.x1) / 2}" y="${Y + 95}" font-size="16" font-weight="600" fill="var(--text)" text-anchor="middle">${st.name}</text>`;
+    h += `<text x="${(g.x0 + g.x1) / 2}" y="${Y + 113}" font-size="12" fill="var(--muted)" text-anchor="middle">${st.km} км · ${st.tracks.length} ${plural(st.tracks.length, 'путь', 'пути', 'путей')}</text>`;
+  }
+  return h + '</g>';
+}
+function signalSvg(sig, L) {
+  const g = L.st[sig.station_id], Y = L.Y, odd = sig.direction === 'odd';
+  const x = sig.kind === 'entry' ? (odd ? g.x0 - 6 : g.x1 + 6) : (odd ? g.x1 - 22 : g.x0 + 22);
+  const y0 = odd ? Y - 6 : Y + 6, y1 = odd ? Y - 26 : Y + 26;
+  const col = sig.aspect === 'green' ? '#22c55e' : '#ef4444';
+  return `<g><title>${sig.kind === 'entry' ? 'Входной' : 'Выходной'} светофор (${odd ? 'к Южной' : 'к Северной'}): ${sig.aspect === 'green' ? 'открыт' : 'закрыт'}</title>
+    <line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" stroke="#94a3b8" stroke-width="1.5"/>
+    <circle cx="${x}" cy="${y1 + (odd ? -5 : 5)}" r="5.5" fill="${col}" stroke="#0d1117" stroke-width="1.5"/></g>`;
+}
+function trainSvg(t, x, y, opts = {}) {
+  const tr = S.trains[t.train_id], col = CAT[tr.category][1], odd = tr.direction === 'odd', w = opts.big ? 76 : 62, h = opts.big ? 24 : 20;
+  const bad = t.status === 'broken', held = t.status === 'stopped' && !!t.segment_id;
+  const nose = odd ? `${x + w / 2},${y - h / 2} ${x + w / 2 + 9},${y} ${x + w / 2},${y + h / 2}` : `${x - w / 2},${y - h / 2} ${x - w / 2 - 9},${y} ${x - w / 2},${y + h / 2}`;
+  let s = `<g class="node" data-node="train:${t.train_id}"><title>${tname(t.train_id)}, ${dirText(t.train_id)}</title>`
+    + `<polygon points="${nose}" fill="${col}"/>`
+    + `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="4" fill="${col}" stroke="${bad || held ? '#ef4444' : '#0d1117'}" stroke-width="${bad || held ? 3 : 1.5}"/>`
+    + `<text x="${x}" y="${y + 4.5}" font-size="${opts.big ? 14 : 12.5}" font-weight="700" text-anchor="middle" fill="#0d1117">${t.train_id}</text>`;
+  let note = '';
+  if (bad) note = '⚠ неисправен';
+  else if (held) note = '⏸ стоит перед препятствием';
+  else if (t.station_id && t.stopped) { const m = waitingFor(t.train_id, t.station_id); if (m) note = `ждёт ${m.passing_train}`; }
+  if (!note && t.delay_s >= 120) note = `опазд. ${mins(t.delay_s)} мин`;
+  if (note) s += `<text x="${x}" y="${opts.noteAbove ? y - h / 2 - 6 : y + h / 2 + 13}" font-size="11" text-anchor="middle" fill="${bad || held ? '#fca5a5' : '#fde68a'}">${note}</text>`;
+  return s + '</g>';
+}
+function renderScheme() {
+  if (!S.layout || !S.field) return;
+  const L = S.layout, Y = L.Y, f = S.field;
+  const closed = new Set(f.closed_segments), occ = new Set(f.occupied_segments);
+  let h = '';
+  for (const seg of S.infra.infra.segments) {
+    const [a, b] = segX(seg.id), isClosed = closed.has(seg.id), isOcc = occ.has(seg.id);
+    const vals = Object.values(S.segTimes[seg.id]).flatMap(o => Object.values(o));
+    h += `<g class="node" data-node="segment:${seg.id}"><rect class="hl" x="${a}" y="${Y - 45}" width="${b - a}" height="105" fill="transparent" stroke="transparent" stroke-width="2" rx="8"/>`
+      + `<line x1="${a}" y1="${Y}" x2="${b}" y2="${Y}" stroke="${isClosed ? '#ef4444' : isOcc ? '#38bdf8' : 'var(--rail)'}" stroke-width="${isClosed ? 6 : 4}" ${isClosed ? 'stroke-dasharray="14 8"' : ''}/>`
+      + `<text x="${(a + b) / 2}" y="${Y + 52}" font-size="12" fill="var(--muted)" text-anchor="middle">${seg.length_m / 1000} км · ход ~${Math.min(...vals)}–${Math.max(...vals)} мин</text></g>`;
+  }
+  for (const id of S.infra.station_order) h += stationSvg(id, L);
+  for (const sig of f.signals || []) h += signalSvg(sig, L);
+  for (const inc of f.incidents) {
+    if (!inc.segment_id || inc.type === 'train_failure') continue;
+    const [sa, sb] = segX(inc.segment_id);
+    const x = inc.type === 'obstacle' && inc.km != null ? kmToX(inc.segment_id, inc.km) : (sa + sb) / 2;
+    const lo = Math.max(0, inc.started_at + inc.est_min_s - f.sim_time), hi = Math.max(0, inc.started_at + inc.est_max_s - f.sim_time);
+    const label = `${INC_ICON[inc.type]} ${inc.type === 'obstacle' ? 'Препятствие' : 'Перегон закрыт'} · ещё ${mins(lo)}–${mins(hi)} мин`;
+    h += `<g class="node" data-node="segment:${inc.segment_id}"><line x1="${x - 9}" y1="${Y - 9}" x2="${x + 9}" y2="${Y + 9}" stroke="#ef4444" stroke-width="4"/><line x1="${x - 9}" y1="${Y + 9}" x2="${x + 9}" y2="${Y - 9}" stroke="#ef4444" stroke-width="4"/>`
+      + `<rect x="${x - 125}" y="${Y - 74}" width="250" height="24" rx="12" fill="#3a1214" stroke="#ef4444"/><text x="${x}" y="${Y - 57}" font-size="12.5" fill="#fecaca" text-anchor="middle">${label}</text></g>`;
+  }
+  for (const t of f.trains) {
+    if (!t.on_field) continue;
+    let x, y = Y;
+    if (t.segment_id) {
+      const [a, b] = segX(t.segment_id), p = t.progress;
+      x = S.trains[t.train_id].direction === 'odd' ? a + p * (b - a) : b - p * (b - a);
+    } else {
+      const g = L.st[t.station_id];
+      x = (g.x0 + g.x1) / 2; y = g.tracks[t.track_id] ?? Y;
+    }
+    h += trainSvg(t, x, y, {noteAbove: y < Y});
+  }
+  $('scheme').innerHTML = h;
+}
+
+// ---------- situation & header ----------
+function renderSituation() {
+  if (!S.field || !S.infra) return;
+  const f = S.field, incs = f.incidents;
+  const onField = f.trains.filter(t => t.on_field), running = onField.filter(t => t.segment_id).length;
+  const notYet = f.trains.filter(t => !t.on_field && t.status !== 'finished').length, done = f.trains.filter(t => t.status === 'finished').length;
+  const late = onField.filter(t => t.delay_s >= 120).sort((a, b) => b.delay_s - a.delay_s);
+  const proposed = S.variants ? S.variants.variants.filter(v => v.status === 'proposed') : [];
+  let cls = 'ok', icon = '✅', main, sub = `В пути ${running}, на станциях ${onField.length - running}, ещё не отправились ${notYet}, прибыли ${done}.`;
+  if (incs.length) {
+    cls = 'bad'; icon = '⚠️';
+    main = incs.map(i => `<b>${INC_ICON[i.type]} ${i.description}</b> — ${i.type === 'train_failure' ? 'поезд ' + i.train_id : segName(i.segment_id)}, с ${clock(i.started_at, false)}, оценка ${mins(i.est_min_s)}–${mins(i.est_max_s)} мин`).join('<br>');
+    const held = onField.filter(t => t.status === 'broken' || (t.status === 'stopped' && t.segment_id)).map(t => t.train_id);
+    const affected = [...new Set([...held, ...late.map(t => t.train_id)])];
+    sub = affected.length ? `Затронуты: ${affected.map(id => { const t = trainState(id); return id + (t.delay_s >= 60 ? ` (+${mins(t.delay_s)} мин)` : ''); }).join(', ')}. ` : '';
+    sub += S.computing ? 'Система считает варианты решения…' : proposed.length ? `Подготовлено ${proposed.length} ${plural(proposed.length, 'вариант', 'варианта', 'вариантов')} — выберите, как действовать.` : 'Решение принято, план перестроен.';
+  } else if (proposed.length) {
+    cls = 'warn'; icon = '↩️'; main = '<b>Сбой снят.</b> Можно вернуть движение к оптимальному графику.';
+    sub = 'Система подготовила варианты — выберите один справа.';
+  } else if (late.length) {
+    cls = 'warn'; icon = '🕒'; main = `<b>Движение по плану, но есть опоздания:</b> ${late.slice(0, 4).map(t => `${t.train_id} +${mins(t.delay_s)} мин`).join(', ')}`;
+  } else main = '<b>Штатное движение.</b> Все поезда следуют по плану, конфликтов нет.';
+  $('situation').className = 'situation ' + cls; $('sitIcon').textContent = icon; $('sitMain').innerHTML = main; $('sitSub').textContent = sub;
+  $('sitBtn').style.display = proposed.length ? '' : 'none';
+  $('decBadge').style.display = proposed.length ? '' : 'none'; $('decBadge').textContent = proposed.length;
+}
+function renderHeader() {
+  const f = S.field;
+  if (f) {
+    $('clock').textContent = clock(f.sim_time);
+    document.querySelectorAll('#speed button').forEach(b => b.classList.toggle('on', b.dataset.p ? f.paused : (!f.paused && +b.dataset.s === f.speed)));
+  }
+  if (S.index) {
+    const v = S.index.index;
+    $('qnum').textContent = Math.round(v.value); $('qnum').style.color = QCOL[v.category];
+    $('qcat').textContent = QNAME[v.category]; $('qcat').style.color = QCOL[v.category];
+    $('qpop').innerHTML = `<div class="muted" style="font-size:12px">Оценка 0–100 прогноза на 2 часа вперёд. Складывается из пяти факторов:</div>`
+      + v.components.map(c => `<div class="factor"><div style="display:flex"><span style="flex:1">${c.label}</span><b>${Math.round(c.score * 100)}</b></div>
+        <div class="bar"><i style="width:${c.score * 100}%;background:${c.score >= .8 ? QCOL.norm : c.score >= .6 ? QCOL.attention : QCOL.critical}"></i></div>
+        <div class="muted" style="font-size:11px">вес ${Math.round(c.weight * 100)}% · сейчас ${c.raw} ${c.unit}</div></div>`).join('');
+  }
+  const parts = [], ms = S.lastSolveMs ?? (S.index && S.index.last_solve_ms);
+  if (ms != null) parts.push(`план пересчитан за ${ms >= 1000 ? (ms / 1000).toFixed(1) + ' с' : ms + ' мс'}`);
+  if (S.lat.length) { const a = [...S.lat].sort((x, y) => x - y); parts.push(`отклик экрана ${Math.round(a[Math.floor(a.length * .95)])} мс`); }
+  if (f) parts.push(`нарушений безопасности: ${f.safety_violations}`);
+  $('metrics').textContent = parts.join(' · ');
+}
+
+// ---------- train graph ----------
+const graph = echarts.init($('graph'));
+const atoChart = echarts.init($('ato'));
+window.addEventListener('resize', () => { graph.resize(); atoChart.resize(); });
+function segKm(segId, dir) { const s = S.segments[segId], a = S.stations[s.from_station].km, b = S.stations[s.to_station].km; return dir === 'odd' ? [a, b] : [b, a]; }
+function planLines(plan) {
+  const by = {}, out = {};
+  for (const e of plan.entries) (by[e.train_id] ||= []).push(e);
+  for (const [tid, es] of Object.entries(by)) {
+    es.sort((a, b) => a.start - b.start || (a.kind === 'dwell' ? -1 : 1));
+    const dir = S.trains[tid].direction, pts = [];
+    for (const e of es) {
+      if (e.kind === 'dwell') { const km = S.stations[e.station_id].km; pts.push([e.start, km], [e.end, km]); }
+      else { const [a, b] = segKm(e.segment_id, dir); pts.push([e.start, a], [e.end, b]); }
+    }
+    out[tid] = pts;
+  }
+  return out;
+}
+function renderGraph() {
+  if (!S.infra || !S.field) return;
+  const now = S.field.sim_time, series = [];
+  const areas = S.field.incidents.filter(i => i.segment_id).map(i => {
+    const s = S.segments[i.segment_id];
+    return [{xAxis: i.started_at, yAxis: S.stations[s.from_station].km, itemStyle: {color: 'rgba(239,68,68,.22)'}}, {xAxis: i.started_at + i.est_max_s, yAxis: S.stations[s.to_station].km}];
+  });
+  series.push({type: 'line', data: [], silent: true,
+    markLine: {symbol: 'none', silent: true, lineStyle: {color: '#2a3442', type: 'solid'}, label: {position: 'start', color: '#8b98a8', formatter: p => p.name, fontSize: 12},
+      data: S.infra.station_order.map(id => ({yAxis: S.stations[id].km, name: S.stations[id].name}))
+        .concat([{xAxis: now, name: '', lineStyle: {color: '#38bdf8', width: 2}, label: {show: false}}])},
+    markArea: {silent: true, data: areas}});
+  if (S.plan) for (const [tid, pts] of Object.entries(planLines(S.plan)))
+    series.push({type: 'line', data: pts, showSymbol: false, silent: true, lineStyle: {color: CAT[S.trains[tid].category][1], width: 1.5, type: [6, 5], opacity: S.ghost ? .2 : .8}});
+  if (S.ghost) {
+    for (const [tid, pts] of Object.entries(planLines(S.ghost)))
+      series.push({type: 'line', data: pts, showSymbol: false, silent: true, lineStyle: {color: CAT[S.trains[tid].category][1], width: 2.4, type: 'dotted'}});
+    series.push({type: 'scatter', symbolSize: 9, itemStyle: {color: '#fff'}, data: S.ghost.meetings.map(m => ({value: [m.time, S.stations[m.station_id].km], m})),
+      tooltip: {formatter: p => `${p.data.m.waiting_train} ждёт на ${sname(p.data.m.station_id)} ${mins(p.data.m.wait_s)} мин, пропуская ${p.data.m.passing_train}`}});
+  }
+  for (const [tid, pts] of Object.entries(S.fact)) if (pts.length)
+    series.push({type: 'line', data: pts, showSymbol: false, silent: true, lineStyle: {color: CAT[S.trains[tid].category][1], width: 3},
+      endLabel: {show: true, formatter: tid, color: CAT[S.trains[tid].category][1], fontWeight: 700}});
+  graph.setOption({
+    animation: false, grid: {left: 120, right: 50, top: 46, bottom: 28},
+    tooltip: {trigger: 'item', backgroundColor: '#1c2430', borderColor: '#2a3442', textStyle: {color: '#e6edf3'}},
+    xAxis: {type: 'value', min: now - 30 * 60, max: now + 120 * 60, interval: 15 * 60, axisLabel: {color: '#8b98a8', formatter: v => clock(v, false)}, splitLine: {lineStyle: {color: '#1a212b'}}},
+    yAxis: {type: 'value', min: 0, max: S.stations[S.infra.station_order.at(-1)].km, inverse: true, axisLabel: {show: false}, splitLine: {show: false}},
+    series,
+  }, {replaceMerge: ['series']});
+}
+
+// ---------- decisions ----------
+function renderVariants() {
+  const box = $('variants');
+  if (S.computing) { box.innerHTML = `<div class="muted" style="margin-bottom:10px">Считаем варианты… <span id="timer">0.0</span> с</div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`; return; }
+  const vs = S.variants ? S.variants.variants : [];
+  if (!vs.length) { box.innerHTML = `<div class="empty">Сейчас решений не требуется.<br><br>Когда случится сбой, здесь появятся 3 варианта плана: что будет с задержками в каждом случае и почему.</div>`; return; }
+  const live = vs.filter(v => v.status === 'proposed');
+  const best = live.length ? live.reduce((a, b) => b.plan.index.value > a.plan.index.value ? b : a) : null;
+  box.innerHTML = (live.length ? `<div class="muted" style="margin-bottom:10px;font-size:13px">Если ничего не менять, качество движения — <b>${S.index ? Math.round(S.index.index.value) : '—'}</b>. Наведите на вариант, чтобы увидеть его на графике движения.</div>` : '')
+    + vs.map(v => {
+      const k = v.plan.kpi, late = k.delayed_trains.slice(0, 3);
+      const rob = k.robust_total_delay_s != null ? k.robust_total_delay_s - k.total_delay_s : null;
+      const tag = v.status === 'applied' ? '<span class="tag blue">применён</span>' : v.status === 'stale' ? '<span class="tag grey">устарел</span>' : best && v.id === best.id ? '<span class="tag">рекомендуем</span>' : '';
+      return `<div class="var ${best && v.id === best.id ? 'best' : ''} ${v.status === 'stale' ? 'dim' : ''}" data-v="${v.id}">
+        <div class="top"><b>${v.title}</b>${tag}</div>
+        <div class="grid3">
+          <div><span>Качество движения</span><b style="color:${QCOL[v.plan.index.category]}">${Math.round(v.plan.index.value)}</b> <span style="display:inline" class="${v.delta_index >= 0 ? 'ok' : 'bad'}">${sgn(v.delta_index, '')}</span></div>
+          <div><span>Задержка всех поездов</span><b>${mins(k.total_delay_s)}</b> мин</div>
+          <div><span>Если сбой затянется</span><b>${rob == null ? '—' : sgn(rob / 60)}</b></div>
+        </div>
+        <div style="font-size:13px">${late.length ? 'Опоздают: ' + late.map(([t, s]) => `<b>${t}</b> +${mins(s)} мин`).join(', ') : 'Никто не опоздает к конечной.'}</div>
+        <details><summary>Почему так</summary><ul>${v.explanation.map(x => `<li>${x}</li>`).join('')}</ul></details>
+        <div class="act">посчитано за ${(v.plan.solve_ms / 1000).toFixed(1)} с ${v.status === 'proposed' ? `<button class="primary" data-apply="${v.id}">Применить</button>` : ''}</div></div>`;
+    }).join('');
+}
+
+// ---------- what-if ----------
+function renderWhatIf() {
+  const r = S.whatif, box = $('wiResult');
+  if (!r) { box.innerHTML = ''; return; }
+  const d = r.delta_index, rows = r.per_train.filter(p => Math.abs(p.arr_delta_s) >= 60).slice(0, 8);
+  box.innerHTML = `<div class="result"><div class="bigdelta">Качество движения: <b>${Math.round(r.plan.index.value - d)}</b> → <b style="color:${QCOL[r.plan.index.category]}">${Math.round(r.plan.index.value)}</b>
+      <span class="${d >= 0 ? 'ok' : 'bad'}">(${sgn(d, '')})</span></div>
+    ${rows.length ? `<table><tr><th>Поезд</th><th class="r">Прибытие на конечную</th></tr>${rows.map(p => `<tr><td>${tname(p.train_id)}</td><td class="r ${p.arr_delta_s > 0 ? 'bad' : 'ok'}">${p.arr_delta_s > 0 ? 'позже' : 'раньше'} на ${Math.abs(mins(p.arr_delta_s))} мин</td></tr>`).join('')}</table>` : '<div class="muted">Прибытие поездов на конечные почти не меняется.</div>'}
+    <ul style="margin:10px 0 0;padding-left:18px;font-size:13px">${r.explanation.slice(1).map(x => `<li>${x}</li>`).join('')}</ul>
+    <div class="muted" style="font-size:12px;margin-top:6px">Прогноз показан точками на графике движения.</div></div>`;
+}
+function syncWhatIf() {
+  if (!S.infra) return;
+  const t = S.trains[$('wiTrain').value], cat = S.infra.categories.find(c => c.id === t.category);
+  $('wiVmax').textContent = `(обычно до ${cat.v_max_kmh})`; $('wiSpeed').max = cat.v_max_kmh;
+  const incs = S.field ? S.field.incidents : [], cur = $('wiInc').value;
+  $('wiIncRow').style.display = incs.length ? '' : 'none';
+  $('wiInc').innerHTML = incs.map(i => `<option value="${i.id}">«${i.description}»</option>`).join('');
+  if (incs.some(i => i.id === cur)) $('wiInc').value = cur;
+}
+
+// ---------- ATO ----------
+async function loadAto() {
+  if (S.tab !== 'ato') return;
+  try { renderAto(await api('GET', '/api/ato/' + $('atoTrain').value)); }
+  catch (e) { atoChart.clear(); $('atoKpi').innerHTML = ''; $('atoText').innerHTML = `<span class="muted">${e.message}</span>`; }
+}
+function renderAto(p) {
+  const km = s => +(s / 1000).toFixed(2), reg = {};
+  for (const k in REGIME) reg[k] = [];
+  for (let i = 0; i < p.points.length - 1; i++) {
+    const a = p.points[i], b = p.points[i + 1];
+    reg[a.regime].push([km(a.s_m), a.v_kmh], [km(b.s_m), b.v_kmh], [km(b.s_m), null]);
+  }
+  const L = km(p.points.at(-1).s_m), seg = S.segments[p.segment_id];
+  const from = p.direction === 'odd' ? seg.from_station : seg.to_station, to = p.direction === 'odd' ? seg.to_station : seg.from_station;
+  const coast = p.points.find(q => q.regime === 'coast'), vmax = Math.max(...p.points.map(q => q.v_kmh));
+  $('atoText').innerHTML = `Перегон <b>${sname(from)} → ${sname(to)}</b>: разгон до <b>${Math.round(vmax)} км/ч</b>`
+    + (coast ? `, с <b>${km(coast.s_m)} км</b> отключить тягу и идти накатом` : '') + `, затем торможение. Поезд приходит точно к нужному по плану моменту `
+    + `(${Math.round(p.t_target_s / 60)} мин в пути) и тратит на <b class="ok">${p.saving_pct}%</b> меньше энергии, чем при езде на максимальной скорости.`;
+  const tr = trainState(p.train_id);
+  atoChart.setOption({
+    animation: false, grid: {left: 40, right: 16, top: 34, bottom: 26},
+    legend: {top: 0, left: 0, textStyle: {color: '#8b98a8', fontSize: 11}, itemWidth: 14, itemHeight: 6},
+    tooltip: {trigger: 'axis', backgroundColor: '#1c2430', borderColor: '#2a3442', textStyle: {color: '#e6edf3'}},
+    xAxis: {type: 'value', min: 0, max: L, name: 'км', nameGap: 4, axisLabel: {color: '#8b98a8'}, splitLine: {lineStyle: {color: '#1a212b'}}},
+    yAxis: {type: 'value', min: 0, name: 'км/ч', nameTextStyle: {color: '#8b98a8'}, axisLabel: {color: '#8b98a8'}, splitLine: {lineStyle: {color: '#1a212b'}}},
+    series: [
+      {name: 'На максимальной скорости', type: 'line', showSymbol: false, data: p.min_points.map(q => [km(q.s_m), q.v_kmh]), lineStyle: {color: '#64748b', type: 'dashed', width: 1.4}, itemStyle: {color: '#64748b'}},
+      ...Object.entries(REGIME).map(([k, [name, color]]) => ({name, type: 'line', showSymbol: false, data: reg[k], lineStyle: {color, width: 3.5}, itemStyle: {color}})),
+      ...(tr && tr.segment_id === p.segment_id ? [{name: 'Поезд сейчас', type: 'scatter', data: [[km(tr.pos_m), tr.speed_kmh]], symbolSize: 11, itemStyle: {color: '#fff'}}] : []),
+    ],
+  }, true);
+  const mmss = s => `${Math.floor(s / 60)}:${pad(Math.round(s % 60))}`;
+  $('atoKpi').innerHTML = `<div><span>Время по плану</span>${mmss(p.t_target_s)}</div><div><span>По рекомендации</span>${mmss(p.t_profile_s)}</div>
+    <div><span>Самое быстрое</span>${mmss(p.t_min_s)}</div><div><span>Энергия</span>${p.energy_kwh} кВт·ч</div>
+    <div><span>На макс. скорости</span>${p.energy_min_time_kwh} кВт·ч</div><div><span>Экономия</span><b class="ok">${p.saving_pct}%</b></div>`;
+}
+
+// ---------- node drawer ----------
+function openNode(node) { S.drawer = node; $('drawer').classList.add('open'); renderDrawer(); }
+function closeNode() { S.drawer = null; $('drawer').classList.remove('open'); }
+function stationDrawer(id, now) {
+  const st = S.stations[id], Y = 120, off = trackOffsets(st, 44), tracks = {};
+  for (const k in off) tracks[k] = Y + off[k];
+  const L = {Y, st: {[id]: {x0: 40, x1: 480, tracks}}};
+  let svg = `<line x1="0" y1="${Y}" x2="40" y2="${Y}" stroke="var(--rail)" stroke-width="4"/><line x1="480" y1="${Y}" x2="520" y2="${Y}" stroke="var(--rail)" stroke-width="4"/>` + stationSvg(id, L, {big: true, noLabel: true, inset: 70});
+  for (const sig of (S.field.signals || []).filter(s => s.station_id === id)) svg += signalSvg(sig, L);
+  const here = S.field.trains.filter(t => t.station_id === id);
+  for (const t of here) svg += trainSvg(t, 270, tracks[t.track_id] ?? Y, {big: true, noteAbove: (tracks[t.track_id] ?? Y) < Y});
+  const order = S.infra.station_order, i = order.indexOf(id);
+  if (i > 0) svg += `<text x="6" y="18" font-size="12" fill="var(--muted)">← ${sname(order[i - 1])}</text>`;
+  if (i < order.length - 1) svg += `<text x="514" y="18" font-size="12" fill="var(--muted)" text-anchor="end">${sname(order[i + 1])} →</text>`;
+  let h = `<div class="zoom"><svg viewBox="0 0 520 240" width="100%">${svg}</svg></div>`;
+  h += `<h3>Пути</h3><table><tr><th>Путь</th><th>Длина</th><th>Сейчас</th></tr>` + st.tracks.map(t => {
+    const occ = here.find(x => x.track_id === t.id);
+    let what = '<span class="muted">свободен</span>';
+    if (occ) { const d = planDwell(occ.train_id, id), m = waitingFor(occ.train_id, id);
+      what = `<b>${tname(occ.train_id)}</b>${d ? `, отправление по плану ${clock(d.end, false)}` : ''}${m ? ` — ждёт ${m.passing_train}` : ''}`; }
+    return `<tr><td>${t.main ? 'I (главный)' : t.id}${t.platform ? ' · платформа' : ''}</td><td>${t.length_m} м</td><td>${what}</td></tr>`;
+  }).join('') + '</table>';
+  const dw = (S.plan ? S.plan.entries : []).filter(e => e.kind === 'dwell' && e.station_id === id && e.end >= now && e.start <= now + 2 * 3600).sort((a, b) => a.start - b.start);
+  h += `<h3>Поезда через станцию в ближайшие 2 часа (по плану)</h3>` + (dw.length ? `<table><tr><th>Прибытие</th><th>Отправл.</th><th>Поезд</th><th>Что делает</th></tr>` + dw.map(e => {
+    const m = S.plan.meetings.find(x => x.waiting_train === e.train_id && x.station_id === id);
+    const stops = S.trains[e.train_id].stops, stop = stops.find(s => s.station_id === id), dur = mins(e.end - e.start);
+    const what = stops[0].station_id === id ? 'отправление с начальной' : stops.at(-1).station_id === id ? 'прибытие на конечную'
+      : m ? `ждёт ${m.kind === 'crossing' ? 'встречный' : 'обгоняющий'} ${m.passing_train} (${mins(m.wait_s)} мин)` : e.stop ? `стоянка ${dur} мин` : 'проследует без остановки';
+    return `<tr><td>${clock(e.start, false)}</td><td>${clock(e.end, false)}</td><td><b>${e.train_id}</b></td><td>${what}</td></tr>`;
+  }).join('') + '</table>' : '<div class="muted">Никого.</div>');
+  return [`${st.name} · ${st.km} км`, h];
+}
+function segmentDrawer(id, now) {
+  const seg = S.segments[id], tm = S.segTimes[id];
+  const incs = S.field.incidents.filter(i => i.segment_id === id), on = S.field.trains.find(t => t.segment_id === id);
+  let h = `<div>${seg.length_m / 1000} км, однопутный: одновременно на перегоне может быть только один поезд. Скорость до ${seg.v_max_kmh} км/ч.</div>`;
+  const zones = seg.speed_zones.map(z => `ограничение ${z.v_kmh} км/ч на ${z.from_m / 1000}–${z.to_m / 1000} км`)
+    .concat(seg.grade_zones.map(z => `${z.permille > 0 ? 'подъём' : 'спуск'} ${Math.abs(z.permille)}‰ на ${z.from_m / 1000}–${z.to_m / 1000} км (в сторону Южной)`));
+  if (zones.length) h += `<div class="muted" style="margin-top:4px">Особенности: ${zones.join('; ')}.</div>`;
+  h += `<h3>Время хода</h3><table><tr><th></th><th class="r">→ Южная</th><th class="r">→ Северная</th></tr>` + Object.entries(tm).map(([c, v]) => `<tr><td>${CAT[c][0]}</td><td class="r">${v.odd} мин</td><td class="r">${v.even} мин</td></tr>`).join('') + '</table>';
+  h += `<h3>Сейчас</h3><div>${on ? `Занят: <b>${tname(on.train_id)}</b> (${dirText(on.train_id)}), ${STATUS[on.status]}` : 'Свободен.'}</div>`;
+  h += incs.map(i => `<div class="incbox">${INC_ICON[i.type]} <b>${i.description}</b>, с ${clock(i.started_at, false)}, оценка ${mins(i.est_min_s)}–${mins(i.est_max_s)} мин
+    <div class="btnrow"><button data-resolve="${i.id}">Сбой устранён — снять</button></div></div>`).join('');
+  const runs = (S.plan ? S.plan.entries : []).filter(e => e.kind === 'run' && e.segment_id === id && e.end >= now).sort((a, b) => a.start - b.start).slice(0, 8);
+  h += `<h3>Очередь на перегон по плану</h3>` + (runs.length ? `<table><tr><th>Вход</th><th>Выход</th><th>Поезд</th><th>Куда</th></tr>${runs.map(e => `<tr><td>${clock(e.start, false)}</td><td>${clock(e.end, false)}</td><td><b>${e.train_id}</b></td><td>${S.trains[e.train_id].direction === 'odd' ? '→ Южная' : '→ Северная'}</td></tr>`).join('')}</table>` : '<div class="muted">Никого.</div>');
+  const mid = (S.stations[seg.from_station].km + S.stations[seg.to_station].km) / 2;
+  h += `<h3>Смоделировать сбой здесь</h3><div class="btnrow">
+    <button data-inc='{"type":"obstacle","segment_id":"${id}","km":${mid},"est_min_min":15,"est_max_min":30}'>🐄 Препятствие на пути (15–30 мин)</button>
+    <button data-inc='{"type":"segment_closed","segment_id":"${id}","est_min_min":30,"est_max_min":30}'>⛔ Закрыть на 30 мин</button></div>`;
+  return [`Перегон ${segName(id)}`, h];
+}
+function trainDrawer(id) {
+  const tr = S.trains[id], t = trainState(id), cat = S.infra.categories.find(c => c.id === tr.category);
+  const where = !t.on_field ? (t.status === 'finished' ? 'прибыл на конечную' : `ещё не вышел (отправление ${clock(tr.stops[0].dep, false)})`)
+    : t.segment_id ? `на перегоне ${segName(t.segment_id)}, ${Math.round(t.speed_kmh)} км/ч` : `на станции ${sname(t.station_id)}, путь ${t.track_id}`;
+  let h = `<div style="font-size:15px">${dirText(id)} · <b>${STATUS[t.status]}</b> — ${where}.</div>`;
+  h += `<div class="muted" style="margin-top:4px">${cat.length_m} м, ${cat.mass_t} т, до ${cat.v_max_kmh} км/ч. Отклонение от плана: ${t.delay_s >= 60 ? `<b class="bad">+${mins(t.delay_s)} мин</b>` : 'нет'}.</div>`;
+  const ents = (S.plan ? S.plan.entries : []).filter(e => e.kind === 'dwell' && e.train_id === id);
+  h += `<h3>Маршрут: расписание и план</h3><table><tr><th>Станция</th><th class="r">По расписанию</th><th class="r">По плану</th><th class="r">Разница</th></tr>` + tr.stops.map(s => {
+    const e = ents.find(x => x.station_id === s.station_id), sch = s.arr ?? s.dep, pl = e ? (s.arr != null ? e.start : e.end) : null, d = pl != null ? pl - sch : null;
+    return `<tr><td>${sname(s.station_id)}${s.stop ? '' : ' <span class="muted">(без ост.)</span>'}</td><td class="r">${clock(sch, false)}</td><td class="r">${pl != null ? clock(pl, false) : '<span class="muted">пройдена</span>'}</td><td class="r ${d > 60 ? 'bad' : ''}">${d != null && Math.abs(d) >= 60 ? sgn(d / 60) : ''}</td></tr>`;
+  }).join('') + '</table>';
+  h += `<div class="btnrow"><button data-goto="ato" data-train="${id}">Профиль скорости</button><button data-goto="whatif" data-train="${id}">Что если изменить скорость</button>
+    ${t.status !== 'finished' ? `<button data-inc='{"type":"train_failure","train_id":"${id}","est_min_min":20,"est_max_min":45}'>⚙️ Смоделировать поломку (20–45 мин)</button>` : ''}</div>`;
+  return [tname(id), h];
+}
+function renderDrawer() {
+  if (!S.drawer || !S.field) return;
+  const [kind, id] = S.drawer.split(':'), now = S.field.sim_time;
+  const [title, body] = kind === 'station' ? stationDrawer(id, now) : kind === 'segment' ? segmentDrawer(id, now) : trainDrawer(id);
+  $('dTitle').textContent = title; $('dBody').innerHTML = body;
+}
+
+// ---------- render loop & ws ----------
+let queued = false, pendingLat = [], lastDrawer = 0;
+function schedule() {
+  if (queued) return; queued = true;
+  requestAnimationFrame(() => {
+    queued = false;
+    renderHeader(); renderSituation(); renderScheme(); renderGraph();
+    const now = Date.now() / 1000;
+    for (const ts of pendingLat) { S.lat.push((now - ts) * 1000); if (S.lat.length > 200) S.lat.shift(); }
+    pendingLat = [];
+  });
+}
+function connect() {
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => { $('wsdot').classList.add('ok'); $('wstext').textContent = 'онлайн'; };
+  ws.onclose = () => { $('wsdot').classList.remove('ok'); $('wstext').textContent = 'нет связи'; setTimeout(connect, 1500); };
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === 'snapshot') { const p = m.payload; Object.assign(S, {field: p.field, plan: p.plan, variants: p.variants, index: p.index, fact: p.fact || {}}); renderVariants(); syncWhatIf(); schedule(); return; }
+    switch (m.type) {
+      case 'field.state': {
+        const prev = S.field ? S.field.incidents.map(i => i.id).join() : '';
+        S.field = m.payload; pendingLat.push(m.ts_wall);
+        for (const t of m.payload.trains) if (t.on_field) { const a = (S.fact[t.train_id] ||= []); if (!a.length || m.payload.sim_time > a.at(-1)[0]) a.push([m.payload.sim_time, t.km]); }
+        if (prev !== m.payload.incidents.map(i => i.id).join()) syncWhatIf();
+        if (S.drawer && performance.now() - lastDrawer > 1000) { lastDrawer = performance.now(); renderDrawer(); }
+        schedule(); break;
+      }
+      case 'kpi.index': S.index = m.payload; schedule(); break;
+      case 'plan.approved': S.plan = m.payload; S.ghost = S.whatif ? S.whatif.plan : null; schedule(); loadAto(); break;
+      case 'planner.variants': S.variants = m.payload; S.computing = false; S.lastSolveMs = m.payload.solve_ms; renderVariants(); schedule(); break;
+      case 'incident.created': case 'incident.resolved': S.computing = true; S.computeStart = performance.now(); setTab('decide'); renderVariants(); schedule(); break;
+    }
+  };
+  setInterval(() => { if (ws.readyState === 1 && S.lat.length) { const a = [...S.lat].sort((x, y) => x - y); ws.send(JSON.stringify({op: 'latency', p95_ms: a[Math.floor(a.length * .95)]})); } }, 5000);
+}
+setInterval(() => { const t = $('timer'); if (t && S.computing) t.textContent = ((performance.now() - S.computeStart) / 1000).toFixed(1); }, 100);
+setInterval(() => { if (S.field && !S.field.paused) loadAto(); }, 5000);
+
+// ---------- interactions ----------
+function setTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + tab));
+  if (tab === 'ato') { setTimeout(() => atoChart.resize(), 0); loadAto(); }
+}
+document.addEventListener('click', async e => {
+  const node = e.target.closest('[data-node]');
+  if (node && !e.target.closest('button')) { openNode(node.dataset.node); return; }
+  if (!e.target.closest('#quality')) $('quality').classList.remove('open');
+  const b = e.target.closest('button'); if (!b) return;
+  try {
+    if (b.dataset.tab) setTab(b.dataset.tab);
+    else if (b.dataset.inc) await api('POST', '/api/incidents', JSON.parse(b.dataset.inc));
+    else if (b.dataset.resolve) await api('POST', `/api/incidents/${b.dataset.resolve}/resolve`);
+    else if (b.dataset.apply) { b.disabled = true; await api('POST', '/api/plan/apply', {variant_id: b.dataset.apply, base_plan_version: S.plan.version}); toast('План перестроен — поезда идут по новому графику', true); }
+    else if (b.dataset.p) await api('POST', '/api/sim/clock', {paused: !S.field.paused});
+    else if (b.dataset.s) await api('POST', '/api/sim/clock', {paused: false, speed: +b.dataset.s});
+    else if (b.dataset.goto) { closeNode(); if (b.dataset.goto === 'ato') $('atoTrain').value = b.dataset.train; else { $('wiTrain').value = b.dataset.train; syncWhatIf(); } setTab(b.dataset.goto); }
+  } catch (err) { toast(err.message); b.disabled = false; }
+});
+$('quality').addEventListener('click', () => $('quality').classList.toggle('open'));
+$('sitBtn').addEventListener('click', () => setTab('decide'));
+$('dClose').addEventListener('click', closeNode);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNode(); });
+$('variants').addEventListener('mouseover', e => { const c = e.target.closest('.var'); if (!c) return; const v = S.variants.variants.find(x => x.id === c.dataset.v); if (v && S.ghost !== v.plan) { S.ghost = v.plan; schedule(); } });
+$('variants').addEventListener('mouseleave', () => { S.ghost = S.whatif ? S.whatif.plan : null; schedule(); });
+$('wiTrain').addEventListener('change', syncWhatIf);
+$('atoTrain').addEventListener('change', loadAto);
+$('wiRun').addEventListener('click', async () => {
+  const mods = [{kind: 'train_speed', target_id: $('wiTrain').value, value: +$('wiSpeed').value}];
+  if ($('wiInc').value && $('wiIncRow').style.display !== 'none') mods.push({kind: 'incident_duration', target_id: $('wiInc').value, value: +$('wiDur').value});
+  $('wiStatus').textContent = 'считаем…'; $('wiRun').disabled = true;
+  const t0 = performance.now();
+  try { S.whatif = await api('POST', '/api/whatif', {modifications: mods}); S.ghost = S.whatif.plan; $('wiStatus').textContent = `готово за ${((performance.now() - t0) / 1000).toFixed(1)} с`; }
+  catch (err) { toast(err.message); $('wiStatus').textContent = ''; }
+  $('wiRun').disabled = false; renderWhatIf(); schedule();
+});
+$('wiClear').addEventListener('click', () => { S.whatif = null; S.ghost = null; $('wiStatus').textContent = ''; renderWhatIf(); schedule(); });
+
+// ---------- boot ----------
+(async function boot() {
+  const inf = await api('GET', '/api/infra');
+  S.infra = inf; S.segTimes = inf.segment_times;
+  for (const s of inf.infra.stations) S.stations[s.id] = s;
+  for (const s of inf.infra.segments) S.segments[s.id] = s;
+  for (const t of inf.timetable) S.trains[t.id] = t;
+  const m = inf.sim_epoch.match(/T(\d\d):(\d\d):(\d\d)/); S.epochSec = +m[1] * 3600 + +m[2] * 60 + +m[3];
+  const opts = Object.values(S.trains).map(t => `<option value="${t.id}">${t.id} · ${CAT[t.category][0].toLowerCase()}, ${dirText(t.id)}</option>`).join('');
+  $('wiTrain').innerHTML = opts; $('atoTrain').innerHTML = opts; $('wiTrain').value = '2003'; $('atoTrain').value = '2004';
+  buildLayout(); syncWhatIf(); renderVariants(); connect();
+})();
+</script>
+</body>
+</html>

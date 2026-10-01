@@ -1,0 +1,494 @@
+{
+ "trains": [
+  {
+   "id": "2002",
+   "category": "freight",
+   "direction": "even",
+   "stops": [
+    {
+     "station_id": "YUZ",
+     "arr": null,
+     "dep": 4500.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 5460.0,
+     "dep": 5514.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 6775.0,
+     "dep": 7044.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 7904.0,
+     "dep": 7958.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 8858.0,
+     "dep": 8912.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "SEV",
+     "arr": 9722.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "2001",
+   "category": "freight",
+   "direction": "odd",
+   "stops": [
+    {
+     "station_id": "SEV",
+     "arr": null,
+     "dep": 5179.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 6243.0,
+     "dep": 6548.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 7874.0,
+     "dep": 7964.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 9297.0,
+     "dep": 9351.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 10201.0,
+     "dep": 10255.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "YUZ",
+     "arr": 11215.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "101",
+   "category": "express",
+   "direction": "odd",
+   "stops": [
+    {
+     "station_id": "SEV",
+     "arr": null,
+     "dep": 900.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 1460.0,
+     "dep": 1478.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 2181.0,
+     "dep": 2301.0,
+     "stop": true,
+     "min_dwell_s": 60
+    },
+    {
+     "station_id": "R2",
+     "arr": 3001.0,
+     "dep": 3019.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 3762.0,
+     "dep": 3780.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "YUZ",
+     "arr": 4440.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "102",
+   "category": "express",
+   "direction": "even",
+   "stops": [
+    {
+     "station_id": "YUZ",
+     "arr": null,
+     "dep": 1500.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 2160.0,
+     "dep": 2178.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 2805.0,
+     "dep": 3061.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 3821.0,
+     "dep": 3881.0,
+     "stop": true,
+     "min_dwell_s": 60
+    },
+    {
+     "station_id": "R1",
+     "arr": 4541.0,
+     "dep": 4559.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "SEV",
+     "arr": 5119.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "341",
+   "category": "passenger",
+   "direction": "odd",
+   "stops": [
+    {
+     "station_id": "SEV",
+     "arr": null,
+     "dep": 2100.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 2660.0,
+     "dep": 2682.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 3342.0,
+     "dep": 3881.0,
+     "stop": true,
+     "min_dwell_s": 60
+    },
+    {
+     "station_id": "R2",
+     "arr": 4581.0,
+     "dep": 4603.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 5230.0,
+     "dep": 5520.0,
+     "stop": true,
+     "min_dwell_s": 60
+    },
+    {
+     "station_id": "YUZ",
+     "arr": 6240.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "342",
+   "category": "passenger",
+   "direction": "even",
+   "stops": [
+    {
+     "station_id": "YUZ",
+     "arr": null,
+     "dep": 3000.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 3720.0,
+     "dep": 3822.0,
+     "stop": true,
+     "min_dwell_s": 60
+    },
+    {
+     "station_id": "R2",
+     "arr": 4543.0,
+     "dep": 4641.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 5401.0,
+     "dep": 5621.0,
+     "stop": true,
+     "min_dwell_s": 60
+    },
+    {
+     "station_id": "R1",
+     "arr": 6281.0,
+     "dep": 6303.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "SEV",
+     "arr": 6863.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "2003",
+   "category": "freight",
+   "direction": "odd",
+   "stops": [
+    {
+     "station_id": "SEV",
+     "arr": null,
+     "dep": 3368.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 4499.0,
+     "dep": 4601.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 5561.0,
+     "dep": 5651.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 6984.0,
+     "dep": 7038.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 7888.0,
+     "dep": 7942.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "YUZ",
+     "arr": 8902.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "2004",
+   "category": "freight",
+   "direction": "even",
+   "stops": [
+    {
+     "station_id": "YUZ",
+     "arr": null,
+     "dep": 8962.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 9982.0,
+     "dep": 10393.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 11604.0,
+     "dep": 11670.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 12530.0,
+     "dep": 12584.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 13484.0,
+     "dep": 13538.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "SEV",
+     "arr": 14348.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "2005",
+   "category": "freight",
+   "direction": "odd",
+   "stops": [
+    {
+     "station_id": "SEV",
+     "arr": null,
+     "dep": 7721.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 8852.0,
+     "dep": 8919.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 10187.0,
+     "dep": 10277.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 11610.0,
+     "dep": 11664.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 12514.0,
+     "dep": 12568.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "YUZ",
+     "arr": 13528.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  },
+  {
+   "id": "2006",
+   "category": "freight",
+   "direction": "even",
+   "stops": [
+    {
+     "station_id": "YUZ",
+     "arr": null,
+     "dep": 6300.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "OZR",
+     "arr": 7320.0,
+     "dep": 7948.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R2",
+     "arr": 8918.0,
+     "dep": 9357.0,
+     "stop": true,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "STP",
+     "arr": 10217.0,
+     "dep": 10271.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "R1",
+     "arr": 11171.0,
+     "dep": 11225.0,
+     "stop": false,
+     "min_dwell_s": 0
+    },
+    {
+     "station_id": "SEV",
+     "arr": 12035.0,
+     "dep": null,
+     "stop": true,
+     "min_dwell_s": 0
+    }
+   ]
+  }
+ ]
+}

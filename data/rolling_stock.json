@@ -1,0 +1,52 @@
+{
+ "categories": [
+  {
+   "id": "express",
+   "name": "Скорый",
+   "mass_t": 500,
+   "length_m": 300,
+   "v_max_kmh": 140,
+   "power_kw": 5000,
+   "f_start_kn": 250,
+   "b_service": 0.7,
+   "davis_a": 0.9,
+   "davis_b": 0.008,
+   "davis_c": 0.00022,
+   "priority_weight": 5,
+   "min_dwell_s": 60,
+   "color": "#a78bfa"
+  },
+  {
+   "id": "passenger",
+   "name": "Пассажирский",
+   "mass_t": 700,
+   "length_m": 450,
+   "v_max_kmh": 120,
+   "power_kw": 4000,
+   "f_start_kn": 300,
+   "b_service": 0.6,
+   "davis_a": 1.0,
+   "davis_b": 0.01,
+   "davis_c": 0.00025,
+   "priority_weight": 3,
+   "min_dwell_s": 60,
+   "color": "#60a5fa"
+  },
+  {
+   "id": "freight",
+   "name": "Грузовой",
+   "mass_t": 4500,
+   "length_m": 900,
+   "v_max_kmh": 80,
+   "power_kw": 6000,
+   "f_start_kn": 500,
+   "b_service": 0.3,
+   "davis_a": 0.9,
+   "davis_b": 0.007,
+   "davis_c": 0.00012,
+   "priority_weight": 1,
+   "min_dwell_s": 0,
+   "color": "#f59e0b"
+  }
+ ]
+}
