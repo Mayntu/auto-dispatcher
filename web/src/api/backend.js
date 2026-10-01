@@ -81,6 +81,14 @@ export const api = {
   resolveIncident: (id) => call('POST', `/incidents/${encodeURIComponent(id)}/resolve`),
   estimate: (id, minS, maxS) => call('POST', `/incidents/${encodeURIComponent(id)}/estimate`, { est_min_s: minS, est_max_s: maxS }),
   runScenario: (id) => call('POST', `/scenarios/${encodeURIComponent(id)}/run`),
+  // ── ручное изменение времени на ГИД и указания диспетчера ──
+  manualBounds: (trainId, stationId) => call('GET', `/plan/manual/bounds?train_id=${encodeURIComponent(trainId)}&station_id=${encodeURIComponent(stationId)}`),
+  manualPreview: (req) => call('POST', '/plan/manual/preview', req),
+  manualCommit: (req) => call('POST', '/plan/manual/commit', req),
+  async pins() {
+    return list((await call('GET', '/plan/pins')).data, 'pins');
+  },
+  deletePin: (id) => call('DELETE', `/plan/pins/${encodeURIComponent(id)}`),
 };
 
 /**

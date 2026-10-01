@@ -4,7 +4,7 @@
  *
  * Время: на сервере sim_time — секунды от SIM_EPOCH, в интерфейсе — секунды от полуночи.
  */
-import { impactsOf, prosCons } from '../core/planner';
+import { impactsOf, prosCons, stepsOf } from '../core/planner';
 import { destDelayMin } from '../core/qualityIndex';
 import { SECTION } from '../core/section';
 
@@ -108,6 +108,90 @@ export function planFromSpec(plan, trains) {
     trains: out,
     meetings: (plan.meetings ?? []).map((m) => ({ ...m, station: idx.get(m.station_id), time: toUi(m.time) })),
     kpi: plan.kpi,
+  };
+}
+
+// ───────────── указания диспетчера и ручное изменение ─────────────
+/** Pin сервера → указание интерфейса. */
+export function pinFromSpec(p) {
+  return {
+    id: p.id,
+    trainId: p.train_id,
+    station: stIdx().get(p.station_id),
+    kind: p.kind,
+    time: toUi(p.time),
+    createdAt: toUi(p.created_at),
+    status: p.status,
+    reason: p.reason ?? null,
+    description: p.description,
+  };
+}
+const boundFromSpec = (b) =>
+  b && {
+    current: toUi(b.current),
+    min: toUi(b.min),
+    max: toUi(b.max),
+    minReason: b.min_reason,
+    maxReason: b.max_reason,
+    locked: b.locked,
+    lockedReason: b.locked_reason,
+  };
+/** BoundsResponse → границы точки для перетаскивания. */
+export function boundsFromSpec(r) {
+  const i = r.info ?? {};
+  return {
+    basePlanVersion: r.base_plan_version,
+    pointType: r.point_type,
+    arr: boundFromSpec(r.arr),
+    dep: boundFromSpec(r.dep),
+    info: {
+      minDwell: i.min_dwell_s ?? 0,
+      prevDep: toUi(i.prev_dep ?? null),
+      prevStation: i.prev_station_id ? stIdx().get(i.prev_station_id) : null,
+      run: i.min_run_s != null ? { min: i.min_run_s, max: i.max_run_s, lengthKm: (i.segment_length_m ?? 0) / 1000, vmax: i.v_max_kmh } : null,
+      schedArr: toUi(i.sched_arr ?? null),
+      schedDep: toUi(i.sched_dep ?? null),
+      pin: i.pin ? pinFromSpec(i.pin) : null,
+    },
+  };
+}
+/** PreviewResponse → прогноз: нитки затронутых поездов накладываются на действующий план. */
+export function previewFromSpec(r, plan, trains) {
+  const idx = stIdx();
+  const out = { ...plan.trains };
+  for (const th of r.threads ?? []) {
+    const cur = plan.trains[th.train_id]?.stops ?? [];
+    const byStation = new Map(th.points.map((pt) => [idx.get(pt.station_id), pt]));
+    out[th.train_id] = {
+      ...(plan.trains[th.train_id] ?? { trainId: th.train_id }),
+      stops: cur.map((st) => {
+        const pt = byStation.get(st.station);
+        if (!pt) return st;
+        const arr = toUi(pt.arr ?? pt.dep);
+        const dep = toUi(pt.dep ?? pt.arr);
+        return { ...st, arr, dep };
+      }),
+    };
+  }
+  const num = new Map(trains.map((t) => [t.id, t.number]));
+  const kmOf = (res) => {
+    const g = SECTION.segments.find((x) => x.specId === res);
+    if (g) return (SECTION.stations[g.from].km + SECTION.stations[g.to].km) / 2;
+    const st = SECTION.stations.find((x) => x.specId === res || res?.startsWith?.(`${x.specId}:`));
+    return st?.km ?? 0;
+  };
+  const d = r.dragged ?? {};
+  return {
+    time: toUi(r.time),
+    clamped: r.clamped,
+    dragged: { arr: toUi(d.arr ?? null), dep: toUi(d.dep ?? null), dwell: d.dwell_s ?? 0, prevRun: d.prev_run_s ?? null },
+    plan: { ...plan, trains: out },
+    changed: (r.affected ?? []).map((a) => ({ trainId: a.train_id, number: num.get(a.train_id) ?? a.train_id, deltaFinal: a.delta_final_s, deltaMax: a.delta_max_s })),
+    conflicts: (r.conflicts ?? []).map((c) => ({ time: toUi(c.time_from), km: kmOf(c.resource_id), trains: c.trains, kind: c.kind })),
+    index: { value: r.index_forecast },
+    deltaIndex: r.delta_index ?? 0,
+    totalDelayDelta: (r.total_delay_delta_s ?? 0) / 60,
+    ms: r.compute_ms,
   };
 }
 
@@ -218,6 +302,7 @@ export function variantsFromSpec(payload, ctx) {
       basePlanVersion: v.base_plan_version,
       solveMs: v.plan.solve_ms,
       explanation: ['', ...(v.explanation ?? [])],
+      steps: prev ? stepsOf(prev, plan, trains) : [],
       wins: [],
     };
   });
