@@ -14,7 +14,8 @@ from app.bus.envelope import Envelope
 
 log = logging.getLogger("ws")
 FORWARD = ("field.state", "kpi.index", "plan.approved", "plan.refreshed", "journal.entry", "planner.variants", "planner.metrics",
-           "incident.created", "incident.resolved", "dc.command_result", "safety.violation", "field.train_event")
+           "incident.created", "incident.updated", "incident.resolved", "dc.command_result", "safety.violation",
+           "field.train_event", "planner.pin_violated", "planner.conflicts")
 MAX_QUEUE = 500
 
 

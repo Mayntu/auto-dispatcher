@@ -25,6 +25,9 @@ print("stale", code); bad += [] if code == 409 else ["stale"]
 print("invalid", c.post("/api/plan/manual/preview", json={**body, "kind":"xx"}).status_code)
 print("locked origin arr", c.post("/api/plan/manual/preview", json={**body, "station_id": d[0]["station_id"], "kind":"arr"}).status_code)
 t=time.perf_counter(); cm = c.post("/api/plan/manual/commit", json=body); vs = cm.json()["variants"]; print("commit", cm.status_code, round((time.perf_counter()-t)*1000),"ms", [(x["title"], x["strategy"], x["score"], x["recommended"]) for x in vs]); print("  ", vs[0]["explanation"][:2])
+time.sleep(5)  # the dispatcher reads the card: it must stay alive (live re-timing must keep the instruction)
+alive = {x["id"]: x["status"] for x in c.get("/api/variants").json()}
+bad += [] if all(alive.get(x["id"]) == "proposed" for x in vs) else [f"manual variant went stale while waiting: {alive}"]
 best = next(x for x in vs if x["recommended"])
 ap = c.post("/api/plan/apply", json={"variant_id": best["id"], "base_plan_version": v}); print("apply", ap.status_code, ap.json())
 time.sleep(1.5)
@@ -45,6 +48,21 @@ time.sleep(6)
 print("after removal variants", [(x["title"], x["source"]) for x in c.get("/api/variants").json()])
 print("journal", [j["text"][:90] for j in c.get("/api/journal").json() if j["kind"].startswith("pin") or "Указание" in j["text"]])
 print("safety", c.get("/api/state").json()["field"]["safety_violations"])
+# two incidents cleared within the debounce: no cards without incidents (§12.1), at most "return to schedule"
+for x in c.get("/api/variants").json():
+    c.post(f"/api/plan/variants/{x['id']}/reject")
+i1 = c.post("/api/incidents", json={"type": "obstacle", "segment_id": "R1-STP", "est_min_min": 15, "est_max_min": 30}).json()
+i2 = c.post("/api/incidents", json={"type": "speed_restriction", "segment_id": "R2-OZR", "km_from": 52, "km_to": 55,
+                                     "v_kmh": 40, "est_min_min": 30, "est_max_min": 30}).json()
+time.sleep(6)
+for x in c.get("/api/variants").json():
+    c.post(f"/api/plan/variants/{x['id']}/reject")
+c.post(f"/api/incidents/{i1['id']}/resolve")
+c.post(f"/api/incidents/{i2['id']}/resolve")
+time.sleep(8)
+after = [(x["title"], x.get("kind")) for x in c.get("/api/variants").json() if x["status"] == "proposed"]
+print("after clearing both incidents", after)
+bad += [] if all(k == "return" for _, k in after) else [f"cards without incidents: {after}"]
 safety = c.get("/api/state").json()["field"]["safety_violations"]
 bad += [] if safety == 0 else ["safety"]
 print("RESULT", "OK" if not bad else f"FAIL {bad}")

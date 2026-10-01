@@ -19,7 +19,7 @@ from app.bus.envelope import Envelope
 from app.field.autoblock import SIGNAL_STOP_M, AutoBlock
 from app.railcore.warnings import restriction_of, restrictions_by_segment
 from app.railcore.warnings import validate as validate_warning
-from app.field.incidents import FieldIncident, IncidentError, make_incident
+from app.field.incidents import MVP_TYPES, FieldIncident, IncidentError, make_incident
 from app.railcore.infra import World
 from app.railcore.models import Direction, Incident, IncidentType, Plan, PlanEntry, Train, TrainState, TrainStatus
 from app.railcore.problem import CLOSING_TYPES, OBSTACLE_STOP_M
@@ -107,6 +107,12 @@ class FieldSim:
         return [fi for fi in self.incidents.values() if fi.incident.status == "active"]
 
     def create_incident(self, req: dict) -> Incident:
+        try:
+            itype = IncidentType(req["type"])
+        except ValueError:
+            raise IncidentError(f"неизвестный тип сбоя «{req['type']}»") from None
+        if itype not in MVP_TYPES:  # the type first: otherwise a missing segment hides the real reason
+            raise IncidentError(f"тип сбоя «{itype}» пока не поддерживается")
         seg_id, km = req.get("segment_id"), req.get("km")
         if req["type"] == IncidentType.TRAIN_FAILURE:
             tr = self.trains.get(req.get("train_id") or "")

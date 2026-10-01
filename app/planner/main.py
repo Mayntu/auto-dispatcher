@@ -165,7 +165,9 @@ class PlannerService:
         t0 = time.perf_counter()
         snap = self.snapshot()
         forecast = forecast_plan(snap, self.settings) or self.forecast
-        if snap.incidents or reasons & {"incident", "replan", "broken"}:
+        # "incident" without active incidents (several cleared within the debounce) is a resolution, not a reason
+        # for three new cards
+        if snap.incidents or reasons & {"replan", "broken"}:
             kind = "incident" if snap.incidents else ("broken" if "broken" in reasons else "replan")
             variants = await generate_variants(self.pool, self.world, snap, self.settings, self.version, forecast,
                                                pick_strategies(snap.incidents, self.settings), kind)
@@ -309,11 +311,16 @@ class PlannerService:
         moment; a variant that became unexecutable or worse than keeping the current plan goes stale."""
         went_stale = []
         for v in self.proposed():
+            # a variant from the train graph is compared with the current plan under the same instruction: the
+            # delay the dispatcher asked for is not "worse than the current plan"
+            vsnap = self.snapshot(self._pending_pins[v.id]) if v.id in self._pending_pins else snap
             durations = durations_for(STRATEGIES[v.strategy], snap.incidents, self.settings)
-            new = retime_with_objective(snap.model_copy(update={"hint": v.plan.entries}), self.settings,
+            new = retime_with_objective(vsnap.model_copy(update={"hint": v.plan.entries}), self.settings,
                                         v.strategy, durations)
-            cur = retime_with_objective(snap, self.settings, v.strategy, durations)
+            cur = retime_with_objective(vsnap, self.settings, v.strategy, durations)
             if new is None or (cur is not None and new[1] > cur[1] + STALE_MARGIN_S):
+                log.info("variant %s (%s) stale: %s", v.id, v.strategy, "unexecutable" if new is None
+                         else f"objective {new[1]:.0f} vs current {cur[1]:.0f}")
                 v.status = "stale"
                 went_stale.append(v)
                 continue
@@ -322,12 +329,16 @@ class PlannerService:
                                                "solve_ms": v.plan.solve_ms, "created_at": v.plan.created_at})
             v.plan.kpi.robust_total_delay_s = robust
             v.updated_at = snap.now
-        score_variants(self.world, snap, self.settings, list(self.variants.values()), self.forecast)
+        pin = next((self._pending_pins[v.id] for v in self.proposed() if v.id in self._pending_pins), None)
+        score_variants(self.world, self.snapshot(pin) if pin else snap, self.settings, list(self.variants.values()),
+                       self.forecast)
         if went_stale:
             await self._journal("variants_stale", "Устарели варианты: " + ", ".join(f"«{v.title}»" for v in went_stale)
                                 + " — положение поездов изменилось")
-            if not self.proposed():
-                self._request("broken" if not self.incidents else "incident")
+            # new variants only while incidents are active; without them nothing needs a decision (§12.1) — a plan
+            # that really stopped working is caught by the forecast check, not by a stale card
+            if not self.proposed() and self.incidents:
+                self._request("incident")
         await self._publish_variants()
 
     async def _maybe_refresh(self, fc: Plan) -> None:

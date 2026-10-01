@@ -22,6 +22,7 @@ from app.railcore.problem import Solution, Task
 SCALE = 100  # objective coefficients are floats * SCALE
 EPS_FINAL = 0.01
 WAIT_FREE_S = 1200  # a train may wait this long at a station before the long-wait penalty starts
+PIN_TOLERANCE_S = 30
 PIN_PENALTY = 10_000  # per second a dispatcher's instruction is missed: hard in practice, never infeasible
 LAMBDA_WAIT = 0.5  # per second of waiting beyond that: no train (a freight in particular) starves for hours
 WINDOW_SLACK_S = 3 * 3600  # pairs further apart than this keep their natural order without a decision variable
@@ -262,10 +263,12 @@ def objective(tasks: list[Task], sol: Solution, settings: dict, lambda_stop_mult
                 total += t.weight * max(0, arr - n.sched_arr)
             if n.kind == "mid" and not n.stop_fixed and stop:
                 total += lam
+            # a re-timed plan lands on whole seconds while "now" may be fractional: a second or two off the
+            # instruction is not a deviation (the service calls it violated only beyond a minute)
             if n.pin_arr is not None:
-                total += PIN_PENALTY * abs(arr - n.pin_arr)
+                total += PIN_PENALTY * max(0, abs(arr - n.pin_arr) - PIN_TOLERANCE_S)
             if n.pin_dep is not None:
-                total += PIN_PENALTY * abs(dep - n.pin_dep)
+                total += PIN_PENALTY * max(0, abs(dep - n.pin_dep) - PIN_TOLERANCE_S)
             if n.kind == "mid":
                 total += LAMBDA_WAIT * max(0, dep - arr - n.dwell_min - WAIT_FREE_S)
             elif n.kind == "origin" and n.sched_dep is not None:
