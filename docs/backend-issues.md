@@ -40,3 +40,10 @@
     `{"type":"train_delay","train_id":"104","est_min_min":10,"est_max_min":20}` → 422 `unknown segment`.
     Ожидал 422 «тип не поддерживается» (как для остальных типов вне MVP): в `FieldSim.create_incident` проверка
     перегона идёт раньше проверки типа в `make_incident`, диспетчер видит непонятную причину.
+
+11. **[контракт] Нет API ручного изменения времени на ГИД и указаний диспетчера.** Фронт из ветки `frontMax`
+    (перетаскивание ниток, `web/src/components/ManualDrag.jsx`) вызывает `GET /api/plan/manual/bounds?train_id&station_id`,
+    `POST /api/plan/manual/preview`, `POST /api/plan/manual/commit`, `GET /api/plan/pins`, `DELETE /api/plan/pins/{id}`,
+    ждёт `plan.pins` в `Plan` и событие WS `planner.pin_violated` — сейчас все пути отвечают 404. Формат, который ждёт фронт,
+    — в `web/src/api/adapter.js` (`boundsFromSpec`, `previewFromSpec`, `pinFromSpec`). В памятке упомянут
+    `tasks/02-manual-drag-*.md`, в репозитории его пока нет.

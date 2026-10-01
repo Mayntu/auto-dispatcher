@@ -38,6 +38,16 @@ export default function App() {
   const [draft, setDraft] = useState(null);
   const [toast, setToast] = useState(null);
   const [graphOpen, setGraphOpen] = useState(false);
+  // Уведомления движка: указание применено, снято, невыполнимо (красное — до закрытия, с кнопками).
+  const [notice, setNotice] = useState(null);
+  const toastId = s.toast?.id;
+  useEffect(() => {
+    if (!s.toast) return undefined;
+    setNotice(s.toast);
+    if (s.toast.kind === 'crit') return undefined;
+    const id = setTimeout(() => setNotice((n) => (n?.id === s.toast.id ? null : n)), 3500);
+    return () => clearTimeout(id);
+  }, [toastId]);
 
   const pendingId = s.pending?.id;
   useEffect(() => {
@@ -178,6 +188,47 @@ export default function App() {
 
       {draft && <DropPopover draft={draft} trains={s.trains} onDone={() => setDraft(null)} />}
       {toast && <div className="toast">{toast}</div>}
+      {notice && !toast && (
+        <div className={`toast ${notice.kind === 'crit' ? 'crit' : ''}`}>
+          <span>{tr(notice.text)}</span>
+          {notice.undoPinId && (
+            <button
+              onClick={() => {
+                engine.removePin(notice.undoPinId);
+                setNotice(null);
+              }}
+            >
+              {tr('Отменить')}
+            </button>
+          )}
+          {notice.pinId && (
+            <>
+              <button
+                onClick={() => {
+                  engine.removePin(notice.pinId);
+                  setNotice(null);
+                }}
+              >
+                {tr('Снять')}
+              </button>
+              <button
+                onClick={() => {
+                  setGraphOpen(true);
+                  setSelected(notice.trainId);
+                  setNotice(null);
+                }}
+              >
+                {tr('Показать')}
+              </button>
+            </>
+          )}
+          {notice.kind === 'crit' && (
+            <button className="toast-x" onClick={() => setNotice(null)} title={tr('Закрыть')}>
+              ×
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

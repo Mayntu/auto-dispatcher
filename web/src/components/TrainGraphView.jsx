@@ -7,6 +7,9 @@
 import { ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { computeMeets } from '../core/conflicts';
+import { can } from '../engine/roles';
+import { useManualDrag } from './ManualDrag';
+import { TrainFilter } from './TrainFilter';
 import { destDelayMin } from '../core/qualityIndex';
 import { durationOf, isBlocking } from '../core/scheduler';
 import { CATEGORIES, SECTION, SECTION_KM } from '../core/section';
@@ -26,11 +29,15 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
   const [ref, size] = useSize();
   const [span, setSpan] = useState(240);
   const [shift, setShift] = useState(0);
-  const [layers, setLayers] = useState({ fact: true, plan: true, base: true, ghost: true });
+  // Факт, план, вариант и нормативный график рисуются всегда; выбирать можно сами поезда.
+  const layers = { fact: true, plan: true, base: true, ghost: true };
   const showBase = layers.base;
+  const [shown, setShown] = useState(null);
   const [hover, setHover] = useState(null);
   const drag = useRef(null);
-  const plan = runningPlan(s);
+  const basePlan = runningPlan(s);
+  const svgRef = useRef(null);
+  const hoverTimer = useRef(null);
 
   const w = Math.max(600, size.w);
   const h = Math.max(250, size.h);
@@ -43,6 +50,20 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
   const t1 = t0 + span * 60;
   const x = (t) => L + ((t - t0) / (t1 - t0)) * (w - L - R);
   const y = (km) => T + (km / SECTION_KM) * (h - T - B);
+  // Ручное изменение времени: ручки у точек плановой нитки, указания-замки, прогноз и варианты.
+  const md = useManualDrag({
+    s,
+    plan: basePlan,
+    geo: { x, y, invX: (px) => t0 + ((px - L) / (w - L - R)) * (t1 - t0), L, R, T, B, w, h },
+    svgRef,
+    canEdit: can(s.user, 'section') && open,
+    focus: hover ?? selected,
+    onHandleEnter: (id) => {
+      clearTimeout(hoverTimer.current);
+      setHover(id);
+    },
+  });
+  const plan = md.viewPlan;
   const conflicts = s.forecast ? s.forecastConflicts : s.conflicts;
   const trainById = new Map(s.trains.map((t) => [t.id, t]));
 
@@ -141,14 +162,14 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
   };
   const onPointerUp = () => (drag.current = null);
 
-  const focus = hover ?? selected;
+  const focus = md.drag?.trainId ?? hover ?? selected;
 
   return (
     <div className={`graph-view ${open ? 'open' : ''}`}>
       <div className="gv-head">
         <button className="gv-toggle" onClick={onToggle} title={t(open ? 'Свернуть' : 'Развернуть')}>
           {open ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-          {t('ГИД')}
+          {t('ГИД (поездограмма)')}
         </button>
         {open && <div className="seg-ctl">
           {SPANS.map((o) => (
@@ -157,20 +178,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
             </button>
           ))}
         </div>}
-        {open && (
-          <div className="gv-layers" title={t('Слои ГИД')}>
-            {[
-              ['fact', 'факт'],
-              ['plan', 'план'],
-              ['ghost', 'вариант'],
-              ['base', 'нормативный график'],
-            ].map(([k, label]) => (
-              <button key={k} className={`gv-layer ${k} ${layers[k] ? 'on' : ''}`} onClick={() => setLayers((v) => ({ ...v, [k]: !v[k] }))}>
-                <i /> {t(label)}
-              </button>
-            ))}
-          </div>
-        )}
+        {open && <TrainFilter trains={s.trains} plan={plan} shown={shown} onChange={setShown} />}
         {shift !== 0 && (
           <button className="gv-now" onClick={() => setShift(0)}>
             <RotateCcw size={14} /> {t('К текущему времени')}
@@ -188,6 +196,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
       {open && (
       <div className="gv-body" ref={ref}>
         <svg
+          ref={svgRef}
           width={w}
           height={h}
           onPointerDown={onPointerDown}
@@ -286,13 +295,13 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
               })}
 
             {showBase &&
-              s.trains.map((t) =>
+              s.trains.filter((tr) => !shown || shown.has(tr.id) || tr.id === selected).map((t) =>
                 s.baseline.trains[t.id] && !t.cancelled ? (
                   <polyline key={t.id} points={poly(pts(s.baseline, t.id))} stroke={CATEGORIES[t.category].color} className="gv-base" />
                 ) : null,
               )}
 
-            {s.trains.map((t) => {
+            {s.trains.filter((tr) => !shown || shown.has(tr.id) || tr.id === selected).map((t) => {
               if (t.cancelled || !plan.trains[t.id]) return null;
               const all = pts(plan, t.id);
               const p = poly(all);
@@ -302,9 +311,17 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
               return (
                 <g
                   key={t.id}
+                  data-train={t.id}
                   className={`gv-train ${focus === t.id ? 'focus' : ''} ${dim ? 'dim' : ''}`}
-                  onPointerEnter={() => setHover(t.id)}
-                  onPointerLeave={() => setHover(null)}
+                  onPointerEnter={() => {
+                    clearTimeout(hoverTimer.current);
+                    setHover(t.id);
+                  }}
+                  onPointerLeave={() => {
+                    // Небольшая задержка — чтобы успеть навести на ручку точки.
+                    clearTimeout(hoverTimer.current);
+                    hoverTimer.current = setTimeout(() => setHover((v) => (v === t.id ? null : v)), 400);
+                  }}
                   onClick={() => onSelect(t.id)}
                 >
                   <polyline points={p} className="gv-hit" />
@@ -342,7 +359,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
             {/* выбранный вариант — только для поездов, у которых он что-то меняет */}
             {preview &&
               layers.ghost &&
-              s.trains.map((t) => {
+              s.trains.filter((tr) => !shown || shown.has(tr.id) || tr.id === selected).map((t) => {
                 const a = preview.trains[t.id]?.stops;
                 const b = plan.trains[t.id]?.stops;
                 if (!a || !b || a.every((st, j) => Math.abs(st.arr - (b[j]?.arr ?? st.arr)) < 30)) return null;
@@ -360,7 +377,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
                 </g>
               ))}
 
-            {s.trains.map((t) => {
+            {s.trains.filter((tr) => !shown || shown.has(tr.id) || tr.id === selected).map((t) => {
               if (t.cancelled || !plan.trains[t.id]) return null;
               const lb = labelOf(t.id);
               if (!lb) return null;
@@ -388,6 +405,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
                 </text>
               </g>
             ))}
+            {md.svgLayer}
           </g>
 
           {x(s.now) >= L && x(s.now) <= w - R && (
@@ -400,8 +418,9 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
             </g>
           )}
         </svg>
+        {md.overlay}
 
-        {hover && trainById.get(hover) && plan.trains[hover] && (
+        {!md.drag && !md.popupOpen && hover && trainById.get(hover) && plan.trains[hover] && (
           <div className="gv-tip">
             <span className="tr-dot" style={{ background: CATEGORIES[trainById.get(hover).category].color }} />
             <b>{trainById.get(hover).number}</b> · {t(CATEGORIES[trainById.get(hover).category].name)}

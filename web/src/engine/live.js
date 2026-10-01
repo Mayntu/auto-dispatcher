@@ -15,7 +15,12 @@ import {
   trainFromSpec,
   variantsFromSpec,
   whatIfFromSpec,
+  boundsFromSpec,
+  pinFromSpec,
+  previewFromSpec,
+  toServer,
 } from '../api/adapter';
+import { fmtHM } from '../core/time';
 import { api, connectStream } from '../api/backend';
 import { m } from '../i18n/msg';
 import { SECTION } from '../core/section';
@@ -35,6 +40,7 @@ export function startLive(engine) {
   let fact = {};
   let incidentsKey = '';
   const journalSeen = new Set();
+  let manualBase = null;
 
   const st = () => engine.getState();
   const ctx = () => ({ trains, baseline, prev: st().plan, disruptions: st().disruptions });
@@ -45,6 +51,8 @@ export function startLive(engine) {
   const setPlan = (plan) => {
     const p = planFromSpec(plan, trains);
     if (p) engine.set({ plan: p, conflicts: [] });
+    // Указания диспетчера приходят вместе с планом (§6.4).
+    if (plan?.pins) engine.set({ pins: plan.pins.map(pinFromSpec) });
   };
   const setIndex = (k) => {
     if (!k) return;
@@ -172,6 +180,12 @@ export function startLive(engine) {
       case 'planner.metrics':
         if (p.solve_ms !== undefined) engine.set({ metrics: { ...st().metrics, lastVariantsMs: p.solve_ms } });
         return;
+      case 'planner.pin_violated': {
+        const pin = pinFromSpec(p.pin ?? p);
+        engine.set({ pins: (st().pins ?? []).map((x) => (x.id === pin.id ? { ...pin, status: 'violated', reason: p.reason } : x)) });
+        engine.toast(m('Указание по {n} невыполнимо: {r}', { n: pin.trainId, r: p.reason ?? '' }), 'crit', { pinId: pin.id, trainId: pin.trainId });
+        return;
+      }
       case 'safety.violation':
         engine.log('crit', m('Нарушение безопасности: {d}', { d: typeof p === 'string' ? p : JSON.stringify(p) }), 'Безопасность');
         return;
@@ -197,7 +211,8 @@ export function startLive(engine) {
         if (st().pending) engine.set({ pending: { ...st().pending, notice: r.detail ?? m('Вариант устарел — план уже изменился, пересчитываю варианты…') } });
         return;
       }
-      ok(r, 'утверждение плана');
+      if (!ok(r, 'утверждение плана')) return;
+      if (s.pending?.source === 'manual') engine.toast(m('Указание: {d}', { d: s.pending.manual.description }));
     },
     async rejectVariant(variantId) {
       if (engine.allowed('section', 'отклонение варианта')) ok(await api.reject(variantId), 'отклонение варианта');
@@ -253,6 +268,64 @@ export function startLive(engine) {
       if (!engine.allowed('section', 'запрос вариантов') || st().pending) return;
       if (ok(await api.replan(), 'запрос вариантов') && !st().pending)
         engine.set({ pending: { id: uid('R'), createdAt: st().now, status: 'computing', variants: [], disruptionIds: [] } });
+    },
+    // ── ручное изменение времени на ГИД (ТЗ §6) ──
+    async manualBounds(trainId, station) {
+      const r = await api.manualBounds(trainId, SECTION.stations[station].specId);
+      if (!r.ok) {
+        engine.toast(r.status === 423 ? r.data?.reason ?? m('Точку менять нельзя') : r.status === 404 ? m('Поезд или пункт не найден в плане') : m('План обновился — повторите действие'), 'warn');
+        return null;
+      }
+      manualBase = r.data.base_plan_version;
+      return boundsFromSpec(r.data);
+    },
+    async manualPreview(req) {
+      const r = await api.manualPreview({ base_plan_version: manualBase, train_id: req.trainId, station_id: SECTION.stations[req.station].specId, kind: req.kind, time: toServer(req.time) });
+      if (!r.ok) throw new Error(String(r.status));
+      return previewFromSpec(r.data, st().plan, trains);
+    },
+    async manualCommit(req) {
+      if (!engine.allowed('section', 'ручное изменение времени')) return;
+      const r = await api.manualCommit({ base_plan_version: manualBase, train_id: req.trainId, station_id: SECTION.stations[req.station].specId, kind: req.kind, time: toServer(req.time) });
+      if (r.status === 409) {
+        engine.toast(m('План обновился — повторите действие'), 'warn');
+        return;
+      }
+      if (!r.ok) throw new Error(String(r.status));
+      const variants = variantsFromSpec({ variants: r.data.variants ?? [] }, ctx());
+      const p = st().plan.trains[req.trainId]?.stops.find((x) => x.station === req.station);
+      const description = m(req.kind === 'dep' ? 'Задержать {n} отправлением со станции {st} до {t}' : 'Поезд {n}: прибытие на {st} в {t}', { n: req.trainId, st: m(SECTION.stations[req.station].short), t: fmtHM(req.time) });
+      engine.set({
+        pending: {
+          id: uid('R'),
+          source: 'manual',
+          manual: { ...req, from: p ? (req.kind === 'dep' ? p.dep : p.arr) : null, description },
+          createdAt: st().now,
+          status: 'ready',
+          variants,
+          disruptionIds: [],
+          basePlanVersion: manualBase,
+        },
+      });
+    },
+    /** С сервером: фиксируем изменение и сразу применяем вариант «Сохранить порядок». */
+    async manualApply(req) {
+      await commands.manualCommit(req);
+      const p = st().pending;
+      if (p?.source !== 'manual' || !p.variants.length) return;
+      const v = p.variants.find((x) => x.specStrategy === 'keep_order') ?? p.variants[0];
+      await commands.applyVariant(v.id);
+    },
+    cancelManual() {
+      if (st().pending?.source === 'manual') engine.set({ pending: undefined });
+    },
+    async removePin(id) {
+      if (!engine.allowed('section', 'снятие указания')) return;
+      const pin = (st().pins ?? []).find((x) => x.id === id);
+      if (ok(await api.deletePin(id), 'снятие указания')) {
+        engine.set({ pins: (st().pins ?? []).filter((x) => x.id !== id) });
+        engine.toast(m('Указание по {n} снято', { n: pin?.trainId ?? '' }));
+      }
     },
     reset() {
       unsupported('сброс участка');

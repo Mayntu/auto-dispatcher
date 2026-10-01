@@ -8,7 +8,7 @@ import { computeMeets, detectConflicts, forcedWaits } from './conflicts';
 import { planEnergy } from './profile';
 import { computeIndex, destDelayMin, weightedDelay } from './qualityIndex';
 import { effectivePriority, propagate, routeOf, runTime, scheduleSequential, segOf } from './scheduler';
-import { stationName } from './section';
+import { segmentName, stationName } from './section';
 const ctxOf = (inp, durMode) => ({
   section: inp.section,
   settings: inp.settings,
@@ -17,6 +17,7 @@ const ctxOf = (inp, durMode) => ({
   now: inp.now,
   prev: inp.prev,
   baseline: inp.baseline,
+  pins: inp.pins ?? [],
   durMode,
 });
 function categoryOrder(trains, s) {
@@ -34,6 +35,8 @@ const STRATEGY_TITLE = {
   passengers: 'Сначала пассажирские',
   robust: 'С запасом времени',
   whatif: 'Что если',
+  keep_order: 'Сохранить порядок',
+  reoptimize: 'Переразвести',
 };
 const STRATEGY_LEAD = {
   hold: 'Поезда ждут на ближайших станциях, пока путь не освободится. Порядок движения не меняется.',
@@ -41,6 +44,8 @@ const STRATEGY_LEAD = {
   passengers: 'Грузовые уступают дорогу, чтобы пассажирские и пригородные пришли вовремя.',
   optimized: 'Система перебрала порядок пропуска поездов и нашла вариант с наименьшими опозданиями.',
   robust: 'Рассчитано на самый долгий срок устранения — план не придётся менять, если ремонт затянется.',
+  keep_order: 'Ваше указание выполняется, порядок поездов прежний — остальные подстраиваются по времени.',
+  reoptimize: 'Ваше указание выполняется, а порядок пропуска поездов перестроен так, чтобы опозданий было меньше.',
 };
 /** Время прибытия на конечный пункт при свободном ходе (без скрещений и обгонов). */
 function idealArrival(ctx, t) {
@@ -131,7 +136,8 @@ export function planWithStrategy(inp, strategy, durMode, seedOrder) {
     case 'naive':
       return propagate(ctx, false, 'naive', title);
     case 'hold':
-      return propagate(ctx, true, 'hold', title);
+    case 'keep_order':
+      return propagate(ctx, true, strategy, title);
     case 'priority':
     case 'baseline':
       return scheduleSequential(ctx, categoryOrder(inp.trains, inp.settings), strategy, title);
@@ -195,6 +201,70 @@ function explain(trains, before, after, strategy) {
     lines.push(m('{n}: стоянка для скрещения / обгона на {st}, {min} мин', { n: num.get(w.trainId), st: stationName(w.station), min: Math.round(w.min) }));
   }
   return lines;
+}
+/**
+ * Шаги варианта для диспетчера — конкретные действия относительно действующего плана, по времени:
+ * задержать поезд на станции (и кого он пропускает), задержать отправление, перенести скрещение,
+ * вести поезд медленнее по перегону. Возвращает [{ t, text }] — text сообщение для перевода.
+ */
+export function stepsOf(before, after, trains, now = -Infinity) {
+  const byId = new Map(trains.map((t) => [t.id, t]));
+  const steps = [];
+  const MIN = 120;
+  for (const t of trains) {
+    const a = after.trains[t.id]?.stops;
+    const b = before?.trains[t.id]?.stops;
+    if (!a || !b || t.cancelled) continue;
+    for (let j = 0; j < a.length - 1; j++) {
+      const st = a[j];
+      const old = b.find((x) => x.station === st.station);
+      if (!old || st.dep < now) continue;
+      const dwell = st.dep - st.arr;
+      const extra = dwell - (old.dep - old.arr);
+      if (j === 0) {
+        if (st.dep - old.dep >= MIN) steps.push({ t: st.dep, text: m('{n}: задержать отправление — {st}, на {d} мин', { n: t.number, st: stationName(st.station), d: Math.round((st.dep - old.dep) / 60) }) });
+        continue;
+      }
+      if (extra < MIN) continue;
+      // Кого пропускает, пока стоит: встречные — скрещение, попутные, ушедшие раньше него, — обгон.
+      const passing = [];
+      for (const q of trains) {
+        if (q.id === t.id || q.cancelled) continue;
+        const qs = after.trains[q.id]?.stops.find((x) => x.station === st.station);
+        if (!qs || qs.dep < st.arr - 30 || qs.dep > st.dep + 60) continue;
+        if (q.dir !== t.dir) passing.push(q.number);
+        else if (qs.arr >= st.arr - 30) passing.push(q.number);
+      }
+      const base = { n: t.number, st: stationName(st.station), min: Math.round(dwell / 60) };
+      steps.push({
+        t: st.arr,
+        text: passing.length
+          ? m('{n}: стоянка — {st}, {min} мин, пропускает {list}', { ...base, list: passing.slice(0, 3).join(', ') })
+          : m('{n}: стоянка — {st}, {min} мин, ждёт освобождения пути', base),
+      });
+    }
+    // Медленнее по перегону без остановки — ход растянут на 2 мин и больше.
+    for (let j = 0; j + 1 < a.length; j++) {
+      const ob = b.findIndex((x) => x.station === a[j].station);
+      if (ob < 0 || !b[ob + 1] || a[j].dep < now) continue;
+      const slower = a[j + 1].arr - a[j].dep - (b[ob + 1].arr - b[ob].dep);
+      if (slower >= MIN) {
+        steps.push({ t: a[j].dep, text: m('{n}: вести медленнее — {seg}, +{d} мин', { n: t.number, seg: segmentName(Math.min(a[j].station, a[j + 1].station)), d: Math.round(slower / 60) }) });
+      }
+    }
+  }
+  // Перенесённые скрещения — если пара разъезжается на другом пункте.
+  const mb = computeMeets(before, trains);
+  const ma = computeMeets(after, trains);
+  for (const [key, st] of ma) {
+    const old = mb.get(key);
+    if (old === undefined || old === st) continue;
+    const [x, y] = key.split('|');
+    const tt = Math.max(after.trains[x]?.stops.find((s) => s.station === st)?.arr ?? 0, after.trains[y]?.stops.find((s) => s.station === st)?.arr ?? 0);
+    if (tt < now) continue;
+    steps.push({ t: tt, text: m('Скрещение {a} и {b} — на {to} вместо {from}', { a: byId.get(x)?.number ?? x, b: byId.get(y)?.number ?? y, to: stationName(st), from: stationName(old) }) });
+  }
+  return steps.sort((p, q) => p.t - q.t);
 }
 const signature = (p) =>
   Object.values(p.trains)
@@ -277,6 +347,7 @@ export function computeVariants(inp) {
       energyKWh: energy,
       energyDeltaPct: prevEnergy > 0 ? (energy / prevEnergy - 1) * 100 : 0,
       explanation: explain(inp.trains, inp.prev, c.plan, c.strategy),
+      steps: stepsOf(inp.prev, c.plan, inp.trains, inp.now),
       wins: [],
     });
   }
@@ -292,6 +363,8 @@ const STRATEGY_WHEN = {
   optimized: 'Когда главное — чтобы суммарно поезда опоздали как можно меньше.',
   passengers: 'Когда важнее всего пассажиры, а грузовые могут подождать.',
   hold: 'Когда сбой короткий и не хочется перестраивать движение.',
+  keep_order: 'Поезда идут в прежнем порядке, остальные подстраиваются по времени.',
+  reoptimize: 'Система меняет порядок пропуска вокруг вашего указания, если так опозданий меньше.',
   priority: 'Когда нужно действовать строго по регламенту категорий поездов.',
   robust: 'Когда неясно, сколько продлится сбой, и план не должен «сломаться».',
 };
@@ -331,4 +404,59 @@ export function prosCons(v, all, longestMin) {
   if (v.strategy !== 'hold' && v.impacts.some((x) => Math.abs(x.deltaMin) >= 1)) cons.push(m('Меняется порядок поездов'));
 
   return { pros: pros.slice(0, 3), cons: cons.slice(0, 3), when: STRATEGY_WHEN[v.strategy] ?? '' };
+}
+
+// ───────────── ручное изменение времени на ГИД ─────────────
+const sameSig = (a, b) => signature(a) === signature(b);
+
+/**
+ * Прогноз ручного изменения: план с указанием при прежнем порядке поездов (как «Сохранить порядок»),
+ * без перебора — считается быстро, на каждый шаг перетаскивания.
+ */
+export function previewManual(inp) {
+  const ctx = ctxOf(inp, inp.settings.planDuration);
+  const plan = propagate(ctx, true, 'keep_order', STRATEGY_TITLE.keep_order);
+  const { conflicts, index } = evaluatePlan(inp, plan);
+  return { plan, conflicts, index };
+}
+
+/** Варианты после отпускания точки: «Сохранить порядок» и, если выгоднее, «Переразвести». */
+export function manualVariants(inp) {
+  const t0 = performance.now();
+  const ctx = ctxOf(inp, inp.settings.planDuration);
+  const active = inp.trains.filter((t) => !t.cancelled);
+  const keep = propagate(ctx, true, 'keep_order', STRATEGY_TITLE.keep_order);
+  const seeds = [inp.prev.order, categoryOrder(inp.trains, inp.settings), fifoOrder(inp.trains)];
+  const reopt = optimizeOrder(ctx, seeds, 'reoptimize', STRATEGY_TITLE.reoptimize).plan;
+  const prevEnergy = planEnergy(inp.section, active, inp.prev);
+  const candidates = [{ strategy: 'keep_order', plan: keep }];
+  const reoptBetter = !sameSig(keep, reopt) && cost(ctx, reopt) < cost(ctx, keep) - 0.5;
+  if (reoptBetter) candidates.push({ strategy: 'reoptimize', plan: reopt });
+  const variants = candidates.map((c) => {
+    const { conflicts, index } = evaluatePlan(inp, c.plan);
+    const energy = planEnergy(inp.section, active, c.plan);
+    const explanation = explain(inp.trains, inp.prev, c.plan, c.strategy);
+    if (!reoptBetter) explanation.push(m('Перестановка скрещений не даёт выигрыша'));
+    return {
+      id: c.plan.id,
+      strategy: c.strategy,
+      title: STRATEGY_TITLE[c.strategy],
+      plan: c.plan,
+      index,
+      worstIndex: index.value,
+      robustExtraMin: null,
+      unplannedStops: forcedWaits(c.plan, inp.trains).length,
+      conflicts: conflicts.length,
+      weightedDelayMin: weightedDelay(c.plan, inp.baseline, inp.trains, inp.settings),
+      passengerDelayMin: passengerDelay(c.plan, inp.baseline, inp.trains),
+      impacts: impactsOf(inp.prev, c.plan, inp.baseline, inp.trains),
+      energyKWh: energy,
+      energyDeltaPct: prevEnergy > 0 ? (energy / prevEnergy - 1) * 100 : 0,
+      explanation,
+      steps: stepsOf(inp.prev, c.plan, inp.trains, inp.now),
+      wins: [],
+    };
+  });
+  for (const v of variants) Object.assign(v, prosCons(v, variants, 0));
+  return { variants, computeMs: performance.now() - t0 };
 }
