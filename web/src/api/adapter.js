@@ -1,0 +1,267 @@
+/**
+ * Данные бэкенда (модели §8 ТЗ, конверты §15) → состояние движка, которое читают компоненты интерфейса.
+ * Всё знание о формате сервера собрано здесь: если сервер поменяет поле, правится только этот файл.
+ *
+ * Время: на сервере sim_time — секунды от SIM_EPOCH, в интерфейсе — секунды от полуночи.
+ */
+import { impactsOf, prosCons } from '../core/planner';
+import { destDelayMin } from '../core/qualityIndex';
+import { SECTION } from '../core/section';
+
+let epoch = parseEpoch(import.meta.env.VITE_SIM_EPOCH ?? '07:55');
+
+function parseEpoch(v) {
+  const m = /(\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(v).includes('T') ? String(v).split('T')[1] : String(v));
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] ?? 0) : 7 * 3600 + 55 * 60;
+}
+export const setEpoch = (v) => v && (epoch = parseEpoch(v));
+/** Серверное время → время интерфейса и обратно. */
+export const toUi = (t) => (t === null || t === undefined ? t : epoch + t);
+export const toServer = (t) => t - epoch;
+
+const stIdx = () => new Map(SECTION.stations.map((s, i) => [s.specId, i]));
+const segIdx = () => new Map(SECTION.segments.map((g, i) => [g.specId, i]));
+
+// ───────────── поезда и график ─────────────
+const CATEGORY = { express: 'express', passenger: 'pass', freight: 'freight' };
+export const toSpecCategory = (c) => ({ express: 'express', pass: 'passenger', suburb: 'passenger', freightFast: 'freight', freight: 'freight' })[c] ?? c;
+
+/** Поезд расписания (§8 Train) → поезд интерфейса. */
+export function trainFromSpec(t) {
+  const idx = stIdx();
+  const stops = t.stops.filter((s, i) => i > 0 && i < t.stops.length - 1 && s.stop).map((s) => idx.get(s.station_id));
+  const dwell = Math.max(0, ...t.stops.filter((s) => s.stop).map((s) => s.min_dwell_s ?? 0));
+  return {
+    id: t.id,
+    number: t.id,
+    category: CATEGORY[t.category] ?? 'freight',
+    dir: t.direction === 'odd' ? 1 : -1,
+    departure: toUi(t.stops[0].dep),
+    stops,
+    dwell,
+    vmaxOverride: t.v_max_override_kmh ?? undefined,
+    priorityOverride: t.priority_override ?? undefined,
+    cancelled: !!t.cancelled,
+    spec: t,
+  };
+}
+
+/** Норматив = расписание сервера в форме плана: от него считаются опоздания. */
+export function baselineFromTimetable(trains) {
+  const idx = stIdx();
+  const out = {};
+  for (const t of trains) {
+    const sp = t.spec;
+    out[t.id] = {
+      trainId: t.id,
+      stops: sp.stops.map((s, i) => {
+        const arr = toUi(s.arr ?? s.dep);
+        const dep = toUi(s.dep ?? s.arr);
+        return { station: idx.get(s.station_id), arr: i === 0 ? dep : arr, dep: i === sp.stops.length - 1 ? arr : dep, track: 0, planned: i === 0 || i === sp.stops.length - 1 || s.stop };
+      }),
+    };
+  }
+  return { id: 'timetable', strategy: 'baseline', order: trains.map((t) => t.id), trains: out };
+}
+
+/** План сервера (§8 Plan: run/dwell) → план интерфейса: остановки поезда по всем раздельным пунктам. */
+export function planFromSpec(plan, trains) {
+  if (!plan) return null;
+  const idx = stIdx();
+  const byTrain = new Map();
+  for (const e of plan.entries) {
+    if (e.kind !== 'dwell') continue;
+    if (!byTrain.has(e.train_id)) byTrain.set(e.train_id, []);
+    byTrain.get(e.train_id).push(e);
+  }
+  const trainById = new Map(trains.map((t) => [t.id, t]));
+  const out = {};
+  for (const [id, dwells] of byTrain) {
+    dwells.sort((a, b) => a.start - b.start);
+    const t = trainById.get(id);
+    out[id] = {
+      trainId: id,
+      stops: dwells.map((d, i) => {
+        const station = idx.get(d.station_id);
+        const st = SECTION.stations[station];
+        const first = i === 0;
+        const last = i === dwells.length - 1;
+        return {
+          station,
+          arr: toUi(first ? d.end : d.start),
+          dep: toUi(last ? d.start : d.end),
+          track: Math.max(0, st?.trackIds?.indexOf(d.track_id) ?? 0),
+          planned: first || last || !!t?.stops.includes(station),
+          unplanned: !!d.unplanned,
+        };
+      }),
+    };
+  }
+  const order = Object.keys(out).sort((a, b) => out[a].stops[0].dep - out[b].stops[0].dep);
+  return {
+    id: `v${plan.version}`,
+    version: plan.version,
+    strategy: plan.strategy ?? 'balanced',
+    solver: plan.solver,
+    solveMs: plan.solve_ms,
+    order,
+    trains: out,
+    meetings: (plan.meetings ?? []).map((m) => ({ ...m, station: idx.get(m.station_id), time: toUi(m.time) })),
+    kpi: plan.kpi,
+  };
+}
+
+// ───────────── индекс ─────────────
+const CAT = { norm: 'norm', attention: 'warn', critical: 'crit' };
+const fmtRaw = (v) => (Math.abs(v) >= 100 ? Math.round(v).toLocaleString('ru-RU') : (Math.round(v * 10) / 10).toString());
+
+/** IndexValue сервера → индекс интерфейса (факторы с подписью и «сырым» значением). */
+export function indexFromSpec(ix) {
+  if (!ix) return null;
+  return {
+    value: Math.round(ix.value * 10) / 10,
+    category: CAT[ix.category] ?? 'norm',
+    factors: (ix.components ?? []).map((c) => ({ key: c.key, name: c.label, weight: c.weight, score: c.score, detail: `${fmtRaw(c.raw)} ${c.unit}` })),
+  };
+}
+
+// ───────────── сбои ─────────────
+const KIND = {
+  obstacle: 'livestock',
+  segment_closed: 'closure',
+  speed_restriction: 'signal',
+  signal_failure: 'signal',
+  train_failure: 'breakdown',
+  train_delay: 'delay',
+};
+/** Обратное соответствие: событие, брошенное инструктором на карту, → тип сбоя сервера. */
+export const SPEC_TYPE = { livestock: 'obstacle', closure: 'segment_closed', signal: 'speed_restriction', breakdown: 'train_failure', delay: 'train_delay' };
+
+/** Incident сервера → сбой интерфейса (перегон по индексу, место перекрытия в метрах от начала ребра). */
+export function disruptionFromSpec(d, now) {
+  const kind = KIND[d.type];
+  if (!kind) return null;
+  const segs = segIdx();
+  let segment = d.segment_id ? segs.get(d.segment_id) : undefined;
+  if (segment === undefined && d.station_id) {
+    // Отказ светофора на станции — ограничение на перегоне отправления от неё.
+    const i = SECTION.stations.findIndex((s) => s.specId === d.station_id);
+    segment = Math.min(Math.max(0, i), SECTION.segments.length - 1);
+  }
+  const g = segment !== undefined ? SECTION.segments[segment] : null;
+  let posStart;
+  let posEnd;
+  if (g) {
+    const from = SECTION.stations[g.from].km;
+    const at = d.km != null ? (d.km - from) * 1000 : g.length / 2;
+    const p0 = d.type === 'speed_restriction' ? Number(d.params?.from_m ?? at - 500) : at - 500;
+    const p1 = d.type === 'speed_restriction' ? Number(d.params?.to_m ?? at + 500) : at + 500;
+    // Позиции на ребре считаются от его start_node.
+    posStart = Math.max(0, Math.round(g.reversed ? g.length - p1 : p0));
+    posEnd = Math.min(g.length, Math.round(g.reversed ? g.length - p0 : p1));
+  }
+  const resolvedAt = d.status === 'resolved' ? toUi(d.params?.resolved_at ?? now - epoch) : undefined;
+  return {
+    id: d.id,
+    kind,
+    specType: d.type,
+    segment,
+    track: undefined,
+    edgeId: g?.edgeId,
+    posStart,
+    posEnd,
+    trainId: d.train_id ?? undefined,
+    start: toUi(d.started_at),
+    durMin: d.est_min_s,
+    durMax: d.est_max_s,
+    durExpected: d.est_expected_s ?? Math.round((d.est_min_s + d.est_max_s) / 2),
+    speedLimit: kind === 'signal' ? Number(d.params?.speed_kmh ?? 20) : undefined,
+    anchors: [],
+    resolvedAt,
+    note: d.description,
+    description: d.description,
+  };
+}
+
+// ───────────── варианты ─────────────
+const STRATEGY = { balanced: 'optimized', passenger_first: 'passengers', robust: 'robust', rescue: 'rescue', fewer_stops: 'eco', whatif: 'whatif' };
+
+/** Variant сервера → вариант интерфейса с плюсами и минусами (как у локального планировщика). */
+export function variantsFromSpec(payload, ctx) {
+  const { trains, baseline, prev, disruptions } = ctx;
+  const list = payload.variants.filter((v) => v.status === 'proposed');
+  const variants = list.map((v) => {
+    const plan = planFromSpec(v.plan, trains);
+    const k = v.plan.kpi;
+    const index = indexFromSpec(v.plan.index);
+    const robustExtra = k.robust_total_delay_s != null ? Math.max(0, k.robust_total_delay_s - k.total_delay_s) / 60 : 0;
+    return {
+      id: v.id,
+      specStrategy: v.strategy,
+      strategy: STRATEGY[v.strategy] ?? v.strategy,
+      title: v.title,
+      plan,
+      index,
+      // Индекс при максимальной длительности сбоя сервер не присылает — оцениваем по приросту опоздания.
+      worstIndex: Math.max(0, index.value - robustExtra * 0.5),
+      robustExtraMin: k.robust_total_delay_s != null ? robustExtra : null,
+      conflicts: k.conflicts ?? 0,
+      weightedDelayMin: (k.weighted_delay_s ?? 0) / 60,
+      passengerDelayMin: trains.filter((t) => t.category !== 'freight' && t.category !== 'freightFast').reduce((s, t) => s + destDelayMin(plan, baseline, t.id), 0),
+      impacts: prev ? impactsOf(prev, plan, baseline, trains) : [],
+      energyKWh: k.energy_kwh ?? 0,
+      energyDeltaPct: k.energy_ideal_kwh ? (k.energy_kwh / k.energy_ideal_kwh - 1) * 100 : 0,
+      unplannedStops: k.unplanned_stops ?? 0,
+      delayedTrains: (k.delayed_trains ?? []).map(([id, s]) => ({ id, min: s / 60 })),
+      totalDelayMin: (k.total_delay_s ?? 0) / 60,
+      deltaIndex: v.delta_index,
+      basePlanVersion: v.base_plan_version,
+      solveMs: v.plan.solve_ms,
+      explanation: ['', ...(v.explanation ?? [])],
+      wins: [],
+    };
+  });
+  const longest = Math.max(0, ...disruptions.filter((d) => d.resolvedAt === undefined).map((d) => d.durMax / 60));
+  for (const v of variants) Object.assign(v, prosCons(v, variants, longest));
+  return variants;
+}
+
+/** Результат what-if сервера → результат песочницы интерфейса. */
+export function whatIfFromSpec(r, ctx) {
+  const plan = planFromSpec(r.plan, ctx.trains);
+  return {
+    requestId: r.request_id,
+    plan,
+    trains: ctx.trains,
+    index: indexFromSpec(r.plan.index),
+    deltaIndex: r.delta_index,
+    conflicts: r.plan.kpi?.conflicts ?? 0,
+    affected: r.per_train.map((x) => ({ trainId: x.train_id, number: x.train_id, deltaMin: x.arr_delta_s / 60, delayMin: x.final_delay_s / 60 })),
+    changedMeetings: (r.changed_meetings ?? []).map((m) => ({ ...m, time: toUi(m.time) })),
+    explanation: r.explanation ?? [],
+    computeMs: r.plan.solve_ms,
+  };
+}
+
+// ───────────── поле ─────────────
+/** Где поезда сейчас — по данным поля (§11.1), а не по плану: сервер — источник правды о положении. */
+export function fieldFromSpec(f) {
+  const idx = stIdx();
+  const segs = segIdx();
+  const trains = f.trains
+    .filter((t) => t.on_field !== false && t.status !== 'finished')
+    .map((t) => {
+      const base = { trainId: t.train_id, status: t.status, speed: t.speed_kmh, delayS: t.delay_s, regime: t.regime };
+      if (t.segment_id) return { ...base, km: t.km, segment: segs.get(t.segment_id), moving: t.status === 'running' };
+      const station = idx.get(t.station_id);
+      const st = SECTION.stations[station];
+      return { ...base, station, km: st?.km, track: Math.max(0, st?.trackIds?.indexOf(t.track_id) ?? 0), moving: false };
+    });
+  return {
+    t: toUi(f.sim_time),
+    trains,
+    signals: Object.fromEntries((f.signals ?? []).map((s) => [s.id, s.aspect])),
+    segments: Object.fromEntries((f.segments ?? []).map((s) => [s.segment_id, s])),
+    safetyViolations: f.safety_violations ?? 0,
+  };
+}
