@@ -585,4 +585,6 @@ export default {
   'Шаги': 'Steps',
   'Ещё шагов: {n}': '{n} more steps',
   'горизонт плана': 'plan horizon',
+  'What-if перенесён в работу — вариант ждёт решения': 'What-if moved into operation — the option awaits a decision',
+  'Не удалось перенести в работу: {r}': 'Could not move into operation: {r}',
 };

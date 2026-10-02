@@ -368,8 +368,22 @@ export function startLive(engine) {
         else ok(r, 'what-if моделирование');
       }, 400);
     },
-    whatIfApply() {
-      unsupported('перенос what-if в работу');
+    async whatIfApply() {
+      const w = st().whatIf;
+      const id = w?.result?.requestId;
+      if (!id || w.promoting || !engine.allowed('section', 'перенос what-if в работу')) return;
+      engine.set({ whatIf: { ...w, promoting: true } });
+      const r = await api.promoteWhatIf(id);
+      if (r.ok) {
+        // Вариант придёт событием planner.variants — панель решения откроется на вкладке «Ситуация».
+        engine.set({ whatIf: undefined });
+        engine.toast(m('What-if перенесён в работу — вариант ждёт решения'));
+        return;
+      }
+      ok(r, 'перенос what-if в работу');
+      // 409: план изменился после расчёта или порядок из what-if хуже действующего — причину пишет сервер.
+      engine.toast(m('Не удалось перенести в работу: {r}', { r: r.detail ?? String(r.status) }), 'crit');
+      if (st().whatIf) engine.set({ whatIf: { ...st().whatIf, promoting: false } });
     },
     updateSettings() {
       unsupported('изменение настроек индекса');

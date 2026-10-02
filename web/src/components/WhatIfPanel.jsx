@@ -51,7 +51,7 @@ export function WhatIfPanel({ s }) {
             ))}
           </div>
           <div className="row-actions">
-            <button className="primary" onClick={() => engine.whatIfApply()}>
+            <button className="primary" disabled={!!s.whatIf?.promoting} onClick={() => engine.whatIfApply()}>
               {tr('Перенести в работу')}
             </button>
             <button className="ghost" onClick={() => engine.whatIfClose()}>
