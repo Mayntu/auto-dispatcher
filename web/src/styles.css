@@ -221,7 +221,7 @@ label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); fo
 .gv-line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; transition: stroke-width .15s, opacity .15s; }
 .gv-train.focus .gv-line { stroke-width: 5; }
 .gv-train.focus .gv-halo { stroke-width: 10; }
-.gv-train.dim { opacity: .28; }
+.gv-train.dim { opacity: .5; }
 .gv-stop { stroke: #fff; stroke-width: 1.5; }
 .gv-num { font: 700 12px var(--mono); paint-order: stroke; stroke: #fff; stroke-width: 4px; pointer-events: none; }
 .gv-num.dim { opacity: .3; }

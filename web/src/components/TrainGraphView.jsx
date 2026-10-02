@@ -163,6 +163,9 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
   const onPointerUp = () => (drag.current = null);
 
   const focus = md.drag?.trainId ?? hover ?? selected;
+  // Остальные поезда бледнеют только на время наведения или перетаскивания: выбранный поезд и так выделен
+  // жирной линией, а постоянное затенение после нажатия выглядело так, будто линии пропали.
+  const dimFor = md.drag?.trainId ?? hover;
 
   return (
     <div className={`graph-view ${open ? 'open' : ''}`}>
@@ -307,7 +310,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
               const p = poly(all);
               const fact = factPts(t.id);
               const future = splitAtNow(all)[1];
-              const dim = focus && focus !== t.id;
+              const dim = dimFor && dimFor !== t.id;
               return (
                 <g
                   key={t.id}
@@ -413,7 +416,7 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
                   transform={`translate(${lb.x} ${lb.y}) rotate(${lb.deg})`}
                   y={-6}
                   textAnchor="middle"
-                  className={`gv-num ${focus && focus !== t.id ? 'dim' : ''}`}
+                  className={`gv-num ${dimFor && dimFor !== t.id ? 'dim' : ''}`}
                   fill={CATEGORIES[t.category].color}
                 >
                   {t.number}
