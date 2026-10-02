@@ -106,6 +106,8 @@ export function planFromSpec(plan, trains) {
     solveMs: plan.solve_ms,
     order,
     trains: out,
+    // Сервер планирует только поезда, отправляющиеся в пределах горизонта (planner.horizon_s, 2 ч).
+    horizonEnd: plan.horizon_end != null ? toUi(plan.horizon_end) : undefined,
     meetings: (plan.meetings ?? []).map((m) => ({ ...m, station: idx.get(m.station_id), time: toUi(m.time) })),
     kpi: plan.kpi,
   };

@@ -584,4 +584,5 @@ export default {
   'Порядок и время поездов не меняются — ждём устранения': 'Train order and times stay the same — waiting for the fix',
   'Шаги': 'Steps',
   'Ещё шагов: {n}': '{n} more steps',
+  'горизонт плана': 'plan horizon',
 };
