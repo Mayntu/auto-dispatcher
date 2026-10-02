@@ -1062,6 +1062,12 @@ LOG_LEVEL=INFO
 - **История и отчёт без БД** (кольцевой буфер API, §17): `GET /api/history/frames?from&to&step` — кадры за последние 20 мин симуляции (не чаще 1 на 2 с: поезда, занятые блок-участки, сигналы, сбои, индекс, версия плана), `GET /api/history/events?from&to` — журнал (2000 записей), `GET /api/reports?format=csv` — события, решения, опоздания, индекс по минутам (CSV с BOM для Excel); PDF — 422 «в полной версии».
 - **Проверки:** `tools/e2e_contract.py` — всё перечисленное через API.
 
+### 2026-10-02 · Docker
+
+- **`docker compose up --build`: два контейнера** — `backend` (`python -m app.all`, шина в памяти, один образ Python, зависимости из `pyproject.toml`) и `web` (сборка React в live-режиме → nginx: статика, прокси `/api`, `/ws` без буферизации, `/docs`; кэш `/assets`, `index.html` без кэша). Порты и логины — `.env` (`.env.example`), логины встраиваются в сборку фронта. `deploy/nginx/autodispatcher.conf` — nginx хоста с HTTPS перед `web`.
+- Из ветки `feature/docker` взяты Dockerfile, nginx-конфиги и `.dockerignore`. **RabbitMQ, раздельные сервисы, recorder и TimescaleDB оттуда не перенесены:** они написаны под код до шагов реализма и не проходили стресс и живые сценарии; демо и все замеры работают на конфигурации «всё в одном процессе». Перенос — отдельной задачей с проверкой той же связкой тестов.
+- Проверено на собранных контейнерах: WebSocket через nginx (снимок + поток, p95 доставки 49 мс в VM OrbStack), `tools/e2e_manual.py` и `tools/e2e_contract.py` — зелёные.
+
 ---
 
 ## 26. Презентация (`docs/presentation.md`, 10–12 слайдов)

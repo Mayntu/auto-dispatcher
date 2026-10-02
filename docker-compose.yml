@@ -1,0 +1,32 @@
+# Autodispatcher in Docker:  docker compose up --build  ->  UI http://localhost:8080, Swagger http://localhost:8080/docs
+# backend — all services in one process (BUS=memory), the configuration the demo and every check run on;
+# web — the React UI built for live mode + nginx proxying /api and /ws to the backend.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SIM_EPOCH: "${SIM_EPOCH:-2026-10-02T07:55:00+05:00}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"  # direct API for debugging; the UI goes through nginx
+
+  web:
+    build:
+      context: web
+      dockerfile: Dockerfile
+      args:
+        VITE_DISPATCHER_LOGIN: "${VITE_DISPATCHER_LOGIN:-dispatcher}"
+        VITE_DISPATCHER_PASSWORD: "${VITE_DISPATCHER_PASSWORD:-change-me}"
+        VITE_ADMIN_LOGIN: "${VITE_ADMIN_LOGIN:-admin}"
+        VITE_ADMIN_PASSWORD: "${VITE_ADMIN_PASSWORD:-change-me-too}"
+        VITE_INSTRUCTOR_LOGIN: "${VITE_INSTRUCTOR_LOGIN:-instructor}"
+        VITE_INSTRUCTOR_PASSWORD: "${VITE_INSTRUCTOR_PASSWORD:-change-me-three}"
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
