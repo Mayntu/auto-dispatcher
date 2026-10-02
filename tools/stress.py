@@ -17,6 +17,9 @@ from __future__ import annotations
 import argparse
 import copy
 import random
+from pathlib import Path
+import statistics
+import json
 import time
 import traceback
 from multiprocessing import Pool
@@ -77,7 +80,9 @@ def make_incidents(rng: random.Random, world, mass: bool, extended: bool = False
     return sorted(out, key=lambda x: x[0])
 
 
-def run(seed: int) -> dict:
+def run(seed: int, policy_override: str | None = None, pins_override: bool | None = None) -> dict:
+    """`policy_override` (pitch numbers): "ignore" = the base without the system (the order is kept, times are
+    re-timed, only the safety net re-plans), "balanced" = the dispatcher applies «Минимум задержек» at once."""
     rng = random.Random(seed)
     world = get_world()
     settings = copy.deepcopy(load_settings())
@@ -85,7 +90,7 @@ def run(seed: int) -> dict:
     settings["planner"]["cpsat_workers"] = 1  # deterministic: a failing seed reproduces
     settings["planner"]["deterministic_time"] = 1.0  # work units, not wall time: independent of CPU load
     sim = FieldSim(world, RunningTimes(world), settings, seed=seed)
-    policy = POLICIES[seed % len(POLICIES)]
+    policy = policy_override or POLICIES[seed % len(POLICIES)]
     mass = seed % 7 == 0
     incidents = make_incidents(rng, world, mass, extended=seed >= 200)
     res = {"seed": seed, "policy": policy, "mass": mass, "incidents": len(incidents), "errors": [],
@@ -94,7 +99,7 @@ def run(seed: int) -> dict:
            "guard_replans": 0}
 
     pins: list = []  # the dispatcher's instructions from the train graph (tasks/02), on every third seed
-    with_pins = seed % 3 == 1
+    with_pins = seed % 3 == 1 if pins_override is None else pins_override
     res["pins"] = res["pins_violated"] = 0
     last_pin = 0.0
 
@@ -106,6 +111,7 @@ def run(seed: int) -> dict:
         t0 = time.perf_counter()
         p = Plan.model_validate(solve_job(sn.model_dump(mode="json"), strategy, settings)["plan"])
         res["solves"] += 1
+        res["fallbacks"] = res.get("fallbacks", 0) + (p.solver == "fallback")
         times = {(e.train_id, e.station_id): e.end for e in p.entries if e.kind == "dwell"}
         res["pins_violated"] += sum(1 for pn in sn.pins if (pn.train_id, pn.station_id) in times
                                     and abs(times[(pn.train_id, pn.station_id)] - pn.time) > 60)
@@ -125,7 +131,16 @@ def run(seed: int) -> dict:
         resolved_only = False
         seen_overrides = 0
 
+        arrivals: dict[str, float] = {}
+        unplanned: set[tuple[str, str]] = set()
+        index_samples: list[float] = []
         while sim.now < END:
+            for tr in sim.trains.values():
+                if tr.loc == "station" and tr.idx == len(tr.route) - 1 and tr.train.id not in arrivals:
+                    arrivals[tr.train.id] = tr.arrived_at
+                elif tr.loc == "station" and 0 < tr.idx < len(tr.route) - 1 and tr.stopped \
+                        and not tr.train.stops[tr.idx].stop:
+                    unplanned.add((tr.train.id, tr.route[tr.idx]))
             for topic, _ in sim.step(STEP):
                 if topic == "incident.resolved":
                     need_regen = True
@@ -187,6 +202,8 @@ def run(seed: int) -> dict:
             if pending_variants is not None and apply_at is not None and sim.now >= apply_at and policy != "ignore":
                 ranked = sorted(pending_variants, key=lambda v: v[1].index.value, reverse=True)
                 strategy, chosen = ranked[-1] if policy == "worst" else ranked[0]
+                if policy == "balanced":
+                    strategy, chosen = next((v for v in pending_variants if v[0] == "balanced"), ranked[0])
                 sn = snap(plan).model_copy(update={"hint": chosen.entries})
                 durs = durations_for(STRATEGIES[strategy], sn.incidents, settings)
                 nv = retime_with_objective(sn, settings, strategy, durs)
@@ -213,6 +230,8 @@ def run(seed: int) -> dict:
                 sim.set_plan(plan)
                 pending_variants, apply_at, fail_streak = None, None, 0
             fc = forecast_plan(snap(plan), settings)
+            if fc is not None and int(sim.now) % 600 < STEP:
+                index_samples.append(fc.index.value)
             if fc is None:
                 res["forecast_fail"] += 1
                 fail_streak += 1
@@ -251,6 +270,23 @@ def run(seed: int) -> dict:
                 break
 
         res["end"] = round(sim.now)
+        res["energy_kwh"] = round(sum(t.energy_kwh for t in sim.trains.values()), 1)
+        res["unplanned_stops"] = len(unplanned)
+        res["index_mean"] = round(statistics.mean(index_samples), 1) if index_samples else None
+        res["index_min"] = round(min(index_samples), 1) if index_samples else None
+        # actual lateness at the destination of every train due by the end (not yet arrived: lateness so far)
+        lat = {}
+        for t in sim.trains.values():
+            sched = t.train.stops[-1].arr
+            if sched is None or sched > sim.now - DUE_SLACK_S:
+                continue
+            arr = arrivals.get(t.train.id, sim.now)
+            lat[t.train.id] = max(0.0, arr - sched)
+        weights = settings["priority_weights"]
+        res["late_total_min"] = round(sum(lat.values()) / 60, 1)
+        res["late_weighted_min"] = round(sum(v * weights[world.trains[k].category] for k, v in lat.items()) / 60, 1)
+        res["late_trains"] = sum(1 for v in lat.values() if v >= 60)
+        res["due_trains"] = len(lat)
         res["finished"] = sum(t.loc == "done" for t in sim.trains.values())
         res["violations"] = sim.safety_violations
         res["overrides"] = sim.plan_overrides
@@ -289,12 +325,16 @@ def main() -> None:
     ap.add_argument("--procs", type=int, default=8)
     ap.add_argument("--seed0", type=int, default=0)
     ap.add_argument("--timeout", type=float, default=900, help="whole-run budget, seconds")
+    ap.add_argument("--policy", default=None, help="one policy for every seed (ignore = base without the system, balanced)")
+    ap.add_argument("--pins", default=None, choices=["on", "off"], help="dispatcher instructions on every seed / none")
+    ap.add_argument("--json", default=None, help="write per-run results to this file")
     args = ap.parse_args()
+    pins = None if args.pins is None else args.pins == "on"
     t0 = time.time()
     results = []
     failed = 0
     with Pool(args.procs) as pool:
-        pending = {seed: pool.apply_async(run, (seed,)) for seed in range(args.seed0, args.seed0 + args.runs)}
+        pending = {seed: pool.apply_async(run, (seed, args.policy, pins)) for seed in range(args.seed0, args.seed0 + args.runs)}
         deadline = time.time() + args.timeout
         for seed, fut in pending.items():
             try:
@@ -318,6 +358,8 @@ def main() -> None:
             for e in r["errors"]:
                 print(e, flush=True)
         pool.terminate()
+    if args.json:
+        Path(args.json).write_text(json.dumps(results, ensure_ascii=False, default=str), encoding="utf-8")
     print(f"\n{len(results) - failed}/{len(results)} passed in {time.time() - t0:.0f} s")
 
 

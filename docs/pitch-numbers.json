@@ -1,0 +1,1940 @@
+{
+ "facts": {
+  "machine": {
+   "cpu": "Apple M5",
+   "cores": 10,
+   "ram_gb": 16,
+   "os": "Darwin 26.6.2",
+   "python": "3.12.14"
+  },
+  "backend": {
+   "python": "3.12.14",
+   "fastapi": "0.142.2",
+   "pydantic": "2.13.5",
+   "ortools": "9.15.6755",
+   "server": "uvicorn"
+  },
+  "frontend": {
+   "deps": {
+    "lucide-react": "^1.49.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+   },
+   "dev": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.1"
+   },
+   "graph_and_map": "own SVG in React (web/src/components/TrainGraphView.jsx, MapView.jsx), no chart library"
+  },
+  "bus_in_demo": "memory (BUS=memory, app.all — every service in one process)",
+  "database": "none in the demo: history is a ring buffer in the API (last 20 sim min), journal 2000 entries",
+  "services": "field (simulator + DC + safety monitor), planner (CP-SAT in a process pool), api (REST + WS) — one process: python -m app.all; RabbitMQ / TimescaleDB / separate containers are not implemented",
+  "cpsat": {
+   "time_limit_s": 3.5,
+   "pool_workers": 3,
+   "num_workers": 4,
+   "whatif_time_limit_s": 2.5,
+   "horizon_s": 7200,
+   "warm_start": "evaluate() of the current plan's order as AddHint, random_seed 42"
+  },
+  "model_size_balanced_hourly_8h": {
+   "variables": {
+    "n": 8,
+    "p50": 378,
+    "p95": 526,
+    "max": 526,
+    "mean": 404.1
+   },
+   "constraints": {
+    "n": 8,
+    "p50": 713,
+    "p95": 1071,
+    "max": 1071,
+    "mean": 788.2
+   },
+   "trains_in_horizon": {
+    "n": 8,
+    "p50": 8,
+    "p95": 9,
+    "max": 9,
+    "mean": 7.9
+   }
+  },
+  "timetable": {
+   "trains_total": 124,
+   "hours": 52.9,
+   "trains_per_day": 56,
+   "by_category": {
+    "express": 8,
+    "passenger": 16,
+    "freight": 32
+   }
+  },
+  "infra": {
+   "stations": 6,
+   "sidings": 2,
+   "segments": 5,
+   "block_sections": 33,
+   "signals": 80,
+   "km": 84.0
+  },
+  "tests": "46 passed, 1 warning in 99.90s (0:01:39)",
+  "index": {
+   "weights": {
+    "schedule": 0.3,
+    "capacity": 0.2,
+    "energy": 0.15,
+    "conflicts": 0.2,
+    "accuracy": 0.15
+   },
+   "thresholds": {
+    "norm": 80,
+    "attention": 60
+   },
+   "refs": {
+    "delay_ref_min": 30,
+    "conflicts_ref": 6,
+    "accuracy_window_s": 120
+   },
+   "priority_weights": {
+    "express": 5,
+    "passenger": 3,
+    "freight": 1
+   }
+  },
+  "intervals": {
+   "headway_s": 480,
+   "tau_cross_s": 60,
+   "tau_np_s": 180,
+   "direction_change_s": 60
+  }
+ },
+ "eco": {
+  "profiles": 1050,
+  "with_reserve": 510,
+  "with_reserve_eco_kwh": 203061.0,
+  "with_reserve_min_kwh": 285071.0,
+  "with_reserve_saving_pct": 28.8,
+  "all_eco_kwh": 381038.0,
+  "all_min_kwh": 463680.0,
+  "all_saving_pct": 17.8,
+  "saving_pct_per_profile_with_reserve": {
+   "n": 510,
+   "p50": 25.9,
+   "p95": 69.6,
+   "max": 100.0,
+   "mean": 33.2
+  },
+  "by_category": {
+   "express": {
+    "n": 80,
+    "saving_pct": 36.9
+   },
+   "passenger": {
+    "n": 150,
+    "saving_pct": 31.3
+   },
+   "freight": {
+    "n": 280,
+    "saving_pct": 27.7
+   }
+  },
+  "note": "energy of the traction model in railcore/eco.py (simplified dynamics, see expert FAQ)"
+ },
+ "effect": {
+  "seeds": 30,
+  "shift_h": 8.5,
+  "base": {
+   "late_total_min": 5348.6,
+   "late_weighted_min": 9985.0,
+   "late_trains": 310,
+   "due_trains": 420,
+   "unplanned_stops": 122,
+   "energy_kwh": 1395989.8
+  },
+  "balanced": {
+   "late_total_min": 3134.7,
+   "late_weighted_min": 5559.3,
+   "late_trains": 279,
+   "due_trains": 420,
+   "unplanned_stops": 138,
+   "energy_kwh": 1432177.2
+  },
+  "reduction_pct": {
+   "late_total_min": 41.4,
+   "late_weighted_min": 44.3,
+   "late_trains": 10.0,
+   "unplanned_stops": -13.1,
+   "energy_kwh": -2.6
+  },
+  "saved_min_per_shift": {
+   "mean": 73.8,
+   "median": 57.9,
+   "worse_seeds": 2
+  },
+  "index_mean": {
+   "base": 79.2,
+   "balanced": 91.1
+  },
+  "index_min": {
+   "base": 61.7,
+   "balanced": 71.1
+  },
+  "base_guard_replans": 1,
+  "per_seed": [
+   {
+    "seed": 120,
+    "base_late_min": 265.0,
+    "balanced_late_min": 107.1,
+    "incidents": 2
+   },
+   {
+    "seed": 121,
+    "base_late_min": 46.2,
+    "balanced_late_min": 33.3,
+    "incidents": 1
+   },
+   {
+    "seed": 122,
+    "base_late_min": 147.2,
+    "balanced_late_min": 89.7,
+    "incidents": 2
+   },
+   {
+    "seed": 123,
+    "base_late_min": 12.7,
+    "balanced_late_min": 12.2,
+    "incidents": 1
+   },
+   {
+    "seed": 124,
+    "base_late_min": 145.4,
+    "balanced_late_min": 112.8,
+    "incidents": 3
+   },
+   {
+    "seed": 125,
+    "base_late_min": 14.2,
+    "balanced_late_min": 11.6,
+    "incidents": 2
+   },
+   {
+    "seed": 126,
+    "base_late_min": 185.2,
+    "balanced_late_min": 118.8,
+    "incidents": 8
+   },
+   {
+    "seed": 127,
+    "base_late_min": 11.7,
+    "balanced_late_min": 11.7,
+    "incidents": 1
+   },
+   {
+    "seed": 128,
+    "base_late_min": 11.7,
+    "balanced_late_min": 12.1,
+    "incidents": 2
+   },
+   {
+    "seed": 129,
+    "base_late_min": 295.6,
+    "balanced_late_min": 100.7,
+    "incidents": 3
+   },
+   {
+    "seed": 130,
+    "base_late_min": 202.4,
+    "balanced_late_min": 79.8,
+    "incidents": 4
+   },
+   {
+    "seed": 131,
+    "base_late_min": 154.3,
+    "balanced_late_min": 68.6,
+    "incidents": 3
+   },
+   {
+    "seed": 132,
+    "base_late_min": 241.0,
+    "balanced_late_min": 138.1,
+    "incidents": 4
+   },
+   {
+    "seed": 133,
+    "base_late_min": 388.6,
+    "balanced_late_min": 272.0,
+    "incidents": 8
+   },
+   {
+    "seed": 134,
+    "base_late_min": 371.6,
+    "balanced_late_min": 204.5,
+    "incidents": 4
+   },
+   {
+    "seed": 135,
+    "base_late_min": 104.5,
+    "balanced_late_min": 46.1,
+    "incidents": 3
+   },
+   {
+    "seed": 136,
+    "base_late_min": 205.6,
+    "balanced_late_min": 120.3,
+    "incidents": 4
+   },
+   {
+    "seed": 137,
+    "base_late_min": 71.1,
+    "balanced_late_min": 49.4,
+    "incidents": 1
+   },
+   {
+    "seed": 138,
+    "base_late_min": 217.5,
+    "balanced_late_min": 91.3,
+    "incidents": 2
+   },
+   {
+    "seed": 139,
+    "base_late_min": 11.7,
+    "balanced_late_min": 8.8,
+    "incidents": 1
+   },
+   {
+    "seed": 140,
+    "base_late_min": 190.2,
+    "balanced_late_min": 179.3,
+    "incidents": 8
+   },
+   {
+    "seed": 141,
+    "base_late_min": 169.4,
+    "balanced_late_min": 51.8,
+    "incidents": 1
+   },
+   {
+    "seed": 142,
+    "base_late_min": 356.4,
+    "balanced_late_min": 218.1,
+    "incidents": 4
+   },
+   {
+    "seed": 143,
+    "base_late_min": 130.5,
+    "balanced_late_min": 99.0,
+    "incidents": 2
+   },
+   {
+    "seed": 144,
+    "base_late_min": 102.1,
+    "balanced_late_min": 107.2,
+    "incidents": 4
+   },
+   {
+    "seed": 145,
+    "base_late_min": 150.4,
+    "balanced_late_min": 68.7,
+    "incidents": 4
+   },
+   {
+    "seed": 146,
+    "base_late_min": 388.8,
+    "balanced_late_min": 352.8,
+    "incidents": 2
+   },
+   {
+    "seed": 147,
+    "base_late_min": 199.3,
+    "balanced_late_min": 170.1,
+    "incidents": 8
+   },
+   {
+    "seed": 148,
+    "base_late_min": 506.3,
+    "balanced_late_min": 171.9,
+    "incidents": 4
+   },
+   {
+    "seed": 149,
+    "base_late_min": 52.0,
+    "balanced_late_min": 26.9,
+    "incidents": 1
+   }
+  ]
+ },
+ "demo": {
+  "seed": 2026,
+  "note": "demo_full is not a scenario file; the §19 sequence is run here with a fixed seed",
+  "index_start": 100.0,
+  "obstacle": {
+   "incident": "Скот на пути, бригада выехала",
+   "variants_ms": 3596,
+   "index_now": 98.9,
+   "cards": [
+    {
+     "title": "Минимум задержек",
+     "recommended": true,
+     "delta_index": 0.0,
+     "index": 98.9,
+     "total_delay_min": 0,
+     "top3": [],
+     "if_longer_total_delay_min": 38,
+     "solve_ms": 57,
+     "solver": "cpsat",
+     "explanation": [
+      "Пассажирский 341 ждёт на Ст. Степная 28 мин, пропуская грузовой 2002.",
+      "Суммарная задержка 0 мин (±0 мин к «Приоритет пассажирских»), опозданий по прибытию нет.",
+      "Если сбой затянется до максимума (30 мин): +38 мин задержки.",
+      "Индекс 99 → «Норма» (+0 к текущему прогнозу)."
+     ]
+    },
+    {
+     "title": "Устойчивый план",
+     "recommended": false,
+     "delta_index": -5.5,
+     "index": 93.4,
+     "total_delay_min": 21,
+     "top3": [
+      [
+       "2002",
+       6
+      ],
+      [
+       "102",
+       4
+      ],
+      [
+       "342",
+       4
+      ]
+     ],
+     "if_longer_total_delay_min": 21,
+     "solve_ms": 3519,
+     "solver": "cpsat",
+     "explanation": [
+      "Порядок движения совпадает с вариантом «Минимум задержек»: для этой стратегии решатель не нашёл лучшей очерёдности.",
+      "Пассажирский 342 ждёт на Ст. Озёрная 28 мин, пропуская грузовой 2001.",
+      "Суммарная задержка 21 мин (+21 мин к «Минимум задержек»), опаздывают 5 поездов, больше всех — 2002 (+6 мин).",
+      "Если сбой затянется до максимума (30 мин): ±0 мин задержки.",
+      "Индекс 93 → «Норма» (−6 к текущему прогнозу)."
+     ]
+    },
+    {
+     "title": "Приоритет пассажирских",
+     "recommended": false,
+     "delta_index": 0.0,
+     "index": 98.9,
+     "total_delay_min": 0,
+     "top3": [],
+     "if_longer_total_delay_min": 38,
+     "solve_ms": 60,
+     "solver": "cpsat",
+     "explanation": [
+      "Порядок движения совпадает с вариантом «Минимум задержек»: для этой стратегии решатель не нашёл лучшей очерёдности.",
+      "Пассажирский 341 ждёт на Ст. Степная 28 мин, пропуская грузовой 2002.",
+      "Суммарная задержка 0 мин (±0 мин к «Минимум задержек»), опозданий по прибытию нет.",
+      "Если сбой затянется до максимума (30 мин): +38 мин задержки.",
+      "Индекс 99 → «Норма» (+0 к текущему прогнозу)."
+     ]
+    }
+   ]
+  },
+  "freight_for_failure": [
+   {
+    "train_id": "2001",
+    "enters_STP_R2_at_s": 2944,
+    "after_demo_start_min": 34
+   },
+   {
+    "train_id": "2003",
+    "enters_STP_R2_at_s": 7287,
+    "after_demo_start_min": 106
+   }
+  ],
+  "failure": {
+   "train_id": "2001",
+   "on": "STP-R2",
+   "km": 37.208,
+   "incident": "Неисправность локомотива поезда 2001",
+   "variants_ms": 3517,
+   "index_now": 50.8,
+   "cards": [
+    {
+     "title": "Минимум задержек",
+     "recommended": true,
+     "delta_index": 3.6,
+     "index": 54.4,
+     "total_delay_min": 208,
+     "top3": [
+      [
+       "2001",
+       31
+      ],
+      [
+       "101",
+       31
+      ],
+      [
+       "341",
+       31
+      ]
+     ],
+     "if_longer_total_delay_min": 317,
+     "solve_ms": 3502,
+     "solver": "cpsat",
+     "explanation": [
+      "Пассажирский 342 ждёт на Ст. Озёрная 59 мин, пропуская грузовой 2001.",
+      "Суммарная задержка 208 мин (−44 мин к «Вспомогательный локомотив»), опаздывают 7 поездов, больше всех — 2001 (+31 мин).",
+      "Если сбой затянется до максимума (45 мин): +109 мин задержки.",
+      "Индекс 54 → «Критично» (+4 к текущему прогнозу)."
+     ]
+    },
+    {
+     "title": "Устойчивый план",
+     "recommended": false,
+     "delta_index": -5.4,
+     "index": 45.4,
+     "total_delay_min": 287,
+     "top3": [
+      [
+       "2001",
+       44
+      ],
+      [
+       "101",
+       44
+      ],
+      [
+       "341",
+       44
+      ]
+     ],
+     "if_longer_total_delay_min": 287,
+     "solve_ms": 3502,
+     "solver": "cpsat",
+     "explanation": [
+      "Пассажирский 342 ждёт на Ст. Озёрная 71 мин, пропуская грузовой 2001.",
+      "Суммарная задержка 287 мин (+79 мин к «Минимум задержек»), опаздывают 7 поездов, больше всех — 2001 (+44 мин).",
+      "Если сбой затянется до максимума (45 мин): ±0 мин задержки.",
+      "Индекс 45 → «Критично» (−5 к текущему прогнозу)."
+     ]
+    },
+    {
+     "title": "Вспомогательный локомотив",
+     "recommended": false,
+     "delta_index": -2.6,
+     "index": 48.2,
+     "total_delay_min": 252,
+     "top3": [
+      [
+       "2001",
+       39
+      ],
+      [
+       "101",
+       39
+      ],
+      [
+       "341",
+       39
+      ]
+     ],
+     "if_longer_total_delay_min": 252,
+     "solve_ms": 3502,
+     "solver": "cpsat",
+     "explanation": [
+      "Порядок движения совпадает с вариантом «Устойчивый план»: для этой стратегии решатель не нашёл лучшей очерёдности.",
+      "Пассажирский 342 ждёт на Ст. Озёрная 66 мин, пропуская грузовой 2001.",
+      "Суммарная задержка 252 мин (+44 мин к «Минимум задержек»), опаздывают 7 поездов, больше всех — 2001 (+39 мин).",
+      "Срок ограничен прибытием вспомогательного локомотива: риск затягивания снят (±0 мин при худшем сценарии).",
+      "Индекс 48 → «Критично» (−3 к текущему прогнозу)."
+     ]
+    }
+   ]
+  },
+  "ato_candidates": [
+   {
+    "train_id": "102",
+    "segment_id": "R2-OZR",
+    "saving_pct": 98.8,
+    "energy_kwh": 1.3,
+    "energy_min_time_kwh": 111.0,
+    "t_target_s": 782.0,
+    "t_min_s": 534.0
+   },
+   {
+    "train_id": "341",
+    "segment_id": "R1-STP",
+    "saving_pct": 62.2,
+    "energy_kwh": 71.4,
+    "energy_min_time_kwh": 188.6,
+    "t_target_s": 641.0,
+    "t_min_s": 568.0
+   },
+   {
+    "train_id": "2001",
+    "segment_id": "STP-R2",
+    "saving_pct": 27.2,
+    "energy_kwh": 977.5,
+    "energy_min_time_kwh": 1342.1,
+    "t_target_s": 988.0,
+    "t_min_s": 794.0
+   },
+   {
+    "train_id": "2002",
+    "segment_id": "R1-STP",
+    "saving_pct": 25.0,
+    "energy_kwh": 606.1,
+    "energy_min_time_kwh": 808.2,
+    "t_target_s": 1015.0,
+    "t_min_s": 884.0
+   },
+   {
+    "train_id": "342",
+    "segment_id": "OZR-YUZ",
+    "saving_pct": 14.8,
+    "energy_kwh": 302.9,
+    "energy_min_time_kwh": 355.4,
+    "t_target_s": 621.0,
+    "t_min_s": 609.0
+   }
+  ],
+  "obstacle_timing_scan": [
+   {
+    "sim_s": 300,
+    "clock": "08:00",
+    "index_before": 100.0,
+    "index_after": 98.9,
+    "delay_min": 0,
+    "robust_min": 38,
+    "top3": [],
+    "on_segment": []
+   },
+   {
+    "sim_s": 600,
+    "clock": "08:05",
+    "index_before": 100.0,
+    "index_after": 97.1,
+    "delay_min": 7,
+    "robust_min": 78,
+    "top3": [
+     [
+      "2002",
+      3
+     ],
+     [
+      "102",
+      1
+     ],
+     [
+      "342",
+      1
+     ]
+    ],
+    "on_segment": []
+   },
+   {
+    "sim_s": 900,
+    "clock": "08:10",
+    "index_before": 100.0,
+    "index_after": 78.7,
+    "delay_min": 50,
+    "robust_min": 143,
+    "top3": [
+     [
+      "2003",
+      32
+     ],
+     [
+      "2002",
+      8
+     ],
+     [
+      "2001",
+      3
+     ]
+    ],
+    "on_segment": []
+   },
+   {
+    "sim_s": 1200,
+    "clock": "08:15",
+    "index_before": 100.0,
+    "index_after": 74.0,
+    "delay_min": 81,
+    "robust_min": 182,
+    "top3": [
+     [
+      "2003",
+      34
+     ],
+     [
+      "2002",
+      13
+     ],
+     [
+      "2001",
+      8
+     ]
+    ],
+    "on_segment": []
+   },
+   {
+    "sim_s": 1500,
+    "clock": "08:20",
+    "index_before": 100.0,
+    "index_after": 79.0,
+    "delay_min": 121,
+    "robust_min": 173,
+    "top3": [
+     [
+      "2001",
+      71
+     ],
+     [
+      "2003",
+      32
+     ],
+     [
+      "2002",
+      17
+     ]
+    ],
+    "on_segment": [
+     "2001"
+    ]
+   },
+   {
+    "sim_s": 1800,
+    "clock": "08:25",
+    "index_before": 100.0,
+    "index_after": 68.0,
+    "delay_min": 120,
+    "robust_min": 206,
+    "top3": [
+     [
+      "2003",
+      40
+     ],
+     [
+      "2002",
+      18
+     ],
+     [
+      "2001",
+      13
+     ]
+    ],
+    "on_segment": [
+     "2001"
+    ]
+   },
+   {
+    "sim_s": 2100,
+    "clock": "08:30",
+    "index_before": 100.0,
+    "index_after": 88.3,
+    "delay_min": 44,
+    "robust_min": 82,
+    "top3": [
+     [
+      "2003",
+      32
+     ],
+     [
+      "2002",
+      12
+     ]
+    ],
+    "on_segment": [
+     "2001",
+     "101"
+    ]
+   },
+   {
+    "sim_s": 2400,
+    "clock": "08:35",
+    "index_before": 99.9,
+    "index_after": 88.1,
+    "delay_min": 47,
+    "robust_min": 81,
+    "top3": [
+     [
+      "2003",
+      32
+     ],
+     [
+      "2002",
+      13
+     ]
+    ],
+    "on_segment": [
+     "101"
+    ]
+   },
+   {
+    "sim_s": 2700,
+    "clock": "08:40",
+    "index_before": 96.2,
+    "index_after": 95.0,
+    "delay_min": 75,
+    "robust_min": 75,
+    "top3": [
+     [
+      "2002",
+      72
+     ]
+    ],
+    "on_segment": [
+     "101"
+    ]
+   },
+   {
+    "sim_s": 3000,
+    "clock": "08:45",
+    "index_before": 100.0,
+    "index_after": 95.2,
+    "delay_min": 72,
+    "robust_min": 72,
+    "top3": [
+     [
+      "2002",
+      72
+     ]
+    ],
+    "on_segment": [
+     "341"
+    ]
+   },
+   {
+    "sim_s": 3300,
+    "clock": "08:50",
+    "index_before": 100.0,
+    "index_after": 86.1,
+    "delay_min": 50,
+    "robust_min": 86,
+    "top3": [
+     [
+      "2003",
+      32
+     ],
+     [
+      "2002",
+      17
+     ]
+    ],
+    "on_segment": [
+     "341"
+    ]
+   },
+   {
+    "sim_s": 3600,
+    "clock": "08:55",
+    "index_before": 99.9,
+    "index_after": 96.4,
+    "delay_min": 72,
+    "robust_min": 72,
+    "top3": [
+     [
+      "2002",
+      72
+     ]
+    ],
+    "on_segment": [
+     "341"
+    ]
+   },
+   {
+    "sim_s": 3900,
+    "clock": "09:00",
+    "index_before": 100.0,
+    "index_after": 82.8,
+    "delay_min": 93,
+    "robust_min": 130,
+    "top3": [
+     [
+      "2002",
+      20
+     ],
+     [
+      "102",
+      18
+     ],
+     [
+      "342",
+      18
+     ]
+    ],
+    "on_segment": [
+     "2002"
+    ]
+   },
+   {
+    "sim_s": 4200,
+    "clock": "09:05",
+    "index_before": 100.0,
+    "index_after": 98.2,
+    "delay_min": 2,
+    "robust_min": 31,
+    "top3": [],
+    "on_segment": [
+     "2002"
+    ]
+   }
+  ]
+ },
+ "speed": {
+  "A1_headless": {
+   "total_ms": {
+    "n": 54,
+    "p50": 310,
+    "p95": 3556,
+    "max": 3723,
+    "mean": 1110.3
+   },
+   "by_strategy_solve_ms": {
+    "balanced": {
+     "n": 54,
+     "p50": 97,
+     "p95": 3504,
+     "max": 3509,
+     "mean": 871.9
+    },
+    "robust": {
+     "n": 54,
+     "p50": 156,
+     "p95": 3504,
+     "max": 3549,
+     "mean": 974.6
+    },
+    "passenger_first": {
+     "n": 46,
+     "p50": 47,
+     "p95": 3506,
+     "max": 3708,
+     "mean": 549.1
+    },
+    "rescue": {
+     "n": 8,
+     "p50": 3502,
+     "p95": 3585,
+     "max": 3585,
+     "mean": 2708.9
+    }
+   },
+   "by_type_total_ms": {
+    "obstacle": {
+     "n": 9,
+     "p50": 894,
+     "p95": 3569,
+     "max": 3569,
+     "mean": 1575.7
+    },
+    "train_failure": {
+     "n": 9,
+     "p50": 3512,
+     "p95": 3599,
+     "max": 3599,
+     "mean": 2677.2
+    },
+    "segment_closed": {
+     "n": 9,
+     "p50": 340,
+     "p95": 1526,
+     "max": 1526,
+     "mean": 471.9
+    },
+    "speed_restriction": {
+     "n": 9,
+     "p50": 53,
+     "p95": 3723,
+     "max": 3723,
+     "mean": 847.8
+    },
+    "train_delay": {
+     "n": 9,
+     "p50": 44,
+     "p95": 3556,
+     "max": 3556,
+     "mean": 966.7
+    },
+    "signal_failure": {
+     "n": 9,
+     "p50": 45,
+     "p95": 717,
+     "max": 717,
+     "mean": 122.7
+    }
+   },
+   "fallbacks": 3,
+   "debounce_ms": 300,
+   "rows": [
+    {
+     "seed": 120,
+     "type": "obstacle",
+     "total_ms": 3569,
+     "per_strategy": {
+      "balanced": 1157,
+      "robust": 3503,
+      "passenger_first": 1923
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 121,
+     "type": "train_failure",
+     "total_ms": 3599,
+     "per_strategy": {
+      "balanced": 3509,
+      "robust": 3549,
+      "rescue": 3585
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 122,
+     "type": "segment_closed",
+     "total_ms": 538,
+     "per_strategy": {
+      "balanced": 194,
+      "robust": 529,
+      "passenger_first": 366
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 123,
+     "type": "speed_restriction",
+     "total_ms": 3523,
+     "per_strategy": {
+      "balanced": 3504,
+      "robust": 3503,
+      "passenger_first": 3506
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 124,
+     "type": "train_delay",
+     "total_ms": 22,
+     "per_strategy": {
+      "balanced": 15,
+      "robust": 17,
+      "passenger_first": 16
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 125,
+     "type": "signal_failure",
+     "total_ms": 6,
+     "per_strategy": {
+      "balanced": 0,
+      "robust": 0,
+      "passenger_first": 0
+     },
+     "solver": {
+      "balanced": "fallback",
+      "robust": "fallback",
+      "passenger_first": "fallback"
+     }
+    },
+    {
+     "seed": 126,
+     "type": "obstacle",
+     "total_ms": 491,
+     "per_strategy": {
+      "balanced": 237,
+      "robust": 481,
+      "passenger_first": 231
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 127,
+     "type": "train_failure",
+     "total_ms": 3525,
+     "per_strategy": {
+      "balanced": 3507,
+      "robust": 3503,
+      "rescue": 3504
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 128,
+     "type": "segment_closed",
+     "total_ms": 22,
+     "per_strategy": {
+      "balanced": 15,
+      "robust": 15,
+      "passenger_first": 16
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 129,
+     "type": "speed_restriction",
+     "total_ms": 39,
+     "per_strategy": {
+      "balanced": 22,
+      "robust": 25,
+      "passenger_first": 23
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 130,
+     "type": "train_delay",
+     "total_ms": 1401,
+     "per_strategy": {
+      "balanced": 1391,
+      "robust": 335,
+      "passenger_first": 264
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 131,
+     "type": "signal_failure",
+     "total_ms": 33,
+     "per_strategy": {
+      "balanced": 26,
+      "robust": 26,
+      "passenger_first": 25
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 132,
+     "type": "obstacle",
+     "total_ms": 523,
+     "per_strategy": {
+      "balanced": 38,
+      "robust": 43,
+      "passenger_first": 513
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 133,
+     "type": "train_failure",
+     "total_ms": 3512,
+     "per_strategy": {
+      "balanced": 3427,
+      "robust": 2670,
+      "rescue": 3502
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 134,
+     "type": "segment_closed",
+     "total_ms": 373,
+     "per_strategy": {
+      "balanced": 69,
+      "robust": 365,
+      "passenger_first": 79
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 135,
+     "type": "speed_restriction",
+     "total_ms": 65,
+     "per_strategy": {
+      "balanced": 29,
+      "robust": 37,
+      "passenger_first": 46
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 136,
+     "type": "train_delay",
+     "total_ms": 31,
+     "per_strategy": {
+      "balanced": 25,
+      "robust": 24,
+      "passenger_first": 24
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 137,
+     "type": "signal_failure",
+     "total_ms": 45,
+     "per_strategy": {
+      "balanced": 34,
+      "robust": 34,
+      "passenger_first": 37
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 138,
+     "type": "obstacle",
+     "total_ms": 1326,
+     "per_strategy": {
+      "balanced": 1155,
+      "robust": 1315,
+      "passenger_first": 344
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 139,
+     "type": "train_failure",
+     "total_ms": 3536,
+     "per_strategy": {
+      "balanced": 3503,
+      "robust": 3504,
+      "rescue": 3502
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 140,
+     "type": "segment_closed",
+     "total_ms": 163,
+     "per_strategy": {
+      "balanced": 110,
+      "robust": 156,
+      "passenger_first": 77
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 141,
+     "type": "speed_restriction",
+     "total_ms": 53,
+     "per_strategy": {
+      "balanced": 34,
+      "robust": 30,
+      "passenger_first": 30
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 142,
+     "type": "train_delay",
+     "total_ms": 32,
+     "per_strategy": {
+      "balanced": 25,
+      "robust": 22,
+      "passenger_first": 25
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 143,
+     "type": "signal_failure",
+     "total_ms": 24,
+     "per_strategy": {
+      "balanced": 18,
+      "robust": 19,
+      "passenger_first": 18
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 144,
+     "type": "obstacle",
+     "total_ms": 894,
+     "per_strategy": {
+      "balanced": 404,
+      "robust": 883,
+      "passenger_first": 841
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 145,
+     "type": "train_failure",
+     "total_ms": 1746,
+     "per_strategy": {
+      "balanced": 584,
+      "robust": 887,
+      "rescue": 1738
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 146,
+     "type": "segment_closed",
+     "total_ms": 1526,
+     "per_strategy": {
+      "balanced": 1513,
+      "robust": 811,
+      "passenger_first": 92
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 147,
+     "type": "speed_restriction",
+     "total_ms": 117,
+     "per_strategy": {
+      "balanced": 97,
+      "robust": 81,
+      "passenger_first": 92
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 148,
+     "type": "train_delay",
+     "total_ms": 50,
+     "per_strategy": {
+      "balanced": 43,
+      "robust": 41,
+      "passenger_first": 29
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 149,
+     "type": "signal_failure",
+     "total_ms": 46,
+     "per_strategy": {
+      "balanced": 35,
+      "robust": 38,
+      "passenger_first": 38
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 150,
+     "type": "obstacle",
+     "total_ms": 34,
+     "per_strategy": {
+      "balanced": 28,
+      "robust": 24,
+      "passenger_first": 24
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 151,
+     "type": "train_failure",
+     "total_ms": 1124,
+     "per_strategy": {
+      "balanced": 1115,
+      "robust": 61,
+      "rescue": 59
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 152,
+     "type": "segment_closed",
+     "total_ms": 340,
+     "per_strategy": {
+      "balanced": 48,
+      "robust": 333,
+      "passenger_first": 43
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 153,
+     "type": "speed_restriction",
+     "total_ms": 24,
+     "per_strategy": {
+      "balanced": 15,
+      "robust": 13,
+      "passenger_first": 15
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 154,
+     "type": "train_delay",
+     "total_ms": 3556,
+     "per_strategy": {
+      "balanced": 3509,
+      "robust": 3504,
+      "passenger_first": 3532
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 155,
+     "type": "signal_failure",
+     "total_ms": 62,
+     "per_strategy": {
+      "balanced": 49,
+      "robust": 54,
+      "passenger_first": 47
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 156,
+     "type": "obstacle",
+     "total_ms": 306,
+     "per_strategy": {
+      "balanced": 297,
+      "robust": 234,
+      "passenger_first": 112
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 157,
+     "type": "train_failure",
+     "total_ms": 1249,
+     "per_strategy": {
+      "balanced": 948,
+      "robust": 295,
+      "passenger_first": 1239
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 158,
+     "type": "segment_closed",
+     "total_ms": 29,
+     "per_strategy": {
+      "balanced": 23,
+      "robust": 22,
+      "passenger_first": 23
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 159,
+     "type": "speed_restriction",
+     "total_ms": 44,
+     "per_strategy": {
+      "balanced": 28,
+      "robust": 24,
+      "passenger_first": 22
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 160,
+     "type": "train_delay",
+     "total_ms": 44,
+     "per_strategy": {
+      "balanced": 34,
+      "robust": 36,
+      "passenger_first": 33
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 161,
+     "type": "signal_failure",
+     "total_ms": 41,
+     "per_strategy": {
+      "balanced": 34,
+      "robust": 29,
+      "passenger_first": 28
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 162,
+     "type": "obstacle",
+     "total_ms": 3525,
+     "per_strategy": {
+      "balanced": 3503,
+      "robust": 3508,
+      "passenger_first": 3502
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 163,
+     "type": "train_failure",
+     "total_ms": 2285,
+     "per_strategy": {
+      "balanced": 200,
+      "robust": 1909,
+      "rescue": 2277
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 164,
+     "type": "segment_closed",
+     "total_ms": 310,
+     "per_strategy": {
+      "balanced": 51,
+      "robust": 301,
+      "passenger_first": 48
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 165,
+     "type": "speed_restriction",
+     "total_ms": 3723,
+     "per_strategy": {
+      "balanced": 3504,
+      "robust": 3503,
+      "passenger_first": 3708
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 166,
+     "type": "train_delay",
+     "total_ms": 3520,
+     "per_strategy": {
+      "balanced": 1348,
+      "robust": 3510,
+      "passenger_first": 668
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 167,
+     "type": "signal_failure",
+     "total_ms": 130,
+     "per_strategy": {
+      "balanced": 122,
+      "robust": 110,
+      "passenger_first": 99
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 168,
+     "type": "obstacle",
+     "total_ms": 3513,
+     "per_strategy": {
+      "balanced": 3501,
+      "robust": 3502,
+      "passenger_first": 2288
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 169,
+     "type": "train_failure",
+     "total_ms": 3519,
+     "per_strategy": {
+      "balanced": 3503,
+      "robust": 3502,
+      "rescue": 3504
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "rescue": "cpsat"
+     }
+    },
+    {
+     "seed": 170,
+     "type": "segment_closed",
+     "total_ms": 946,
+     "per_strategy": {
+      "balanced": 155,
+      "robust": 937,
+      "passenger_first": 646
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 171,
+     "type": "speed_restriction",
+     "total_ms": 42,
+     "per_strategy": {
+      "balanced": 28,
+      "robust": 27,
+      "passenger_first": 28
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 172,
+     "type": "train_delay",
+     "total_ms": 44,
+     "per_strategy": {
+      "balanced": 33,
+      "robust": 37,
+      "passenger_first": 34
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    },
+    {
+     "seed": 173,
+     "type": "signal_failure",
+     "total_ms": 717,
+     "per_strategy": {
+      "balanced": 287,
+      "robust": 707,
+      "passenger_first": 463
+     },
+     "solver": {
+      "balanced": "cpsat",
+      "robust": "cpsat",
+      "passenger_first": "cpsat"
+     }
+    }
+   ]
+  },
+  "A1_live": {
+   "event_to_ws_ms": {
+    "n": 12,
+    "p50": 810,
+    "p95": 3832,
+    "max": 3926,
+    "mean": 1353.8
+   },
+   "rows": [
+    {
+     "type": "obstacle",
+     "ms": 3926,
+     "solve_ms": 3621
+    },
+    {
+     "type": "segment_closed",
+     "ms": 1144,
+     "solve_ms": 839
+    },
+    {
+     "type": "speed_restriction",
+     "ms": 1592,
+     "solve_ms": 1286
+    },
+    {
+     "type": "train_failure",
+     "ms": 3832,
+     "solve_ms": 3526
+    },
+    {
+     "type": "train_delay",
+     "ms": 2009,
+     "solve_ms": 1705
+    },
+    {
+     "type": "signal_failure",
+     "ms": 534,
+     "solve_ms": 229
+    },
+    {
+     "type": "obstacle",
+     "ms": 369,
+     "solve_ms": 66
+    },
+    {
+     "type": "segment_closed",
+     "ms": 773,
+     "solve_ms": 468
+    },
+    {
+     "type": "speed_restriction",
+     "ms": 810,
+     "solve_ms": 506
+    },
+    {
+     "type": "train_failure",
+     "ms": 330,
+     "solve_ms": 23
+    },
+    {
+     "type": "train_delay",
+     "ms": 431,
+     "solve_ms": 127
+    },
+    {
+     "type": "signal_failure",
+     "ms": 495,
+     "solve_ms": 185
+    }
+   ]
+  },
+  "A3_ws": {
+   "clients": 5,
+   "seconds": 60,
+   "field_state_delivery_ms": {
+    "n": 615,
+    "p50": 1.9,
+    "p95": 2.5,
+    "max": 5.6,
+    "mean": 1.9
+   },
+   "note": "receive time on the client minus ts_wall set when field.state was published (includes bus, API, WebSocket send and the client's event loop) — an upper bound of the server-side part"
+  },
+  "A2_manual": {
+   "bounds_ms": {
+    "n": 30,
+    "p50": 0.9,
+    "p95": 1.0,
+    "max": 1.6,
+    "mean": 0.9
+   },
+   "preview_ms": {
+    "n": 30,
+    "p50": 1.7,
+    "p95": 3.1,
+    "max": 3.1,
+    "mean": 1.9
+   },
+   "preview_server_compute_ms": {
+    "n": 30,
+    "p50": 1,
+    "p95": 2,
+    "max": 2,
+    "mean": 1.2
+   },
+   "commit_ms": {
+    "n": 10,
+    "p50": 49.0,
+    "p95": 3491.2,
+    "max": 3491.2,
+    "mean": 601.4
+   },
+   "note": "client-side wall time over HTTP on localhost"
+  },
+  "A4_mass": {
+   "incidents_created": 8,
+   "run_status": 200,
+   "last_incident_to_variants_with_all_8_ms": 3838,
+   "planner_solve_ms_during_burst": {
+    "n": 6,
+    "p50": 3534,
+    "p95": 3596,
+    "max": 3596,
+    "mean": 3330.5
+   },
+   "ws_delivery_during_burst_ms": {
+    "n": 710,
+    "p50": 2.2,
+    "p95": 4.0,
+    "max": 16.7,
+    "mean": 2.4
+   },
+   "safety_violations": 0,
+   "note": "while variants wait for a decision the line runs at ×1 (decision hold), so 8 incidents spread over 2 simulated minutes take about 2 real minutes"
+  }
+ },
+ "reliability": {
+  "runs": 120,
+  "seeds": "120–239",
+  "sim_hours": 1020.0,
+  "incidents": 389,
+  "mass_runs": 17,
+  "safety_violations": 0,
+  "hangs": 0,
+  "failed_runs": 0,
+  "failures": [],
+  "guard_releases": 2,
+  "guard_replans": 2,
+  "solves": 3042,
+  "fallbacks": 65,
+  "pins_set": 378,
+  "pin_violations_in_solves": 190,
+  "max_solve_ms": 19124
+ }
+}

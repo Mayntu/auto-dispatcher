@@ -99,12 +99,12 @@ check(run.status_code == 200, f"run mass_incidents → {run.status_code}")
 check(c.post("/api/scenarios/nope/run").status_code == 404, "unknown scenario → 404")
 t0 = time.time()
 n = 0
-while time.time() - t0 < 20:
-    n = len(c.get("/api/incidents").json())
-    if n >= 6:
-        break
+# 8 incidents over 2 simulated minutes; while cards wait for a decision the line runs at ×1 — up to ~2.5 real minutes
+seen: set[str] = set()
+while time.time() - t0 < 180 and len(seen) < 8:
+    seen |= {i["id"] for i in c.get("/api/incidents").json()}
     time.sleep(1)
-check(n >= 6, f"mass_incidents created {n} incidents")
+check(len(seen) == 8, f"mass_incidents created {len(seen)} incidents")
 time.sleep(6)
 check(any(v["status"] == "proposed" for v in c.get("/api/variants").json()), "variants for mass incidents")
 

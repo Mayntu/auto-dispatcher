@@ -35,8 +35,17 @@ def start(scenario: dict, now: float) -> ScenarioRun:
 
 
 def pick_train(sim, how: str) -> str | None:
-    """A train on the line (freight first) or standing at a station, for scenario steps that need one."""
-    want = "segment" if how == "auto" else "station"
-    cands = [t for t in sim.trains.values() if t.loc == want and (want == "segment" or t.idx < len(t.route) - 1)]
-    cands.sort(key=lambda t: (t.train.category != "freight", t.train.id))
-    return cands[0].train.id if cands else None
+    """A train for scenario steps that need one: `auto` — on the line (freight first), `auto_station` — standing at
+    a station. If there is none of the wanted kind, the other kind, then the next train to depart: a scenario step is
+    never skipped just because of where the trains happen to be."""
+    def live(loc: str) -> list:
+        ts = [t for t in sim.trains.values() if t.loc == loc and (loc != "station" or t.idx < len(t.route) - 1)]
+        return sorted(ts, key=lambda t: (t.train.category != "freight", t.train.id))
+
+    order = ["segment", "station"] if how == "auto" else ["station", "segment"]
+    for loc in order:
+        if live(loc):
+            return live(loc)[0].train.id
+    waiting = sorted((t for t in sim.trains.values() if t.loc == "none" and t.train.stops[0].dep is not None),
+                     key=lambda t: t.train.stops[0].dep)
+    return waiting[0].train.id if waiting and how == "auto_station" else None
