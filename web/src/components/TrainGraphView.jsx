@@ -309,7 +309,10 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
               const all = pts(plan, t.id);
               const p = poly(all);
               const fact = factPts(t.id);
-              const future = splitAtNow(all)[1];
+              let future = splitAtNow(all)[1];
+              // План сервера начинается со следующей станции — тянем пунктир от того места, где поезд сейчас.
+              const here = fact[fact.length - 1];
+              if (layers.fact && here && future.length && here[0] >= xNow - 2 && future[0][0] > here[0] + 0.5) future = [here, ...future];
               const dim = dimFor && dimFor !== t.id;
               return (
                 <g
