@@ -356,6 +356,32 @@ export function TrainGraphView({ s, selected, onSelect, preview, open = true, on
               );
             })}
 
+            {/* Поезда без плана сервера: дальше горизонта планирования плана для них ещё нет — ведём по расписанию,
+                тем же пунктиром плана, но бледнее. Когда поезд войдёт в горизонт, линию заменит план. */}
+            {s.trains.filter((tr) => !shown || shown.has(tr.id) || tr.id === selected).map((t) => {
+              if (t.cancelled || plan.trains[t.id] || !s.baseline.trains[t.id]) return null;
+              // Доехавший поезд сервер из плана убирает — его фактическая линия всё равно остаётся на графике.
+              const future = splitAtNow(pts(s.baseline, t.id))[1];
+              const fact = factPts(t.id);
+              if (future.length < 2 && fact.length < 2) return null;
+              return (
+                <g key={t.id} data-train={t.id} className="gv-train" onClick={() => onSelect(t.id)}>
+                  {layers.fact && fact.length > 1 && <polyline points={poly(fact)} stroke={CATEGORIES[t.category].color} className="gv-line" />}
+                  {future.length > 1 && <polyline points={poly(future)} className="gv-hit" />}
+                  {future.length > 1 && <polyline points={poly(future)} stroke={CATEGORIES[t.category].color} className="gv-line plan beyond" />}
+                </g>
+              );
+            })}
+
+            {plan.horizonEnd !== undefined && x(plan.horizonEnd) < w - R && (
+              <g className="gv-horizon">
+                <line x1={x(plan.horizonEnd)} x2={x(plan.horizonEnd)} y1={T} y2={h - B} />
+                <text x={x(plan.horizonEnd) + 6} y={h - B - 6}>
+                  {t('горизонт плана')}
+                </text>
+              </g>
+            )}
+
             {/* выбранный вариант — только для поездов, у которых он что-то меняет */}
             {preview &&
               layers.ghost &&

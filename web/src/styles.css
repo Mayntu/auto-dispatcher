@@ -803,3 +803,8 @@ button.dz-row:hover { background: rgba(255, 255, 255, .7); }
 .ab-dir.turnable:hover .ab-dir-hit { fill: rgba(0, 0, 0, .08); }
 .ab-dir.manual line, .ab-dir.manual path { stroke: var(--accent); fill: var(--accent); }
 .ab-dir.changing { opacity: .45; }
+
+/* поезда за горизонтом планирования сервера и сама граница */
+.gv-line.plan.beyond { opacity: .5; }
+.gv-horizon line { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 2 4; }
+.gv-horizon text { fill: var(--muted); font-size: 11.5px; font-weight: 600; }
