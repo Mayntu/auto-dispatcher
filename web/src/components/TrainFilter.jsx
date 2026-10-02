@@ -3,7 +3,8 @@
  * Пустой выбор (null) — показываются все поезда.
  */
 import { Search, TrainFront } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useDismiss } from './ui';
 import { CATEGORIES, SECTION } from '../core/section';
 import { fmtHM } from '../core/time';
 import { t } from '../i18n';
@@ -11,20 +12,8 @@ import { t } from '../i18n';
 export function TrainFilter({ trains, plan, shown, onChange }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const box = useRef(null);
-
-  // Закрывается по клику мимо и по Esc.
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (e) => !box.current?.contains(e.target) && setOpen(false);
-    const onKey = (e) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  // Закрывается по клику мимо (в том числе по карте) и по Esc.
+  const box = useDismiss(open, () => setOpen(false));
 
   const list = useMemo(
     () =>

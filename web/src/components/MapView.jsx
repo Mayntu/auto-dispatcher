@@ -14,7 +14,7 @@ import { isActive, runningPlan } from '../engine/engine';
 import { engine, useSmoothNow } from '../engine/store';
 import { can } from '../engine/roles';
 import { acceptsDrag, currentDragKind, EVENT_BY_KIND, readDragKind } from './EventPalette';
-import { useSize } from './ui';
+import { useDismiss, useSize } from './ui';
 import { makeTrees, TreesLayer } from './MapScenery';
 import { t as tr, useLang } from '../i18n';
 
@@ -244,6 +244,7 @@ export function MapView({ s, snapshot, selected, onSelect, armed, onPlace, allow
   const [is3d, setIs3d] = useState(false);
   const [tilt, setTilt] = useState(0);
   const [stationCard, setStationCard] = useState(null);
+  const legendRef = useDismiss(legend, () => setLegend(false));
   const drag = useRef(null);
   const w = Math.max(360, size.w);
   const h = Math.max(260, size.h);
@@ -689,8 +690,8 @@ export function MapView({ s, snapshot, selected, onSelect, armed, onPlace, allow
       {stationCard !== null && <StationCard i={stationCard} s={s} plan={plan} t={t} at={geo.S[stationCard]} w={w} onClose={() => setStationCard(null)} />}
 
       <div className="zoom" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="legend-wrap" onMouseEnter={() => setLegend(true)} onMouseLeave={() => setLegend(false)}>
-          <button title={tr('Обозначения на карте')} className={legend ? 'on' : ''} onClick={() => setLegend((v) => !v)}>
+        <div className="legend-wrap" ref={legendRef} onMouseEnter={() => setLegend(true)} onMouseLeave={() => setLegend(false)}>
+          <button title={tr('Обозначения на карте')} className={legend ? 'on' : ''} onClick={() => setLegend(true)}>
             <Info size={18} />
           </button>
           {legend && (
@@ -1048,8 +1049,9 @@ function StationCard({ i, s, plan, t, at, w, onClose }) {
   const positions = currentPositions(SECTION, s, plan, t).filter((p) => p.station === i);
   const tracks = st.trackInfo ?? Array.from({ length: st.tracks }, (_, k) => ({ id: String(k + 1), main: k === 0 }));
   const left = Math.min(Math.max(8, at.x + 24), w - 300);
+  const ref = useDismiss(true, onClose, '.station-oval');
   return (
-    <div className="station-card" style={{ left, top: Math.max(8, at.y - 40) }} onPointerDown={(e) => e.stopPropagation()}>
+    <div ref={ref} className="station-card" style={{ left, top: Math.max(8, at.y - 40) }} onPointerDown={(e) => e.stopPropagation()}>
       <div className="sc-head">
         <b>{tr(st.name)}</b>
         <span className="muted small">{tr('км {km}', { km: st.km })}</span>

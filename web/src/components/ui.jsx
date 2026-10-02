@@ -1,5 +1,31 @@
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LANGS, setLang, useLang } from '../i18n';
+/**
+ * Всплывающее окно закрывается нажатием мимо него и клавишей Esc. Слушаем на погружении: элементы карты
+ * гасят pointerdown, чтобы не двигать карту, и до обычного обработчика на window нажатие не доходит.
+ * keep — селектор элементов, которые сами открывают и закрывают окно (повторное нажатие на станцию).
+ */
+export function useDismiss(open, onClose, keep) {
+  const ref = useRef(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (ref.current?.contains(e.target) || (keep && e.target.closest?.(keep))) return;
+      close.current();
+    };
+    const onKey = (e) => e.key === 'Escape' && close.current();
+    window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, keep]);
+  return ref;
+}
+
 /**
  * Размер элемента. Ref-функция подхватывает элемент, даже если он появился позже первого рендера
  * (например, в развёрнутой панели); ref.current — сам элемент.

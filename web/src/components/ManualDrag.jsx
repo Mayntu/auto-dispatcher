@@ -6,6 +6,7 @@
  */
 import { Lock, LockOpen, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDismiss } from './ui';
 import { CATEGORIES, SECTION } from '../core/section';
 import { fmtHM } from '../core/time';
 import { shownIndex } from '../engine/engine';
@@ -57,6 +58,7 @@ export function useManualDrag({ s, plan, geo, svgRef, canEdit, focus, onHandleEn
   const [popup, setPopup] = useState(null);
   const [ghost, setGhost] = useState(null);
   const [lockOpen, setLockOpen] = useState(null);
+  const lockRef = useDismiss(!!lockOpen, () => setLockOpen(null), '.md-lock');
   const dragRef = useRef(null);
   dragRef.current = drag;
   const previewTimer = useRef(null);
@@ -416,7 +418,7 @@ export function useManualDrag({ s, plan, geo, svgRef, canEdit, focus, onHandleEn
 
   const lock = lockOpen && (s.pins ?? []).find((p) => p.id === lockOpen.id);
   const lockEl = lock && (
-    <div className="md-lockcard" style={{ left: Math.min(lockOpen.x + 12, w - 280), top: Math.max(4, lockOpen.y - 8) }} onPointerDown={(e) => e.stopPropagation()}>
+    <div ref={lockRef} className="md-lockcard" style={{ left: Math.min(lockOpen.x + 12, w - 280), top: Math.max(4, lockOpen.y - 8) }} onPointerDown={(e) => e.stopPropagation()}>
       <div className="md-lockcard-head">
         <Lock size={14} /> <b>{t('Указание диспетчера')}</b>
         <button className="icon-btn" onClick={() => setLockOpen(null)}>
