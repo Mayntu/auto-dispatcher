@@ -46,6 +46,8 @@ export const api = {
   replan: () => call('POST', '/plan/replan'),
   /** What-if считается синхронно (≤ 3 с), ответ — WhatIfResult. */
   whatif: (modifications) => call('POST', '/whatif', { modifications }),
+  /** «Перенести в работу»: результат what-if становится вариантом на решение диспетчера (придёт в planner.variants). */
+  promoteWhatIf: (requestId) => call('POST', `/whatif/${encodeURIComponent(requestId)}/promote`),
   /** SpeedProfile на текущий/ближайший перегон → список (карточка поезда умеет рисовать несколько). */
   async ato(trainId) {
     const r = await call('GET', `/ato/${encodeURIComponent(trainId)}`);

@@ -69,7 +69,10 @@ export function planFromSpec(plan, trains) {
   if (!plan) return null;
   const idx = stIdx();
   const byTrain = new Map();
+  // Поезд в пути: план начинается с перегона, по которому он едет, — первая станция для него прибытие, а не отправление.
+  const firstRun = new Map();
   for (const e of plan.entries) {
+    if (e.kind === 'run' && !(firstRun.get(e.train_id) <= e.start)) firstRun.set(e.train_id, e.start);
     if (e.kind !== 'dwell') continue;
     if (!byTrain.has(e.train_id)) byTrain.set(e.train_id, []);
     byTrain.get(e.train_id).push(e);
@@ -79,6 +82,7 @@ export function planFromSpec(plan, trains) {
   for (const [id, dwells] of byTrain) {
     dwells.sort((a, b) => a.start - b.start);
     const t = trainById.get(id);
+    const enRoute = firstRun.get(id) !== undefined && firstRun.get(id) < dwells[0].start;
     out[id] = {
       trainId: id,
       stops: dwells.map((d, i) => {
@@ -88,7 +92,7 @@ export function planFromSpec(plan, trains) {
         const last = i === dwells.length - 1;
         return {
           station,
-          arr: toUi(first ? d.end : d.start),
+          arr: toUi(first && !enRoute ? d.end : d.start),
           dep: toUi(last ? d.start : d.end),
           track: Math.max(0, st?.trackIds?.indexOf(d.track_id) ?? 0),
           planned: first || last || !!t?.stops.includes(station),
@@ -106,6 +110,8 @@ export function planFromSpec(plan, trains) {
     solveMs: plan.solve_ms,
     order,
     trains: out,
+    // Сервер планирует только поезда, отправляющиеся в пределах горизонта (planner.horizon_s, 2 ч).
+    horizonEnd: plan.horizon_end != null ? toUi(plan.horizon_end) : undefined,
     meetings: (plan.meetings ?? []).map((m) => ({ ...m, station: idx.get(m.station_id), time: toUi(m.time) })),
     kpi: plan.kpi,
   };
