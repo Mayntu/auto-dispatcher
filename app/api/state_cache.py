@@ -29,6 +29,11 @@ class StateCache:
 
     async def on_event(self, env: Envelope) -> None:
         t = env.type
+        if t == "sim.reset":  # a new run from SIM_EPOCH: nothing of the old one stays on screen
+            self.plan, self.variants, self.index = None, None, None
+            self.fact, self.journal, self.conflicts, self.index_minutes = {}, [], [], []
+            self.frames.clear()
+            return
         if t == "field.state":
             self.field = env.payload
             self._track(env.payload)

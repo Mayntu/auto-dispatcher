@@ -291,7 +291,7 @@ class JournalEntry(BaseModel):
                   "variant_rejected", "variants_stale", "return_offered", "no_decision_needed",
                   "decisions_archived", "plan_broken", "decision_hold", "guard_replan", "signal_stop",
                   "pin_set", "pin_removed", "pin_violated", "pin_done", "incident_updated",
-                  "settings_updated", "scenario_started"]
+                  "settings_updated", "scenario_started", "sim_reset"]
     text: str
     incident_ids: list[str] = []
     variant_id: str | None = None

@@ -736,6 +736,8 @@ class FieldService:
         self.decision_hold = False  # set by the planner while variants await a decision
         self.scenarios: dict = {}  # running scenarios: run id -> ScenarioRun
         self.paused = False
+        # the timetable runs out (48 h): once its last train has arrived, the simulation starts again by itself
+        self.timetable_end = max(t.stops[-1].arr for t in sim.world.timetable) + 1800
         self._task: asyncio.Task | None = None
 
     @property
@@ -791,6 +793,8 @@ class FieldService:
                 for topic, payload in self.sim.step(self.tick_s * self.effective_speed):
                     await self.bus.publish(topic, payload, source="field", sim_time=self.sim.now)
                 await self._run_scenarios()
+                if self.sim.now >= self.timetable_end:
+                    await self.reset("timetable_end")
             await self._publish_state()
             await asyncio.sleep(max(0.0, nxt - time.monotonic()))
 
@@ -800,8 +804,22 @@ class FieldService:
                      effective_speed=0.0 if self.paused else self.effective_speed)
         await self.bus.publish("field.state", state, source="field", sim_time=self.sim.now)
 
+    async def reset(self, reason: str) -> None:
+        """Start the simulation again at SIM_EPOCH: a new field, no incidents, no scenarios; the planner and the API
+        start over on `sim.reset`, the screens reload."""
+        old = self.sim
+        self.sim = FieldSim(old.world, old.rts, old.settings)
+        self.scenarios.clear()
+        self.decision_hold = False
+        log.warning("simulation reset (%s) at %.0f s", reason, old.now)
+        await self.bus.publish("sim.reset", {"reason": reason, "previous_sim_time": old.now}, source="field", sim_time=0.0)
+        await self._publish_state()
+
     async def _on_plan(self, env: Envelope) -> None:
-        self.sim.set_plan(Plan.model_validate(env.payload))
+        plan = Plan.model_validate(env.payload)
+        if plan.created_at > self.sim.now + 600:
+            return  # a plan for the simulation before a reset, still on its way
+        self.sim.set_plan(plan)
 
     async def _on_cmd(self, env: Envelope) -> None:
         cmd = env.type.rsplit(".", 1)[-1]
@@ -834,6 +852,8 @@ class FieldService:
             elif cmd == "set_direction":
                 self.sim.set_direction(p["segment_id"], Direction(p["direction"]))
                 result["directions"] = self.sim.ab.snapshot()["directions"]
+            elif cmd == "reset":
+                await self.reset("dispatcher")
             elif cmd == "clock":
                 if p.get("paused") is not None:
                     self.paused = bool(p["paused"])

@@ -175,7 +175,7 @@ class ClockRequest(BaseModel):
 
 async def subscribe_api(bus: EventBus, cache: StateCache, ws: WSManager, req: Requester) -> None:
     for topic in ("field.state", "plan.approved", "plan.refreshed", "planner.variants", "kpi.index", "journal.entry",
-                  "planner.conflicts"):
+                  "planner.conflicts", "sim.reset"):
         await bus.subscribe(topic, cache.on_event)
     await bus.subscribe("#", ws.on_event)
     for topic in REPLY_TOPICS:
@@ -237,6 +237,13 @@ def create_app(bus: EventBus, world: World, settings: dict,
         if not res["ok"]:
             raise HTTPException(422, res.get("reason"))
         return res["incident"]
+
+    @app.post("/api/sim/reset", summary="Начать симуляцию заново с 07:55 (поезда по графику, без сбоев и указаний)")
+    async def sim_reset() -> dict:
+        res = await req.request("cmd.field.reset", {})
+        if not res["ok"]:
+            raise HTTPException(500, res.get("reason"))
+        return {"ok": True}
 
     @app.post("/api/dc/direction", summary="Сменить направление на перегоне (только свободный перегон)")
     async def set_direction(body: DirectionRequest) -> dict:

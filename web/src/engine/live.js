@@ -186,6 +186,11 @@ export function startLive(engine) {
         engine.toast(m('Указание по {n} невыполнимо: {r}', { n: pin.trainId, r: p.reason ?? '' }), 'crit', { pinId: pin.id, trainId: pin.trainId });
         return;
       }
+      case 'sim.reset':
+        // новый прогон с 07:55 (кнопка инструктора или график закончился): старые нитки, карточки и журнал
+        // к нему не относятся — проще всего начать экран с чистого снимка сервера
+        window.location.reload();
+        return;
       case 'safety.violation':
         engine.log('crit', m('Нарушение безопасности: {d}', { d: typeof p === 'string' ? p : JSON.stringify(p) }), 'Безопасность');
         return;
@@ -269,6 +274,10 @@ export function startLive(engine) {
     },
     async resolve(id) {
       if (engine.allowed('scenario', 'отметка об устранении')) ok(await api.resolveIncident(id), 'отметка об устранении');
+    },
+    async reset() {
+      // сервер начинает симуляцию заново и рассылает sim.reset — по нему все экраны перезагружаются
+      if (engine.allowed('scenario', 'сброс участка')) ok(await api.resetSim(), 'сброс участка');
     },
     async setRunning(running) {
       if (engine.allowed('scenario', 'управление временем')) ok(await api.clock({ paused: !running }), 'управление временем');

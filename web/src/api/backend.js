@@ -54,6 +54,8 @@ export const api = {
     return r.ok && r.data ? (Array.isArray(r.data) ? r.data : [r.data]) : [];
   },
   clock: (body) => call('POST', '/sim/clock', body),
+  /** Начать симуляцию заново с 07:55: новый план, без сбоев и указаний; всем экранам придёт sim.reset. */
+  resetSim: () => call('POST', '/sim/reset'),
   /** {type: obstacle|train_failure|segment_closed, segment_id?, train_id?, km?, est_min_min, est_max_min, description?} */
   createIncident: (body) => call('POST', '/incidents', body),
   resolveIncident: (id) => call('POST', `/incidents/${encodeURIComponent(id)}/resolve`),

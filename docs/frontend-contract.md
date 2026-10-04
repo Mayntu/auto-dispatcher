@@ -132,3 +132,10 @@
 | GET | `/api/reports?from&to&format=csv` | CSV-файл; `format=pdf` → 422 (в прототипе только CSV) |
 
 WS теперь пересылает `incident.updated`, `planner.pin_violated`, `planner.conflicts`, `settings.updated`.
+
+## Сброс симуляции
+
+`POST /api/sim/reset` — начать заново с 07:55 (план v1, без сбоев и указаний). Всем WS-клиентам приходит
+`sim.reset {reason: "dispatcher" | "timetable_end", previous_sim_time}` — старые нитки, карточки и журнал к новому
+прогону не относятся: экран надо очистить (в `web/` — перезагрузка страницы). Тот же `sim.reset` приходит, когда
+48-часовой график закончился и симуляция перезапустилась сама.

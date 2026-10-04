@@ -61,6 +61,7 @@ class PlannerService:
         self.pins: dict[str, Pin] = {}  # the dispatcher's instructions (tasks/02)
         self._pending_pins: dict[str, Pin] = {}  # manual variant id -> the instruction it would set
         self.conflicts: list[dict] = []  # CDR forecast (§12.7)
+        self.epoch = 0  # incremented on every simulation reset: results computed before it are dropped
         self._whatifs: dict[str, tuple] = {}  # what-if request id -> (result, plan version it was computed on)
 
     async def start(self) -> None:
@@ -70,6 +71,7 @@ class PlannerService:
         await self.bus.subscribe("field.guard", self._on_guard)
         await self.bus.subscribe("field.train_event", self._on_train_event)
         await self.bus.subscribe("settings.updated", self._on_settings)
+        await self.bus.subscribe("sim.reset", self._on_reset)
         await asyncio.wait_for(self._first_state.wait(), timeout=10)
         t0 = time.perf_counter()
         res = await self.pool.solve(self.snapshot().model_dump(mode="json"), "balanced", self.settings)
@@ -125,6 +127,25 @@ class PlannerService:
             await self._journal("incident_resolved", f"Сбой снят: {inc.description}", incident_ids=[inc.id])
             self._request("incident" if self.incidents else "resolved")
 
+    async def _on_reset(self, env: Envelope) -> None:
+        """The field started again at SIM_EPOCH: forget everything about the old run and build plan v1."""
+        self.epoch += 1
+        if self._gen_task and not self._gen_task.done():
+            self._gen_task.cancel()
+        self._reasons.clear()
+        self.plan, self.forecast, self.version = None, None, 0
+        self.variants, self.incidents, self.pins, self._pending_pins, self._whatifs = {}, {}, {}, {}, {}
+        self.journal, self.conflicts = [], []
+        self._forecast_fails, self._broken_since, self._guard_pending = 0, None, None
+        self._hold = False
+        while self.field is None or self.field["sim_time"] > 600:  # wait for the new field's first state
+            await asyncio.sleep(0.1)
+        res = await self.pool.solve(self.snapshot().model_dump(mode="json"), "balanced", self.settings)
+        await self._approve(Plan.model_validate(res["plan"]), None)
+        why = "график закончился" if env.payload.get("reason") == "timetable_end" else "по команде"
+        await self._journal("sim_reset", f"Симуляция начата заново ({why}): план v{self.version}")
+        await self._publish_variants()
+
     async def _on_settings(self, env: Envelope) -> None:
         """The settings object is shared and already updated: the index and the next solves use it at once."""
         w = env.payload["index"]["weights"]
@@ -148,7 +169,10 @@ class PlannerService:
         executable for a while with no decision): rebuild the plan from the current state automatically.
         Journaled and counted — this is a safety net, not a way to plan."""
         snap = self.snapshot()
+        epoch = self.epoch
         res = await self.pool.solve(snap.model_dump(mode="json"), "balanced", self.settings)
+        if epoch != self.epoch:
+            return
         plan = Plan.model_validate(res["plan"])
         plan.strategy = "guard"
         await self._approve(plan, self.version)
@@ -177,6 +201,7 @@ class PlannerService:
     async def _generate(self, reasons: set[str]) -> None:
         if self.plan is None:
             return
+        epoch = self.epoch
         t0 = time.perf_counter()
         snap = self.snapshot()
         forecast = forecast_plan(snap, self.settings) or self.forecast
@@ -188,6 +213,8 @@ class PlannerService:
                                                pick_strategies(snap.incidents, self.settings), kind)
         else:
             variants = await self._after_resolution(snap, forecast, "pin_removed" in reasons)
+        if epoch != self.epoch:
+            return  # the simulation was reset while this was being computed
         self.last_solve_ms = round((time.perf_counter() - t0) * 1000)
         for v in self.variants.values():
             if v.status == "proposed":
@@ -473,13 +500,15 @@ class PlannerService:
         if self.plan is None:
             return await self._reply(env, ok=False, code=409, reason="План ещё не построен")
         snap = self.snapshot()
+        epoch = self.epoch
         try:
             res = await run_whatif(self.pool, self.world, snap, req, self.settings)
         except (ValueError, KeyError) as e:
             await self.bus.publish("planner.whatif.result", {"ok": False, "reason": str(e)},
                                    corr_id=env.corr_id, source="planner")
             return
-        self._whatifs[req.id] = (res, self.version)
+        if epoch == self.epoch:
+            self._whatifs[req.id] = (res, self.version)
         while len(self._whatifs) > 20:
             self._whatifs.pop(next(iter(self._whatifs)))
         await self.bus.publish("planner.whatif.result", {"ok": True, **res.model_dump(mode="json")},
@@ -555,7 +584,10 @@ class PlannerService:
         b = manual_bounds(snap0, self.world, _rts(), self.settings, self.plan, pin.train_id, pin.station_id)
         manual = {"train_id": pin.train_id, "station_id": pin.station_id, "kind": pin.kind,
                   "from_time": b[pin.kind]["current"], "to_time": pin.time}
+        epoch = self.epoch
         res = await self.pool.solve(snap.model_dump(mode="json"), "reoptimize", self.settings)
+        if epoch != self.epoch:
+            raise ManualError(409, "stale_plan", current_version=self.version)
         reopt = Plan.model_validate(res["plan"])
         variants = []
         for strategy, plan in (("keep_order", keep), ("reoptimize", reopt)):
