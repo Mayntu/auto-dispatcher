@@ -348,9 +348,6 @@ export function startLive(engine) {
         engine.toast(m('Указание по {n} снято', { n: pin?.trainId ?? '' }));
       }
     },
-    reset() {
-      unsupported('сброс участка');
-    },
     whatIfOpen() {
       if (!engine.allowed('section', 'what-if моделирование')) return;
       engine.set({ whatIf: { openedAt: st().now, mods: { speed: {}, priority: {}, cancelled: {}, durationMin: {} } } });
